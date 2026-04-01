@@ -133,18 +133,22 @@ data migration from existing Keitaro installations (competitive advantage).
 ### Decision: ClickHouse 24 (clickhouse-go v2 driver)
 
 **Source verification:**
-Keitaro v9 does NOT use ClickHouse. All click storage goes to MySQL via the
-`AddClickCommand` delayed write pattern. This is a known scalability ceiling
-for Keitaro — one of the core reasons to build ZAI TDS.
+Keitaro v9 DOES have ClickHouse support — contrary to our earlier assumption.
+Migration `20180809124704_add_rbooster_config_section.php` adds a `[clickhouse]`
+config section with `ch_host`, `ch_port`, `ch_user`, `ch_password`, `ch_db`.
+Additionally, `application/config/clickhouse/dictionary.xml` defines a ClickHouse
+dictionary backed by MySQL. This indicates Keitaro uses ClickHouse dictionaries
+for reporting/aggregation while MySQL remains the primary write target.
 
-The source shows click storage is the LAST stage of the pipeline:
+However, the hot-path click storage is still MySQL-based. The source shows:
 ```php
 // StoreRawClicksStage.php
-AddClickCommand::saveClick($rawClick);  // queued via Redis, flushed by cron
+AddClickCommand::saveClick($rawClick);  // queued via Redis, flushed by cron to MySQL
 ```
 
-Our architecture: clicks go to **ClickHouse** via the same async pattern
-(buffered Go channels → batch insert). Postgres for no-click data.
+Our architecture improves on this: clicks go to **ClickHouse directly** via async
+buffered Go channels → batch insert. Postgres for config data only, never for clicks.
+This eliminates the MySQL scalability ceiling entirely.
 
 **Research findings:**
 - ClickHouse: purpose-built columnar OLAP. Sub-second aggregation over billions
@@ -228,16 +232,28 @@ Two separate blocking steps: geo lookup + ISP lookup.
 
 ## LAYER 6 — Device Detection
 
-### Decision: mssola/device-detector (Go port)
+### Decision: Device detection library (Go)
 
 **Source verification:**
 `BuildRawClickStage.php` calls device parsing for Browser, OS, DeviceType,
-DeviceModel, DeviceBrand. Keitaro uses a PHP user-agent parser.
+DeviceModel, DeviceBrand. Keitaro uses Matomo's device-detector (PHP).
+Six stream filters depend on these fields: `DeviceType`, `DeviceModel`,
+`Browser`, `BrowserVersion`, `Os`, `OsVersion`.
 
-**Final decision:** `mssola/device-detector` (Go port of Matomo's device-detector).
-- Same UA pattern database as Matomo (well-maintained, production-proven).
-- Alternative: `mileusna/useragent` (simpler, faster, less accurate).
-- Decision: use `mssola/device-detector` for Keitaro parity on device fields.
+**Library correction:** `github.com/mssola/device-detector` does NOT exist.
+The `mssola` Go library is `github.com/mssola/user_agent` — a simpler UA parser
+that extracts browser, OS, and mobile flag but NOT device model/brand.
+
+**Actual options:**
+- `github.com/robicode/device-detector` — Go port of Matomo's device-detector.
+  Full parity with Keitaro's fields. Requires PCRE library dependency.
+- `github.com/mileusna/useragent` — lightweight, no external deps, but
+  missing DeviceModel and DeviceBrand fields.
+- `github.com/mssola/user_agent` — lightweight, misses DeviceModel/Brand.
+
+**Final decision:** Evaluate `robicode/device-detector` first (full Keitaro parity).
+Fallback: `mileusna/useragent` + custom enrichment for device model if PCRE
+dependency is unacceptable for single-binary deployment. Benchmark during Phase 1.
 - Cache parsed UA strings in Valkey (UA string → DeviceInfo, TTL 1 hour).
   Keitaro shows the same UA repeated thousands of times from bot farms.
 

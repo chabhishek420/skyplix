@@ -145,7 +145,7 @@ zai-tds/                     ← Will be the Go module root (go.mod)
 | PHP Subsystem | Purpose | Go Package |
 |---------------|---------|------------|
 | `Traffic/Pipeline/` | 23-stage + 13-stage click pipelines | `internal/pipeline/` |
-| `Traffic/Actions/` | 15 response types (redirect, proxy, iframe, etc.) | `internal/action/` |
+| `Traffic/Actions/` | 19 response types (redirect, proxy, iframe, etc.) | `internal/action/` |
 | `Traffic/RawClick.php` | Click data model (~60 fields) | `internal/model/click.go` |
 | `Traffic/CachedData/` | Valkey entity cache (campaigns, streams, offers) | `internal/cache/` |
 | `Traffic/CommandQueue/` | Async Redis write buffer (RPUSH → batch pop) | `internal/queue/` |
@@ -171,12 +171,16 @@ Triggered when a visitor hits `/{campaign_alias}`.
  1.  DomainRedirect              — Handle domain-level campaign redirects
  2.  CheckPrefetch               — Detect and discard browser prefetch requests
  3.  BuildRawClick               — Extract IP, UA, referrer, sub_ids, costs from request
+                                    ↳ ALSO runs inline bot detection (_checkIfBot + _checkIfProxy)
+                                    ↳ Bot flag feeds IsBot stream filter in stage 9
  4.  FindCampaign                — Lookup campaign from Valkey cache by alias/id
  5.  CheckDefaultCampaign        — Fall back to default campaign if none found
  6.  UpdateRawClick              — Enrich click with geo (GeoIP), device (UA parser)
  7.  CheckParamAliases           — Resolve traffic source parameter aliases
  8.  UpdateCampaignUniqueness    — Check/set unique visitor flag (campaign-level)
- 9.  ChooseStream                — Filter streams, pick matching by position or weight
+ 9.  ChooseStream                — 3-tier selection: FORCED → REGULAR → DEFAULT
+                                    REGULAR uses position OR weight (campaign.type)
+                                    Weight mode + bindVisitors: binds visitor→stream in Valkey
 10.  UpdateStreamUniqueness      — Check/set unique visitor flag (stream-level)
 11.  ChooseLanding               — Rotate landing page (weighted round-robin)
 12.  ChooseOffer                 — Rotate offer (weighted round-robin)
@@ -213,10 +217,12 @@ The `visitor_code` cookie ties Level 1 and Level 2 together.
 13.  StoreRawClicks
 ```
 
-### Action Types (15 response formats)
+### Action Types (19 response formats, from `Traffic/Actions/Predefined/`)
 `HttpRedirect`, `Meta`, `DoubleMeta`, `BlankReferrer`, `Frame`, `Iframe`,
-`Js`, `JsForIframe`, `JsForScript`, `FormSubmit`, `Curl` (reverse proxy),
-`LocalFile`, `ShowHtml`, `ShowText`, `Status404`, `DoNothing`, `ToCampaign`
+`Js`, `JsForIframe`, `JsForScript`, `FormSubmit`, `Curl`,
+`Remote` (reverse proxy — fetches remote URL, critical for cloaking safe pages),
+`LocalFile`, `ShowHtml`, `ShowText`, `Status404`, `DoNothing`,
+`SubId` (sub_id routing), `ToCampaign` (inter-campaign redirect)
 
 ---
 
@@ -283,14 +289,17 @@ The `visitor_code` cookie ties Level 1 and Level 2 together.
 2. Chi router → Traffic handler (not admin)
 3. Level-1 Pipeline runs (23 stages):
    a. Build RawClick from request headers/params
-   b. Lookup Campaign from Valkey cache (NOT Postgres, never on hot path)
-   c. Resolve Geo: MaxMind .mmdb loaded into process memory → sub-ms lookup
-   d. Resolve Device: UA parser (mssola/device-detector)
-   e. Match stream filters → pick winning stream (weighted rotation)
-   f. Rotate landing/offer (weighted round-robin, weights in Valkey)
-   g. Generate click token (crypto/rand)
-   h. Set visitor_code + session cookies
-   i. Build 302 response (most common action type)
+   b. Inline bot detection: IP list check + UA pattern match + proxy detection
+   c. Lookup Campaign from Valkey cache (NOT Postgres, never on hot path)
+   d. Resolve Geo: MaxMind .mmdb loaded into process memory → sub-ms lookup
+   e. Resolve Device: UA parser (robicode/device-detector or mileusna/useragent)
+   f. 3-tier stream selection: FORCED → REGULAR → DEFAULT
+      Stream filters evaluate IsBot flag from step (b)
+   g. Entity binding: if bindVisitors enabled, lock visitor→stream/landing/offer
+   h. Rotate landing/offer (weighted round-robin, weights in Valkey)
+   i. Generate click token (crypto/rand)
+   j. Set visitor_code + session cookies + binding cookies
+   k. Build 302 response (most common action type)
 4. Async: push RawClick to buffered Go channel
 5. Return HTTP 302 + Set-Cookie (done, <5ms)
 6. Background: batch channel → INSERT INTO ClickHouse every 500ms
@@ -313,7 +322,8 @@ The `visitor_code` cookie ties Level 1 and Level 2 together.
 1. HTTP POST /api/v1/campaigns
 2. Auth middleware: validate session token (Valkey lookup)
 3. Controller validates POST body, writes to PostgreSQL
-4. On save: invalidate + warm Valkey cache with updated entity
+4. On save: schedule Valkey cache warmup (WarmupScheduler pattern from Keitaro)
+   NOTE: Keitaro does this async via cron, not inline. Either approach works.
 5. Return JSON 201
 ```
 
@@ -326,13 +336,40 @@ The `visitor_code` cookie ties Level 1 and Level 2 together.
 4. Fire configured network postback URL (fire-and-forget goroutine)
 ```
 
-### Background Workers
+### Background Workers (Critical — 20+ cron tasks in Keitaro)
+
+Keitaro runs a cron system (`cron.php` + `CronTaskRunner`) with channel-based
+task routing. Our Go equivalent: long-running goroutines + ticker-based scheduling.
 
 ```
-1. Click Writer     — buffered channel → batch INSERT ClickHouse (every 500ms)
-2. Session Janitor  — expire old uniqueness sessions from Valkey
-3. GeoIP Updater    — weekly cron: replace .mmdb files + reload into memory
-4. Hit Limit Reset  — daily reset of Valkey click cap counters
+CRITICAL (required for pipeline to function):
+1. Click Writer          — buffered channel → batch INSERT ClickHouse (every 500ms)
+2. DelayedCommand Runner — flushes Redis command queue to DB (Keitaro: ExecuteDelayedCommand)
+3. Cache Warmup          — rebuilds Valkey entity cache when scheduled (WarmupCacheTask)
+4. Cache Flush           — evicts stale entries, prevents Valkey memory overflow
+5. Hit Limit Reset       — daily reset of Valkey click cap counters
+
+IMPORTANT (required for production):
+6. Click Pruner          — ClickHouse data retention (PruneClicks)
+7. Session Janitor       — expire old uniqueness sessions from Valkey
+8. Domain Checker        — validate custom domain DNS (CheckDomains)
+9. SSL Provisioner       — auto-provision Let's Encrypt certs (EnableSSLTask)
+10. Log Cleaner          — rotate/prune application logs
+
+OPTIONAL (Phase 5+):
+11. GeoIP Updater        — weekly: replace .mmdb files + reload
+12. Trigger Runner       — event-based campaign automation (RunTriggersTask)
+13. Stats Refresher      — refresh materialized aggregation views
+```
+
+### Gateway Context
+
+```
+Entry: GET / (bare domain, no campaign alias)
+Keitaro: gateway.php → GatewayRedirectContext → DomainRedirectStage
+Purpose: Route traffic that hits the tracker's domain directly without a
+         campaign alias. Uses domain→campaign mapping from Domains table.
+Go: handled by DomainRedirectStage (pipeline stage 1), not a separate handler.
 ```
 
 ---
@@ -355,15 +392,18 @@ Source: `Admin/AdminApi/AdminApiRouter.php` — AltoRouter
 Base path: `/api/v1/` (renamed from Keitaro's `/admin_api/v1/`)
 **55 controller files → ~110+ REST endpoints.**
 
-Auth: HTTP-only session cookie + `X-Api-Key` header (for programmatic access).
+Auth: HTTP-only session cookie + `X-Api-Key` header (for programmatic access). 
 
 ---
 
 ## Database Schema Notes
 
 **PostgreSQL** (config layer):
-- Tables: campaigns, streams, stream_filters, offers, landings, domains,
+- Tables: campaigns (with `type` field: POSITION/WEIGHT, `bind_visitors` flag),
+  streams, stream_filters, offers, landings, domains,
   affiliate_networks, traffic_sources, users, api_keys, settings, conversions_meta
+- **Association tables**: `stream_landings` (stream_id, landing_id, weight),
+  `stream_offers` (stream_id, offer_id, weight) — join tables with rotation weights
 - JSONB columns for filter rules and stream action configs
 - golang-migrate for schema management (embedded in binary)
 
@@ -371,13 +411,19 @@ Auth: HTTP-only session cookie + `X-Api-Key` header (for programmatic access).
 - `clicks` table: partitioned by `toYYYYMM(created_at)`, ordered by `(campaign_id, created_at)`
 - `conversions` table: join-able to clicks via `click_token`
 - Sub-second aggregation for reporting via materialized views
+- NOTE: Keitaro v9 has ClickHouse dictionary support (MySQL-backed), but click writes
+  still go to MySQL. SkyPlix writes clicks directly to ClickHouse.
 
 **Valkey** key namespaces:
 - `campaign:{id}` → serialized Campaign struct (TTL: 1h, refreshed on admin save)
+- `campaign_aliases` → hash of alias→campaign_id mappings
+- `streams:{campaign_id}` → cached active streams for campaign
 - `sess:{visitor_code}` → uniqueness session
+- `bind:{type}:{uniqueness_id}` → entity binding (stream/landing/offer per visitor)
 - `clicks:queue` → RPUSH list for async batch writes
 - `hitlimit:{stream_id}:{date}` → click counter (INCR)
 - `session:{token}` → admin session data (TTL: 24h)
+- `warmup:scheduled` → flag indicating cache warmup is needed
 
 ---
 
@@ -399,20 +445,21 @@ Auth: HTTP-only session cookie + `X-Api-Key` header (for programmatic access).
 
 ## Technical Debt (From Keitaro PHP Source — Items We Fix)
 
-- [ ] **MySQL for everything** — Keitaro stores config + clicks + stats in one MySQL instance. Scalability ceiling at ~10M click rows.
+- [ ] **MySQL for click storage** — Keitaro stores clicks in MySQL (with optional ClickHouse dictionaries for reporting). Scalability ceiling at ~10M click rows. We write directly to ClickHouse.
 - [ ] **Synchronous click writes** — `StoreRawClicksStage` writes to DB inline, partially buffered via Redis queue but still blocks on flush.
 - [ ] **ADODB legacy** — Raw SQL string concatenation with `Db::quote()`. No parameterized queries, SQL injection risk.
 - [ ] **IonCube encryption** — Source was encrypted. Decoded quality varies; silent bugs possible.
 - [ ] **Singleton pattern everywhere** — `::instance()` on every service. Hard to test, impossible to mock.
 - [ ] **No dependency injection** — Services construct their own dependencies in constructors.
 - [ ] **PHP session handling** — Relies on PHP's session mechanism. Not distributed-safe.
-- [ ] **License enforcement** — `Component/Av/` and `Component/Branding/` enforce commercial licensing. Removed in ZAI.
-- [ ] **Telemetry** — `Component/SelfUpdate/SelfChecker/` phones home. Removed in ZAI.
-- [ ] **No ClickHouse** — Analytics are slow MySQL GROUP BY queries. We replace with columnar ClickHouse.
+- [ ] **License enforcement** — `Component/Av/` and `Component/Branding/` enforce commercial licensing. Removed.
+- [ ] **Telemetry** — `Component/SelfUpdate/SelfChecker/` phones home. Removed.
 
-## Open Research Items (Pre-Phase 4)
+## Open Research Items
 
-- [ ] `mssola/device-detector` vs `mileusna/useragent` — build + benchmark both
-- [ ] FingerprintJS open-source alternatives for JS-based bot detection
+- [ ] `robicode/device-detector` vs `mileusna/useragent` — evaluate PCRE dependency vs feature coverage for 6 device stream filters
+- [ ] FingerprintJS open-source alternatives for JS-based bot detection (Phase 4)
 - [ ] ClickHouse partitioning strategy for click table at scale
 - [ ] IP2Location PROXY database (paid) for VPN/proxy detection accuracy
+- [ ] Investigate Keitaro's `rbooster` ClickHouse config section for schema patterns we can reuse
+- [ ] Clarify `Remote` vs `Curl` action type semantics (both exist in source — are they different actions?)

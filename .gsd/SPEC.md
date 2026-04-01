@@ -1,8 +1,9 @@
 # SPEC.md — Project Specification
 
 > **Status**: `FINALIZED`
-> **Project**: ZAI TDS (Traffic Distribution System)
-> **Codename**: zai-tds
+> **Project**: SkyPlix TDS (Traffic Distribution System)
+> **Domain**: SKYPLIX.COM
+> **Codename**: skyplix
 
 ## Vision
 
@@ -43,7 +44,7 @@ Build a production-grade, open-source Traffic Distribution System in Go that rep
 | **Analytics DB** | ClickHouse 24 | Columnar click storage, sub-second aggregation over billions of rows |
 | **CH Driver** | clickhouse-go v2 | High-level, production-ready, backed by ch-go internally |
 | **GeoIP** | MaxMind GeoLite2 (country/city) + IP2Location LITE (ISP/ASN) | Both loaded into memory, sub-millisecond lookups |
-| **Device Detection** | mssola/device-detector | Matomo-quality UA parsing, same accuracy as Keitaro's parser |
+| **Device Detection** | robicode/device-detector (evaluate vs mileusna/useragent in Phase 1) | Matomo-quality UA parsing, same accuracy as Keitaro's parser — see ADR-010 |
 | **Admin UI** | Vite + React 19 + shadcn/ui | Compiles to static files, embedded in Go binary via go:embed |
 | **Server State** | TanStack Query v5 | Polling-based live data, no WebSockets needed in V1 |
 | **Auth** | Session tokens in Valkey | Revocable sessions, forced logout, team-safe |
@@ -82,6 +83,8 @@ Triggered when a visitor hits `/CAMPAIGN_ALIAS`.
 1.  DomainRedirect              — Handle domain-level campaign redirects
 2.  CheckPrefetch               — Detect and handle browser prefetch requests
 3.  BuildRawClick               — Extract IP, UA, referrer, sub_ids, costs from request
+                                    **Also runs inline bot detection** (_checkIfBot + _checkIfProxy)
+                                    Bot status feeds into IsBot stream filter in stage 9
 4.  FindCampaign                — Lookup campaign from Valkey cache by alias/id
 5.  CheckDefaultCampaign        — Fall back to default campaign if none found
 6.  UpdateRawClick              — Enrich click with geo (GeoIP), device (UA parser)
@@ -123,10 +126,12 @@ The `visitor_code` cookie ties Level 1 and Level 2 clicks together.
 13. StoreRawClicks              — Store landing click to ClickHouse
 ```
 
-### Action Types (15 response formats, from `Traffic/Actions/Predefined/`)
+### Action Types (19 response formats, from `Traffic/Actions/Predefined/`)
 `HttpRedirect`, `Meta`, `DoubleMeta`, `BlankReferrer`, `Frame`, `Iframe`,
-`Js`, `JsForIframe`, `JsForScript`, `FormSubmit`, `Curl` (reverse proxy),
-`LocalFile`, `ShowHtml`, `ShowText`, `Status404`, `DoNothing`, `ToCampaign`
+`Js`, `JsForIframe`, `JsForScript`, `FormSubmit`, `Curl`,
+`Remote` (reverse proxy — fetches remote content, critical for cloaking safe pages),
+`LocalFile`, `ShowHtml`, `ShowText`, `Status404`, `DoNothing`,
+`SubId` (sub_id-based routing), `ToCampaign` (inter-campaign redirect)
 
 ## Constraints
 

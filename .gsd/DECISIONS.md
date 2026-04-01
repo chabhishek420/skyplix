@@ -73,3 +73,52 @@ The `visitor_code` cookie ties both levels together.
 **Decision**: Implement both pipeline levels. Reuse stages where Keitaro does
 (13 of Level 2's stages are shared with Level 1, just reordered).
 **Consequences**: Must implement LP token system for Level 1 → Level 2 linking.
+
+## ADR-008: Bot Detection Inline in Pipeline (Phase 1, not Phase 4)
+**Date**: 2026-04-02
+**Status**: Accepted
+**Context**: Source audit of `BuildRawClickStage.php` revealed bot detection
+(`_checkIfBot` + `_checkIfProxy`) runs INSIDE pipeline stage 3, not as a
+separate system. The `is_bot` flag set here feeds the `IsBot` stream filter
+in `ChooseStreamStage` (stage 9). Without bot detection in the pipeline,
+the IsBot filter silently passes all traffic — no cloaking is possible.
+**Decision**: Basic bot detection (IP list + UA pattern match + empty UA check +
+proxy detection) moves to Phase 1 as part of `BuildRawClickStage`. Advanced
+detection (datacenter IP databases, JS fingerprint challenges) stays in Phase 4.
+**Consequences**: Phase 1 deliverable is a functional cloaking-capable pipeline
+from day one. Phase 4 upgrades detection accuracy, not introduces it.
+
+## ADR-009: Entity Binding Required for Production (Phase 2)
+**Date**: 2026-04-02
+**Status**: Accepted
+**Context**: Source audit revealed `EntityBindingService` in `ChooseStreamStage`.
+When `campaign.bindVisitorsEnabled` is true, returning visitors are locked to
+the same stream/landing/offer via Valkey keys + cookie fallback. Three binding
+types: `s` (stream), `lp` (landing), `of` (offer). Without entity binding:
+- Same visitor sees different offers on different visits → triggers affiliate
+  network fraud detection
+- A/B test results become unreliable (no visitor consistency)
+- Conversion attribution breaks across visits
+**Decision**: Entity binding implemented in Phase 2 alongside stream rotation.
+Uses Valkey `bind:{type}:{uniqueness_id}` keys with cookie fallback.
+Campaign model gains `bind_visitors` boolean field. Data model gains
+`type` field (POSITION vs WEIGHT) on campaigns.
+**Consequences**: Adds Valkey key complexity. Stream/landing/offer rotation
+must check for existing bindings before selecting new entities.
+
+## ADR-010: Device Detection Library Correction
+**Date**: 2026-04-02
+**Status**: Proposed
+**Context**: Planning docs referenced `github.com/mssola/device-detector` which
+does not exist. The actual `mssola` library is `github.com/mssola/user_agent`
+(simple UA parser — browser/OS/mobile only). Six Keitaro stream filters
+(`DeviceType`, `DeviceModel`, `Browser`, `BrowserVersion`, `Os`, `OsVersion`)
+require full device detection including model and brand.
+**Decision**: Evaluate `github.com/robicode/device-detector` (Go port of Matomo's
+device-detector, full field parity) during Phase 1 setup. If PCRE dependency
+conflicts with single-binary CGo-free deployment, fall back to
+`github.com/mileusna/useragent` plus custom device model enrichment from
+Matomo's YAML regex database.
+**Consequences**: If using `robicode/device-detector`, binary requires CGo (PCRE).
+If using `mileusna/useragent`, DeviceModel and DeviceBrand filters may have
+reduced accuracy. Decision made via benchmark during Phase 1 scaffolding.

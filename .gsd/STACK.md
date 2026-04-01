@@ -55,9 +55,12 @@
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `github.com/oschwald/geoip2-golang` | latest | MaxMind .mmdb reader — country, city, ASN lookups |
-| `github.com/mssola/device-detector` | latest | UA parsing — device type, browser, OS (Matomo-quality) |
+| `github.com/robicode/device-detector` | latest | UA parsing — full Matomo parity (device model, brand, browser, OS). Requires PCRE. |
+| *OR* `github.com/mileusna/useragent` | latest | Lightweight UA parser — no PCRE, but missing DeviceModel/Brand fields |
 
-> **TODO (Pre-Phase 4):** Benchmark `mssola/device-detector` vs `mileusna/useragent`. Decision pending.
+> **Decision pending (Phase 1):** Evaluate `robicode/device-detector` first for full Keitaro
+> parity on 6 device stream filters. If PCRE dependency conflicts with single-binary
+> deployment, fall back to `mileusna/useragent` with custom enrichment.
 
 ### Observability
 
