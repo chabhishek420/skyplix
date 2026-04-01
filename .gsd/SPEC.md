@@ -34,17 +34,23 @@ Build a production-grade, open-source Traffic Distribution System in Go that rep
 ## Technical Stack
 
 | Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| **Language** | Go 1.22+ | Single binary, goroutine-per-click, 100K+ req/s |
-| **HTTP** | net/http + chi router | Zero-dependency, battle-tested, ~50μs per route match |
-| **Primary DB** | PostgreSQL 16 | Campaigns, streams, offers, users — relational integrity |
-| **Cache** | Redis 7 | Session cache, click dedup, hot config, rate limiting |
-| **Analytics DB** | ClickHouse | Click log storage, real-time aggregation, columnar compression |
-| **GeoIP** | MaxMind GeoLite2 / IP2Location | Offline geo resolution, no external API calls on hot path |
-| **Device Detection** | ua-parser (Go port) | User-agent parsing without external calls |
-| **Admin UI** | React + shadcn/ui (separate SPA) | Reuse existing component knowledge, served as static files by Go binary |
-| **Config** | YAML + env vars | Simple deployment, 12-factor app |
-| **Migrations** | golang-migrate | Database schema management |
+|-------|-----------|--------|
+| **Language** | Go 1.23+ | Single binary, goroutine-per-click, 100K+ req/s |
+| **HTTP** | Chi v5 (net/http) | Fully stdlib-compatible, idiomatic, no magic, same perf as Fiber on DB-bound routes |
+| **Primary DB** | PostgreSQL 16 | Campaigns, streams, offers, users — JSONB for filter rules, row locking |
+| **DB Driver** | pgx v5 + sqlc | Near-native perf, compile-time type safety, zero reflection — no ORM |
+| **Cache / Queue** | Valkey 8 (Redis fork) | Open-source BSD license, async click write buffer + entity cache + uniqueness tracking |
+| **Analytics DB** | ClickHouse 24 | Columnar click storage, sub-second aggregation over billions of rows |
+| **CH Driver** | clickhouse-go v2 | High-level, production-ready, backed by ch-go internally |
+| **GeoIP** | MaxMind GeoLite2 (country/city) + IP2Location LITE (ISP/ASN) | Both loaded into memory, sub-millisecond lookups |
+| **Device Detection** | mssola/device-detector | Matomo-quality UA parsing, same accuracy as Keitaro's parser |
+| **Admin UI** | Vite + React 19 + shadcn/ui | Compiles to static files, embedded in Go binary via go:embed |
+| **Server State** | TanStack Query v5 | Polling-based live data, no WebSockets needed in V1 |
+| **Auth** | Session tokens in Valkey | Revocable sessions, forced logout, team-safe |
+| **Logging** | uber-go/zap | Structured JSON logging, ~10ns per call |
+| **Metrics** | prometheus/client_golang | Standard Go instrumentation, /metrics endpoint |
+| **Config** | YAML + env vars | Simple deployment, matches Keitaro's config.ini.php schema |
+| **Migrations** | golang-migrate | SQL up/down files, embedded in binary, matches Keitaro's migration approach |
 
 ## Architecture
 
@@ -65,32 +71,62 @@ Build a production-grade, open-source Traffic Distribution System in Go that rep
                      └────────┘  └────────┘  └───────────┘
 ```
 
-## Click Pipeline (Ported from Keitaro's 22-stage Pipeline)
+## Click Pipeline (Source-Verified from Keitaro's Two-Level Pipeline)
 
+> Verified directly from `Traffic/Pipeline/Pipeline.php`.
+> There are TWO pipeline levels, not one. Previously stated as 22 stages — CORRECTED.
+
+### Level 1 — Campaign Click (23 stages)
+Triggered when a visitor hits `/CAMPAIGN_ALIAS`.
 ```
-1.  BuildRawClick          — Extract IP, UA, headers, params from request
-2.  FindCampaign           — Match campaign_id to campaign config
-3.  CheckDefaultCampaign   — Fall back to default if no campaign found
-4.  CheckDomainRedirect    — Handle domain-level redirects
-5.  ResolveGeo             — GeoIP lookup (country, region, city)
-6.  ResolveDevice          — Parse UA (browser, OS, device type)
-7.  ResolveISP             — ISP/ASN lookup for bot detection
-8.  DetectBot              — Multi-signal bot detection
-9.  ChooseStream           — Evaluate stream filters, pick matching stream
-10. ChooseLanding          — Rotate landing page (weighted)
-11. ChooseOffer            — Rotate offer (weighted)
-12. FindAffiliateNetwork   — Resolve affiliate network config
-13. GenerateClickID        — Cryptographically random click token
-14. ReplaceMacros          — Substitute {click_id}, {campaign_id}, etc. in URLs
-15. ExecuteAction          — Determine response type (redirect/show/proxy)
-16. SetCookies             — Session tracking cookies
-17. UpdateUniqueness       — Track unique visitors per campaign/stream/global
-18. UpdateHitLimits        — Check and update daily/total click caps
-19. CalculateCosts         — Apply cost model
-20. QueueClickStorage      — Async write to ClickHouse via channel
-21. QueueStatsUpdate       — Async increment daily stats counters
-22. BuildResponse          — Construct HTTP 302/200/404 response
+1.  DomainRedirect              — Handle domain-level campaign redirects
+2.  CheckPrefetch               — Detect and handle browser prefetch requests
+3.  BuildRawClick               — Extract IP, UA, referrer, sub_ids, costs from request
+4.  FindCampaign                — Lookup campaign from Valkey cache by alias/id
+5.  CheckDefaultCampaign        — Fall back to default campaign if none found
+6.  UpdateRawClick              — Enrich click with geo (GeoIP), device (UA parser)
+7.  CheckParamAliases           — Resolve traffic source parameter aliases
+8.  UpdateCampaignUniqueness    — Check/set unique visitor flag (campaign-level)
+9.  ChooseStream                — Filter streams, pick matching by position or weight
+10. UpdateStreamUniqueness      — Check/set unique visitor flag (stream-level)
+11. ChooseLanding               — Rotate landing page (weighted round-robin)
+12. ChooseOffer                 — Rotate offer (weighted round-robin)
+13. GenerateToken               — Generate cryptographically random click token
+14. FindAffiliateNetwork        — Resolve affiliate network postback config
+15. UpdateHitLimit              — Check daily/total click caps (Valkey counters)
+16. UpdateCosts                 — Apply cost model from traffic source params
+17. UpdatePayout                — Calculate expected payout
+18. SaveUniquenessSession       — Persist uniqueness flags to Valkey session
+19. SetCookie                   — Write visitor_code + session cookies
+20. ExecuteAction               — Build response (302, meta-redirect, proxy, HTML, 404)
+21. PrepareRawClickToStore      — Serialize click data for async storage
+22. CheckSendingToAnotherCampaign — Handle ToCampaign action recursion (limit 10)
+23. StoreRawClicks              — Push to async channel → ClickHouse batch writer
 ```
+
+### Level 2 — Landing Click (13 stages)
+Triggered when visitor clicks through from landing page to offer.
+The `visitor_code` cookie ties Level 1 and Level 2 clicks together.
+```
+1.  FindCampaign                — Re-resolve campaign from landing token
+2.  UpdateParamsFromLanding     — Merge landing-level params into click
+3.  CheckDefaultCampaign
+4.  CheckParamAliases
+5.  ChooseStream                — Re-evaluate stream (may differ from Level 1)
+6.  ChooseOffer                 — Pick final offer URL
+7.  FindAffiliateNetwork
+8.  UpdateCosts
+9.  UpdatePayout
+10. SetCookie
+11. ExecuteAction               — 302 redirect to affiliate offer URL
+12. CheckSendingToAnotherCampaign
+13. StoreRawClicks              — Store landing click to ClickHouse
+```
+
+### Action Types (15 response formats, from `Traffic/Actions/Predefined/`)
+`HttpRedirect`, `Meta`, `DoubleMeta`, `BlankReferrer`, `Frame`, `Iframe`,
+`Js`, `JsForIframe`, `JsForScript`, `FormSubmit`, `Curl` (reverse proxy),
+`LocalFile`, `ShowHtml`, `ShowText`, `Status404`, `DoNothing`, `ToCampaign`
 
 ## Constraints
 
