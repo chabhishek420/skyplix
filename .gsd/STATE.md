@@ -1,26 +1,40 @@
-# STATE.md — Project State
+# Project State
 
-> **Last Updated**: 2026-04-01
-> **Current Phase**: Not started
-> **Active Task**: None
+> Last updated: 2026-04-01T23:47:00+05:30
 
-## Context
+## Current Phase
+**Pre-Phase 1** — Architecture mapping and stack research complete.
 
-- Keitaro PHP source (v9.13.9) fully analyzed — 1,705 PHP files, 82K LOC
-- 22-stage pipeline architecture mapped from `Traffic/Pipeline/Stage/`
-- 51 component modules cataloged from `Component/`
-- YellowCloaker bot detection (12 checks) analyzed
-- yljary.com live TDS verified via terminal (infrastructure confirmed active)
-- Existing Next.js implementation (304 TS files) to be superseded by Go rewrite
-- Reference material preserved in `reference/` directory
+## Last Session Summary
+Codebase mapping complete.
+- 4 top-level Keitaro modules mapped (Traffic, Component, Core, Admin)
+- 1,705 PHP files analyzed across 506 Traffic + 735 Component + 114 Core + 17 Admin
+- 51 Component modules categorized by priority (P0/P1/P2/P3)
+- 27 stream filter types identified
+- 15 action/redirect types identified
+- 23 + 13 stage two-level pipeline verified from source
+- 55 admin API controllers → ~110+ endpoints
+- 321 database migrations counted
+- Full Go project structure designed
+- 10 technical debt items from PHP source documented
 
-## Decisions
+## Stack Finalized
+- Go 1.23+ with Chi v5 router
+- PostgreSQL 16 + pgx v5 + sqlc
+- Valkey 8 (open-source Redis fork)
+- ClickHouse 24 + clickhouse-go v2
+- MaxMind GeoLite2 + IP2Location LITE
+- Vite + React 19 + shadcn/ui (embedded in binary)
+- Prometheus + zap logging
+- Docker Compose deployment
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Language | Go | Single binary, goroutine-per-click, 100K+ req/s, ad-tech standard |
-| Primary DB | PostgreSQL | Relational integrity for campaigns/streams, proven at scale |
-| Cache | Redis | Sub-ms session/config reads, click dedup, rate limiting |
-| Analytics | ClickHouse | Columnar storage for billions of clicks, sub-second aggregation |
-| Admin UI | React + shadcn/ui | Team familiarity, embedded in Go binary |
-| License | MIT | Open source, no restrictions |
+## Files Updated
+- `.gsd/ARCHITECTURE.md` — System design, module mapping, data flow
+- `.gsd/STACK.md` — Technology inventory with versions
+- `.gsd/RESEARCH.md` — 12-layer deep research with source verification
+- `.gsd/SPEC.md` — Corrected pipeline (23+13), updated stack table
+- `.gsd/DECISIONS.md` — Architecture decision records
+
+## Next Step
+Run `/plan 1` to create the Phase 1 execution plan:
+Go project scaffold + core click pipeline (stages 1-6, 9, 20, 23)
