@@ -3,20 +3,73 @@
 ## ADR-001: Go over TypeScript/Next.js for TDS Core
 **Date**: 2026-04-01
 **Status**: Accepted
-**Context**: Existing implementation uses Next.js + Prisma + SQLite. Analysis revealed fundamental performance limitations: SQLite single-writer bottleneck, Prisma ORM overhead on hot path, Node.js single-threaded event loop blocking during CPU-bound bot detection, Next.js framework overhead adding 10-50ms per request.
-**Decision**: Rewrite TDS core in Go. Keep Next.js reference code for admin UI patterns.
-**Consequences**: Need Go expertise on team. Lose TypeScript type-safety ecosystem. Gain 10-100x performance on click processing. Single binary deployment simplifies ops.
+**Context**: Previous implementation used Next.js + Prisma + SQLite.
+Fundamental performance bottlenecks: SQLite single-writer lock, Prisma ORM
+reflection overhead on hot path, Node.js blocking during CPU-bound bot
+detection, framework overhead adding 10-50ms per request.
+**Decision**: Full rewrite in Go. Legacy Next.js archived in `reference/legacy-nextjs/`.
+**Consequences**: 10-100x performance gain. Single binary deployment. Need Go expertise.
 
-## ADR-002: PostgreSQL + Redis + ClickHouse over SQLite
+## ADR-002: PostgreSQL + Valkey + ClickHouse
 **Date**: 2026-04-01
 **Status**: Accepted
-**Context**: SQLite cannot handle concurrent writes from a high-throughput click server. A TDS needs three data access patterns: hot config reads (ms), relational state management, and analytical aggregation over billions of rows.
-**Decision**: PostgreSQL for state, Redis for cache, ClickHouse for analytics.
-**Consequences**: More complex deployment. Docker Compose for local dev. Worth it for correct data architecture.
+**Context**: Keitaro uses MySQL for everything (config + clicks + stats).
+This is a known scalability ceiling — MySQL click tables degrade past 10M rows.
+**Decision**: Split storage by access pattern:
+- PostgreSQL: transactional config (campaigns, streams, offers, users)
+- Valkey 8: hot-path cache, async write buffer, sessions, uniqueness, rate limiting
+- ClickHouse 24: columnar click analytics (billions of rows, sub-second aggregation)
+**Consequences**: Three databases to manage. Docker Compose simplifies this.
+Valkey chosen over Redis for BSD open-source license (drop-in compatible).
 
-## ADR-003: Single Binary Architecture
+## ADR-003: Chi v5 over Fiber
 **Date**: 2026-04-01
 **Status**: Accepted
-**Context**: Keitaro deploys as PHP + Apache/Nginx + MariaDB + Redis. Deployment is complex. For an open-source tool, simplified deployment drives adoption.
-**Decision**: Go binary embeds the React admin SPA via `//go:embed`. Binary serves all HTTP routes (click, API, admin UI).
-**Consequences**: Go binary size ~30-50MB (includes embedded UI assets). Simpler deployment. Admin UI must be built before embedding.
+**Context**: Fiber (fasthttp) leads synthetic benchmarks by ~20%.
+However, real-world TDS bottleneck is GeoIP (1-5ms) + Valkey (0.5ms),
+not routing (<50µs). Fiber is incompatible with Go's `net/http` ecosystem.
+**Decision**: Chi v5 — fully stdlib-compatible, idiomatic, zero vendor lock-in.
+**Consequences**: Every Go middleware and library works without adaptation.
+
+## ADR-004: sqlc + pgx over GORM
+**Date**: 2026-04-01
+**Status**: Accepted
+**Context**: Keitaro uses raw SQL with ADODB (no ORM). Our RESEARCH verified
+that sqlc generates compile-time safe Go code from SQL with zero runtime
+reflection. GORM uses heavy reflection and hides N+1 query patterns.
+**Decision**: sqlc for 95% of queries, squirrel for dynamic admin list filters.
+pgx v5 as the native PostgreSQL driver with pgxpool.
+**Consequences**: Must write SQL by hand. Better performance, full query control.
+
+## ADR-005: Valkey Session Tokens over JWT
+**Date**: 2026-04-01
+**Status**: Accepted
+**Context**: Stateless JWTs cannot be revoked. For a team tool with multiple
+media buyers, you need instant forced-logout, session listing, and
+"log out all devices" after security incidents.
+**Decision**: Session ID in HTTP-only cookie. Session data stored in Valkey
+with 24h TTL. Admin can list/revoke sessions per user.
+**Consequences**: Slightly more complexity than JWT. Full control over sessions.
+
+## ADR-006: Vite + React over Next.js for Admin UI
+**Date**: 2026-04-01
+**Status**: Accepted
+**Context**: Admin panel is an internal tool — no SEO, no SSR needed.
+Next.js Server Components and streaming are disabled in static export mode.
+Using Next.js static export = paying framework overhead for zero benefit.
+**Decision**: Vite + React 19 + shadcn/ui. Compiles to static HTML/JS/CSS.
+Embedded in Go binary via `//go:embed`. Single process in production.
+**Consequences**: No Node.js in production. Faster build. Manual routing
+with react-router-dom instead of file-system routing.
+
+## ADR-007: Two-Level Pipeline Architecture
+**Date**: 2026-04-01
+**Status**: Accepted
+**Context**: Source verification of `Traffic/Pipeline/Pipeline.php` revealed
+Keitaro uses TWO pipeline levels, not one:
+- Level 1 (23 stages): campaign click → stream selection → landing redirect
+- Level 2 (13 stages): landing click → offer selection → affiliate redirect
+The `visitor_code` cookie ties both levels together.
+**Decision**: Implement both pipeline levels. Reuse stages where Keitaro does
+(13 of Level 2's stages are shared with Level 1, just reordered).
+**Consequences**: Must implement LP token system for Level 1 → Level 2 linking.
