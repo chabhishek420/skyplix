@@ -2,11 +2,17 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/config"
+	"github.com/skyplix/zai-tds/internal/device"
+	"github.com/skyplix/zai-tds/internal/geo"
 )
 
 // Server is the main application server.
@@ -16,22 +22,63 @@ type Server struct {
 	logger  *zap.Logger
 	version string
 	http    *http.Server
+	db      *pgxpool.Pool
+	valkey  *redis.Client
+	geo     *geo.Resolver
+	device  *device.Detector
 }
 
-// New constructs a Server, validates connections (Postgres + Valkey),
-// and applies database migrations. Returns error on any startup failure.
+// New constructs a Server, connects to Postgres + Valkey,
+// and wires up the HTTP router with the full pipeline.
 func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error) {
 	s := &Server{
 		cfg:     cfg,
 		logger:  logger,
 		version: version,
+		device:  device.New(),
 	}
 
-	// Build the HTTP server with routes
+	// Connect to PostgreSQL
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	db, err := pgxpool.New(ctx, cfg.Postgres.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("postgres connect: %w", err)
+	}
+	if err := db.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("postgres ping: %w", err)
+	}
+	s.db = db
+	logger.Info("PostgreSQL connected")
+
+	// Connect to Valkey
+	vk := redis.NewClient(&redis.Options{
+		Addr:     cfg.Valkey.Addr,
+		Password: cfg.Valkey.Password,
+		DB:       cfg.Valkey.DB,
+	})
+	if err := vk.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("valkey ping: %w", err)
+	}
+	s.valkey = vk
+	logger.Info("Valkey connected")
+
+	// Initialize GeoIP resolver (graceful — paths may be empty in dev)
+	geoResolver, err := geo.New(cfg.GeoIP.CountryDB, cfg.GeoIP.CityDB, logger)
+	if err != nil {
+		return nil, fmt.Errorf("geoip init: %w", err)
+	}
+	s.geo = geoResolver
+
+	// Build HTTP server
 	mux := s.routes()
 	s.http = &http.Server{
-		Addr:    cfg.Addr(),
-		Handler: mux,
+		Addr:         cfg.Addr(),
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	return s, nil
@@ -59,9 +106,26 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	// Graceful shutdown — 30s timeout
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*1_000_000_000) // 30s
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	s.logger.Info("shutting down HTTP server")
-	return s.http.Shutdown(shutdownCtx)
+	if err := s.http.Shutdown(shutdownCtx); err != nil {
+		s.logger.Error("shutdown error", zap.Error(err))
+	}
+
+	// Close dependencies
+	if s.db != nil {
+		s.db.Close()
+		s.logger.Info("PostgreSQL pool closed")
+	}
+	if s.valkey != nil {
+		s.valkey.Close()
+		s.logger.Info("Valkey client closed")
+	}
+	if s.geo != nil {
+		s.geo.Close()
+	}
+
+	return nil
 }

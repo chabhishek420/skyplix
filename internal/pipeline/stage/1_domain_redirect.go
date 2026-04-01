@@ -1,0 +1,25 @@
+package stage
+
+import (
+	"github.com/go-chi/chi/v5"
+
+	"github.com/skyplix/zai-tds/internal/model"
+	"github.com/skyplix/zai-tds/internal/pipeline"
+)
+
+// DomainRedirectStage — Pipeline Stage 1
+// Extracts the campaign alias from the URL path.
+// Handles the "gateway context" — bare domain access (GET /).
+type DomainRedirectStage struct{}
+
+func (s *DomainRedirectStage) Name() string { return "DomainRedirect" }
+
+func (s *DomainRedirectStage) Process(payload *pipeline.Payload) error {
+	alias := chi.URLParam(payload.Request, "alias")
+
+	if payload.RawClick == nil {
+		payload.RawClick = &model.RawClick{}
+	}
+	payload.RawClick.CampaignAlias = alias
+	return nil
+}
