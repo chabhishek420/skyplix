@@ -11,6 +11,7 @@ import (
 
 	"github.com/skyplix/zai-tds/internal/pipeline"
 	"github.com/skyplix/zai-tds/internal/pipeline/stage"
+	"github.com/skyplix/zai-tds/internal/queue"
 )
 
 // routes wires all HTTP routes and returns the handler.
@@ -42,43 +43,57 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleClick runs the full Level 1 click pipeline.
+// handleClick runs the full Level 1 click pipeline (23 stages).
+// Stages 7-12 and 14-19 are no-ops in Phase 1 — implemented in Phase 2+.
 func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-
-	// Build the Level 1 pipeline with all 23 stages.
-	// Stages 7-12, 14-19, 22 are no-ops in Phase 1.
 	l := s.logger
+
+	// Build the click write channel (nil safe — stages check for nil)
+	var clickChan chan<- queue.ClickRecord
+	if s.chWriter != nil {
+		clickChan = s.chWriter.Chan()
+	}
+
 	p := pipeline.New(
-		// Wave 1: Request processing
+		// Stage 1-3: Request processing
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
 		&stage.BuildRawClickStage{},
-		// Wave 2: Campaign resolution
+
+		// Stage 4-6: Campaign resolution + enrichment
 		&stage.FindCampaignStage{DB: s.db, Logger: l},
 		&stage.CheckDefaultCampaignStage{},
-		// Wave 3: Geo + Device enrichment
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: l},
-		// No-op stubs for Phase 1 (7-12, 14-19)
+
+		// Stages 7-12: No-op in Phase 1 (stream selection in Phase 2)
 		stage.NewNoOp(7, "CheckParamAliases", l),
 		stage.NewNoOp(8, "UpdateCampaignUniqueness", l),
 		stage.NewNoOp(9, "ChooseStream", l),
 		stage.NewNoOp(10, "UpdateStreamUniqueness", l),
 		stage.NewNoOp(11, "ChooseLanding", l),
 		stage.NewNoOp(12, "ChooseOffer", l),
-		// Stage 13: Generate click token (Plan 1.3)
-		stage.NewNoOp(13, "GenerateToken", l),
+
+		// Stage 13: Generate cryptographic click token
+		&stage.GenerateTokenStage{},
+
+		// Stages 14-19: No-op in Phase 1
 		stage.NewNoOp(14, "FindAffiliateNetwork", l),
 		stage.NewNoOp(15, "UpdateHitLimit", l),
 		stage.NewNoOp(16, "UpdateCosts", l),
 		stage.NewNoOp(17, "UpdatePayout", l),
 		stage.NewNoOp(18, "SaveUniquenessSession", l),
 		stage.NewNoOp(19, "SetCookie", l),
-		// Stage 20: Execute action (Plan 1.3)
-		stage.NewNoOp(20, "ExecuteAction", l),
+
+		// Stage 20: Execute the HTTP response action
+		&stage.ExecuteActionStage{Logger: l},
+
+		// Stages 21-22: No-op in Phase 1
 		stage.NewNoOp(21, "PrepareRawClickToStore", l),
 		stage.NewNoOp(22, "CheckSendingToAnotherCampaign", l),
-		stage.NewNoOp(23, "StoreRawClicks", l),
+
+		// Stage 23: Non-blocking push to ClickHouse write channel
+		&stage.StoreRawClicksStage{ClickChan: clickChan},
 	)
 
 	payload := &pipeline.Payload{
@@ -93,31 +108,23 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle abort (prefetch, 404, etc.)
-	if payload.Abort {
-		if payload.AbortCode > 0 {
-			w.WriteHeader(payload.AbortCode)
-		} else {
-			w.WriteHeader(http.StatusOK)
-		}
-		return
+	// Handle abort (prefetch silently 200, 404, etc.)
+	if payload.Abort && payload.AbortCode > 0 && payload.Response == nil {
+		// Only write status if ExecuteAction didn't already write the response
+		w.WriteHeader(payload.AbortCode)
 	}
 
-	// Phase 1: fallback redirect if pipeline didn't set a response.
-	// Full ExecuteAction stage in Plan 1.3 will replace this.
-	if payload.Campaign != nil {
-		s.logger.Info("click processed",
+	// Log click telemetry
+	if payload.RawClick != nil && payload.Campaign != nil {
+		l.Info("click processed",
 			zap.String("alias", payload.RawClick.CampaignAlias),
 			zap.String("campaign", payload.Campaign.Name),
+			zap.String("token", payload.RawClick.ClickToken),
 			zap.String("country", payload.RawClick.CountryCode),
 			zap.String("device", payload.RawClick.DeviceType),
 			zap.Bool("is_bot", payload.RawClick.IsBot),
-			zap.Duration("duration", time.Since(start)),
+			zap.Duration("latency", time.Since(start)),
 		)
-		// Temporary: redirect to example.com until ExecuteAction is wired in Plan 1.3
-		http.Redirect(w, r, "https://example.com", http.StatusFound)
-	} else {
-		http.NotFound(w, r)
 	}
 }
 
@@ -132,7 +139,7 @@ func (s *Server) requestLogger() func(http.Handler) http.Handler {
 				"path", r.URL.Path,
 				"status", ww.Status(),
 				"bytes", ww.BytesWritten(),
-				"remote_addr", r.RemoteAddr,
+				"ip", r.RemoteAddr,
 			)
 		})
 	}

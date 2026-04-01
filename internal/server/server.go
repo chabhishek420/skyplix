@@ -13,23 +13,26 @@ import (
 	"github.com/skyplix/zai-tds/internal/config"
 	"github.com/skyplix/zai-tds/internal/device"
 	"github.com/skyplix/zai-tds/internal/geo"
+	"github.com/skyplix/zai-tds/internal/queue"
+	"github.com/skyplix/zai-tds/internal/worker"
 )
 
 // Server is the main application server.
 // It holds all long-lived dependencies and wires them together.
 type Server struct {
-	cfg     *config.Config
-	logger  *zap.Logger
-	version string
-	http    *http.Server
-	db      *pgxpool.Pool
-	valkey  *redis.Client
-	geo     *geo.Resolver
-	device  *device.Detector
+	cfg       *config.Config
+	logger    *zap.Logger
+	version   string
+	http      *http.Server
+	db        *pgxpool.Pool
+	valkey    *redis.Client
+	geo       *geo.Resolver
+	device    *device.Detector
+	chWriter  *queue.Writer
+	workers   *worker.Manager
 }
 
-// New constructs a Server, connects to Postgres + Valkey,
-// and wires up the HTTP router with the full pipeline.
+// New constructs a Server, connects to all databases, initializes workers.
 func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error) {
 	s := &Server{
 		cfg:     cfg,
@@ -38,10 +41,10 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		device:  device.New(),
 	}
 
-	// Connect to PostgreSQL
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	// PostgreSQL
 	db, err := pgxpool.New(ctx, cfg.Postgres.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("postgres connect: %w", err)
@@ -52,7 +55,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.db = db
 	logger.Info("PostgreSQL connected")
 
-	// Connect to Valkey
+	// Valkey
 	vk := redis.NewClient(&redis.Options{
 		Addr:     cfg.Valkey.Addr,
 		Password: cfg.Valkey.Password,
@@ -64,14 +67,25 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.valkey = vk
 	logger.Info("Valkey connected")
 
-	// Initialize GeoIP resolver (graceful — paths may be empty in dev)
+	// GeoIP (graceful — paths may be empty in dev)
 	geoResolver, err := geo.New(cfg.GeoIP.CountryDB, cfg.GeoIP.CityDB, logger)
 	if err != nil {
 		return nil, fmt.Errorf("geoip init: %w", err)
 	}
 	s.geo = geoResolver
 
-	// Build HTTP server
+	// ClickHouse async writer
+	chWriter, err := queue.NewWriter(cfg.ClickHouse.Addr, cfg.ClickHouse.Database, logger)
+	if err != nil {
+		// Non-fatal in dev — log warning and continue without ClickHouse
+		logger.Warn("clickhouse unavailable — click storage disabled", zap.Error(err))
+		s.chWriter = nil
+	} else {
+		s.chWriter = chWriter
+		logger.Info("ClickHouse connected")
+	}
+
+	// Build HTTP server with full routes
 	mux := s.routes()
 	s.http = &http.Server{
 		Addr:         cfg.Addr(),
@@ -84,10 +98,23 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	return s, nil
 }
 
-// Run starts the HTTP server and blocks until ctx is cancelled.
-// Performs graceful shutdown with a 30-second timeout.
+// Run starts workers, then the HTTP server.
+// Blocks until ctx is cancelled, then performs graceful shutdown.
 func (s *Server) Run(ctx context.Context) error {
-	// Start HTTP server in background
+	// Start background workers
+	workers := []worker.Worker{
+		worker.NewHitLimitResetWorker(s.valkey, s.logger),
+		worker.NewCacheWarmupWorker(s.valkey, s.logger),
+		worker.NewSessionJanitorWorker(s.logger),
+	}
+	if s.chWriter != nil {
+		workers = append(workers, workerFunc("click-writer", s.chWriter.Run))
+	}
+
+	mgr := worker.NewManager(s.logger, workers...)
+	mgr.StartAll(ctx)
+
+	// Start HTTP server
 	errCh := make(chan error, 1)
 	go func() {
 		s.logger.Info("ZAI TDS listening", zap.String("addr", s.cfg.Addr()))
@@ -97,7 +124,6 @@ func (s *Server) Run(ctx context.Context) error {
 		close(errCh)
 	}()
 
-	// Wait for context cancellation (OS signal) or server error
 	select {
 	case <-ctx.Done():
 		s.logger.Info("shutdown signal received")
@@ -105,7 +131,7 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Graceful shutdown — 30s timeout
+	// Graceful HTTP shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -129,3 +155,16 @@ func (s *Server) Run(ctx context.Context) error {
 
 	return nil
 }
+
+// workerFunc adapts a func to the Worker interface for anonymous workers.
+type workerFuncAdapter struct {
+	name string
+	fn   func(context.Context) error
+}
+
+func workerFunc(name string, fn func(context.Context) error) worker.Worker {
+	return &workerFuncAdapter{name: name, fn: fn}
+}
+
+func (w *workerFuncAdapter) Name() string              { return w.name }
+func (w *workerFuncAdapter) Run(ctx context.Context) error { return w.fn(ctx) }
