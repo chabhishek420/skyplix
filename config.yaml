@@ -1,0 +1,27 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+postgres:
+  dsn: "postgres://zai:zai_dev_pass@localhost:5432/zai_tds?sslmode=disable"
+
+valkey:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+clickhouse:
+  addr: "localhost:9000"
+  database: "zai_analytics"
+  username: "default"
+  password: ""
+
+geoip:
+  country_db: ""
+  city_db: ""
+  asn_db: ""
+
+system:
+  salt: "change-me-in-production-min-32-chars"
+  debug: true
+  log_level: "info"

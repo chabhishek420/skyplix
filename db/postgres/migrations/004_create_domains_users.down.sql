@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS traffic_sources;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS domains;

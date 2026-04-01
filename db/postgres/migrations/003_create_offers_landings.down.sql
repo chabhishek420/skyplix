@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS affiliate_networks;
+DROP TABLE IF EXISTS offers;
+DROP TABLE IF EXISTS landings;

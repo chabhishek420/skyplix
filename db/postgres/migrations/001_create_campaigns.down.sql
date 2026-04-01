@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS campaigns;
+DROP TYPE IF EXISTS campaign_type;
+DROP EXTENSION IF EXISTS "pgcrypto";
+DROP EXTENSION IF EXISTS "uuid-ossp";
