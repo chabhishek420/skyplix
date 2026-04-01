@@ -1,0 +1,52 @@
+<?php
+if (empty($translations)) {
+    throw new \Exception('no $translations');
+}
+if (empty($data)) {
+    throw new \Exception('no $data');
+}
+if (empty($assetsHost)) {
+    throw new \Exception('no $assetsHost');
+}
+if (empty($revision)) {
+    throw new \Exception('no $revision');
+}
+if (is_null($isDevelopment)) {
+    throw new \Exception('no $isDevelopment');
+}
+if (is_null($isProduction)) {
+    throw new \Exception('no $isProduction');
+}
+if (empty($title)) {
+    throw new \Exception('no $title');
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title><?php echo $title ?></title>
+    <?php include 'shared/_head.phtml' ?>
+    <?php
+    if ($isProduction) {
+        echo '<link href="assets/license.css?' . $revision . '" media="screen" rel="stylesheet" type="text/css" />';
+    }
+    ?>
+</head>
+<body>
+<div id="root" class="license"></div>
+
+<script type="application/javascript">
+  var kData = <?php echo json_encode($data) ?>;
+  var kTranslations = <?php echo json_encode($translations) ?>;
+</script>
+
+<?php
+if ($isDevelopment) {
+    echo '<script type="application/javascript" src="' . $assetsHost . '/webpack-dev-server.js' . '?' . $revision . '"></script>' . "\n";
+    echo '<script type="application/javascript" src="' . $assetsHost . '/license.js' . '?' . $revision . '"></script>' . "\n";
+} else {
+    echo '<script type="application/javascript" src="assets/license.js' . '?' . $revision . '"></script>' . "\n";
+}
+?>
+</body>
+</html>

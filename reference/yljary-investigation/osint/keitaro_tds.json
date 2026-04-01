@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://keitaro.io",
+    "name": "Keitaro — Your Ad Performance Tracker",
+    "snippet": "Stop the chaos of media buying — track what works, cut what doesn't, and scale results in real time.",
+    "host_name": "keitaro.io",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.infoblox.com/blog/threat-intelligence/inside-keitaro-abuse-a-persistent-stream-of-ai-driven-investment-scams",
+    "name": "Inside Keitaro Abuse Part 1: Cloaking AI‑Enhanced Scams",
+    "snippet": "4 days ago — Infoblox and Confiant reveal how Keitaro is exploited for cloaking scams, targeting victims, and automating AI‑enhanced fraud in today's ...",
+    "host_name": "www.infoblox.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://sublime.security/blog/keitaro-tds-abused-to-delivery-autoit-based-loader-targeting-german-speakers",
+    "name": "Keitaro TDS abused to deliver AutoIT-based loader",
+    "snippet": "24-Jul-2025 — Malicious AutoIT payload hidden as explicit content delivered with anti-analysis tactics over a commercial TDS .",
+    "host_name": "sublime.security",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.okoone.com/spark/technology-innovation/why-malicious-tds-traffic-keeps-growing-and-what-to-do-about-it",
+    "name": "Why malicious TDS traffic keeps growing and what to do",
+    "snippet": "Cybercriminals exploit TDSs for ransomware and malware. AI-driven security is the key to stopping evolving threats before they escalate.",
+    "host_name": "www.okoone.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.phishprotection.com/phishing-awareness/understanding-traffic-distribution-system-tds-and-the-associated-cyber-risks",
+    "name": "Understanding Traffic Distribution System (TDS) and the",
+    "snippet": "27-Mar-2025 — TDS has been a type of cybersecurity threat. Cyber actors are capable of exploiting the Traffic Distribution System for malicious purposes.",
+    "host_name": "www.phishprotection.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.darkreading.com/cyberattacks-data-breaches/why-hard-stop-rising-malicious-tds-traffic",
+    "name": "Why It's So Hard to Stop Rising Malicious TDS Traffic",
+    "snippet": "20-Mar-2025 — Cybersecurity vendors say threat actors' abuse of traffic distribution systems ( TDS ) is becoming more complex and sophisticated — and much ...",
+    "host_name": "www.darkreading.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://exchange.xforce.ibmcloud.com/osint/guid:c4af6e5efde14f0a84f82116b95dfca9",
+    "name": "IBM X-Force OSINT Advisory Inside Keitaro Abuse: A",
+    "snippet": "3 days ago — The article delves into the pervasive issue of domain cloaking in cybercriminal operations, highlighting the use of traffic distribution ...",
+    "host_name": "exchange.xforce.ibmcloud.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=raM-v6Boywk",
+    "name": "Keitaro Academy. Traffic distribution in the tracker. Why",
+    "snippet": "This video will address all questions related to the distribution of traffic in the tracker.",
+    "host_name": "www.youtube.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/SecOpsDaily/comments/1ry2tcy/inside_keitaro_abuse_a_persistent_stream_of",
+    "name": "A Persistent Stream of AI-Driven Investment Scams",
+    "snippet": "Threat actors are extensively abusing the Keitaro Traffic Distribution System ( TDS ) to deploy sophisticated cloaking techniques, ...",
+    "host_name": "www.reddit.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://x.com/Infoblox/status/2034757060504543325",
+    "name": "Inside Keitaro Abuse Part 1: Cloaking AI‑Enhanced Scams",
+    "snippet": "Infoblox (@Infoblox). 7 likes 431 views. A threat isn't much of a threat if it can't reach the right victims.",
+    "host_name": "x.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

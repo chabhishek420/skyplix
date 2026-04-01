@@ -1,0 +1,24 @@
+<?php
+/*
+ * @ https://EasyToYou.eu - IonCube v11 Decoder Online
+ * @ PHP 7.2
+ * @ Decoder version: 1.0.4
+ * @ Release: 01/09/2021
+ */
+
+namespace Core\Sandbox\Exception;
+
+class SandboxError extends \Exception
+{
+    private $_subject = NULL;
+    public function setSubject(\Core\Sandbox\SandboxSubject $subject)
+    {
+        $this->_subject = $subject;
+    }
+    public function subject()
+    {
+        return $this->_subject;
+    }
+}
+
+?>

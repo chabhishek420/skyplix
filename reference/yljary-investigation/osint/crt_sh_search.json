@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://crt.sh",
+    "name": "Crt.sh",
+    "snippet": "No information is available for this page. Learn why",
+    "host_name": "crt.sh",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.letsencrypt.org/t/how-do-certificates-end-up-on-crt-sh/46651",
+    "name": "How do certificates end up on crt.sh? - Help",
+    "snippet": "20 Nov 2017 — Let's Encrypt submits newly issued certificates to certificate transparency logs . It takes time for the certificates to be received by the logs and for crt.sh ... Read more",
+    "host_name": "community.letsencrypt.org",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://blog.appsecco.com/certificate-transparency-part-3-the-dark-side-9d401809b025",
+    "name": "Certificate Transparency Part 3— The dark side | by Bharath",
+    "snippet": "14 Sept 2017 — In this post, we will look at the dark side of Certificate Transparency (CT). We'll look at how attackers can leverage CT logs to conduct reconnaissance. Read more",
+    "host_name": "blog.appsecco.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://hub.steampipe.io/plugins/turbot/crtsh/tables/crtsh_log_entry",
+    "name": "Table: crtsh_log_entry - Query crt.sh Log Entries using SQL",
+    "snippet": "crt . sh is a free public Certificate Transparency Log (CT Log ) search engine provided by Sectigo. It allows users to search for SSL/TLS certificates by various ... Read more",
+    "host_name": "hub.steampipe.io",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://groups.google.com/g/crtsh/c/bu2rvfNt288",
+    "name": "How does crt.sh becomes aware of certificates that are in",
+    "snippet": "23 Mar 2022 — Log entries for leaf certs need to also contain the chain of intermediate certs up to an accepted root. crt . sh creates records for these ... Read more",
+    "host_name": "groups.google.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.sectigo.com/blog/what-is-certificate-transparency",
+    "name": "What Is Certificate Transparency?",
+    "snippet": "There are several tools available for mining this data, including crt . sh and Censys. Crt . sh is the most commonly used tool for reading and auditing CT log data. Read more",
+    "host_name": "www.sectigo.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/@MuhammedAsfan/certificate-transparency-a-technical-overview-and-osint-toolkit-%EF%B8%8F-30d4f556f7f8",
+    "name": "Certificate Transparency: A Technical Overview and OSINT",
+    "snippet": "By monitoring CT logs , domain owners and browser vendors can quickly identify mistakenly or maliciously issued certificates , aiding in the ... Read more",
+    "host_name": "medium.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/78390449/how-to-query-certificate-transparency-logs-to-get-certificates-from-certain-peri",
+    "name": "How to query certificate transparency logs to get",
+    "snippet": "You can read RFC6962 for the CT logs APIs. This doc tells you how to fetch the entries from the CT logs . Read more",
+    "host_name": "stackoverflow.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://gist.github.com/reigningshells/1695ac631edfa54e8c02b09c8b28ade1",
+    "name": "Simple script to extract hostnames from cert transparency",
+    "snippet": "Simple script to extract hostnames from cert transparency logs at crt . sh - cert - transparency -extractor.py.",
+    "host_name": "gist.github.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.certkit.io/blog/searching-ct-logs",
+    "name": "Searching Certificate Transparency Logs (Part 1) - CertKit",
+    "snippet": "17 Nov 2025 — Searching Certificate Transparency logs lets you uncover every SSL/TLS certificate ever issued for your domain. You can detect mis-issuance, ...",
+    "host_name": "www.certkit.io",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -1,0 +1,221 @@
+{% raw %}
+<script type="text/x-template" id="settings-template">
+    <v-container fluid>
+        <h2>Settings</h2>
+        <v-container fluid class="mt-4">
+
+            <v-row class="ml-4 mt-2">
+                <v-btn
+                        color="success"
+                        @click="saveSettings"
+                        outlined
+                >
+                    Save Settings
+                </v-btn>
+            </v-row>
+            <v-row>
+                <v-col cols="12" md="6">
+                    <v-card dark flat>
+                        <v-card-title>App postback URL - GET REQUEST to:&nbsp;<code>{{ postbackUrl }}</code> </v-card-title>
+                        <v-card-title>Demo:&nbsp;<code>{{ postbackUrlDemo }}</code> </v-card-title>
+                        <v-card-text>
+                        <b>Statuses can be only: 'lead', 'sale', 'upsale', 'rejected', 'hold', 'trash'</b>
+                        </v-card-text>
+                    </v-card>
+                </v-col>
+            </v-row>
+            <v-row>
+                <v-col cols="12" md="6">
+                    <v-card dark flat>
+                        <v-card-title>General Settings</v-card-title>
+                        <v-card-text>
+                            <v-text-field
+                                    label="Tracker Domain"
+                                    v-model="settings.domain"
+                                    outlined
+                                    dense
+                            ></v-text-field>
+
+                            <v-select
+                                    label="Currency"
+                                    :items="currencies"
+                                    v-model="settings.currency"
+                                    outlined
+                                    dense
+                            ></v-select>
+
+                            <v-select
+                                    label="Timezone"
+                                    :items="timezones"
+                                    v-model="settings.timezone"
+                                    outlined
+                                    dense
+                            ></v-select>
+
+                        </v-card-text>
+                    </v-card>
+                </v-col>
+
+                <!--                <v-col cols="12" md="6">-->
+                <!--                    <v-card dark flat class="pa-4">-->
+                <!--                        <v-card-title>Advanced Settings</v-card-title>-->
+                <!--                        <v-card-text>-->
+
+                <!--                            <v-text-field-->
+                <!--                                    label="API Access Token"-->
+                <!--                                    v-model="settings.apiToken"-->
+                <!--                                    outlined-->
+                <!--                                    dense-->
+                <!--                                    append-icon="mdi-refresh"-->
+                <!--                                    @click:append="generateToken"-->
+                <!--                            ></v-text-field>-->
+
+                <!--                            <v-switch-->
+                <!--                                    label="Enable Request Logging"-->
+                <!--                                    v-model="settings.enableLogging"-->
+                <!--                                    inset-->
+                <!--                                    dense-->
+                <!--                            ></v-switch>-->
+
+                <!--                        </v-card-text>-->
+                <!--                    </v-card>-->
+                <!--                </v-col>-->
+                <!-- Блок маппинга переменных -->
+                <v-col cols="12">
+                    <v-card dark flat>
+                        <v-card-title>Matching Variables (Sub IDs)</v-card-title>
+                        <v-card-text>
+                            <v-row dense v-for="(mapping, index) in subIdMapping" :key="index" align="center">
+                                <v-col cols="3">
+                                    <v-text-field
+                                            :label="mapping.name"
+                                            v-model="mapping.name"
+                                            :readonly="!mapping.editable_name"
+                                            outlined
+                                            dense
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="3">
+                                    <v-text-field
+                                            :label="mapping.parameter"
+                                            v-model="mapping.parameter"
+                                            :readonly="!mapping.editable_name"
+                                            outlined
+                                            dense
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="6">
+                                    <v-text-field
+                                            label="Variable Name"
+                                            v-model="mapping.token"
+                                            outlined
+                                            dense
+                                    ></v-text-field>
+                                </v-col>
+                            </v-row>
+
+                        </v-card-text>
+                    </v-card>
+                </v-col>
+            </v-row>
+
+            <v-row class="ml-4 mt-2">
+                &nbsp;
+                <v-btn
+                        color="red"
+                        @click="clearData"
+                        outlined
+                >
+                    Delete Clicks & Conversion History Data
+                </v-btn>
+            </v-row>
+
+        </v-container>
+    </v-container>
+</script>
+
+<script type="application/javascript">
+    Vue.component('settings-component', {
+        template: '#settings-template',
+        data() {
+            return {
+                settings: {
+                    domain: '',
+                    currency: 'USD',
+                    timezone: 'UTC',
+                    autoUpdateReports: true,
+                    apiToken: 'a1b2c3d4e5f6',
+                    enableLogging: false,
+                },
+                subIdMapping: [
+                ],
+                currencies: ['USD', 'EUR', 'GBP', 'JPY'],
+                timezones: ['UTC', 'America/New_York', 'Europe/Berlin', 'Asia/Tokyo'],
+            };
+        },
+        mounted() {
+            this.loadSettings();
+            this.$root.$on('load-settings', this.loadSettings);
+        },
+        computed:{
+              postbackUrl() {
+                return `${window.location.origin}/pb/{click_id}/{status}/{payout}`;
+              },
+              postbackUrlDemo() {
+                return `${window.location.origin}/pb/d8f8d388-356b-4063-90ef-6137258b59c1/sale/202.15`;
+              }
+        },
+        methods: {
+            async clearData() {
+                if (!confirm("Are you sure you want to delete all tracking data?")) return;
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                if (!confirm("Are you REALLY sure you want to DELETE ALL TRACKING  HISTORY DATA?")) return;
+
+                fetch("/backend/api/settings/clear-tracking-data", {
+                    method: "POST"
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        this.$root.$emit("show-message", {type: "success", text: "Tracking data cleared successfully"});
+                    })
+                    .catch(err => {
+                        this.$root.$emit("show-message", {type: "error", text: "Error clearing data."});
+                    });
+            },
+            loadSettings() {
+                fetch("/backend/api/settings/", {
+                    credentials: "include"
+                })
+                    .then((r) => r.json())
+                    .then((data) => {
+                        if (data.settings) this.settings = data.settings;
+                        if (data.subIdMapping) this.subIdMapping = data.subIdMapping;
+                    });
+            },
+            saveSettings() {
+                const payload = {
+                    settings: this.settings,
+                    subIdMapping: this.subIdMapping
+                };
+                fetch("/backend/api/settings/", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    credentials: "include",
+                    body: JSON.stringify(payload)
+                })
+                    .then((r) => r.json())
+                    .then((data) => {
+                        this.$root.$emit("show-message", {type: "success", text: "Settings saved"});
+                    })
+                    .catch((err) => {
+                        this.$root.$emit("show-message", {type: "error", text: err.message});
+                    });
+            },
+
+            generateToken() {
+                this.settings.apiToken = Math.random().toString(36).substring(2, 12);
+            }
+        }
+    });
+</script>
+{% endraw %}

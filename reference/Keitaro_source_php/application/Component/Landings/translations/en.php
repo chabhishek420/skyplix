@@ -1,0 +1,11 @@
+<?php
+/*
+ * @ https://EasyToYou.eu - IonCube v11 Decoder Online
+ * @ PHP 7.2
+ * @ Decoder version: 1.0.4
+ * @ Release: 01/09/2021
+ */
+
+return ["landings" => ["title" => "Landing Pages", "landing" => "Landing Page", "choose" => "Choose landing page", "empty" => "No landing pages found", "help" => "http://v9.help.keitaro.io/en/landing-pages", "name" => "Name", "url" => "URL", "archive" => "ZIP File", "folder" => "Folder", "folder_desc" => "If you change the folder name, the folder will be renamed automatically.", "max_file_size" => "Max size {{size}}. ", "php_allowed" => "PHP allowed.", "php_not_allowed" => "PHP disabled. PHP can be enabled in Maintenance - Settings", "offer_count" => "Offer count", "offer_count_desc" => "Set count of offers that this landings shows. If you set more that 1, \n        rotation of offers will be disabled.", "creating" => "Create Landing Page", "editing" => "Edit Landing Page", "restored" => "The landing page has been restored", "group" => "Group", "add" => "Add Landing Pages", "create" => "Create Landing Page", "created" => "Landing page has been created", "instruction" => ["title" => "How to link LP with offers", "text" => "In order to make the landing page working with offers, you must use a special code on them. ", "html_desc" => "Attention! This method uses Cookies. Some browsers forbid saving cookies and \n            you'll lose them.\n            Also, it doesn't compatible with Click API.", "click_desc" => "To link with specific offer use it's ID: <code>\$client->getOffer(ID)</code>"], "invalid_zip" => "That is not valid ZIP file", "no_index_in_zip" => "The archive must contain file which name: %s.", "forbidden_function" => "Index file contains forbidden function: '%s' on line '%s'", "forbidden_charset" => "Index file contains forbidden charset: %s.", "forbidden_files" => "That archive contains forbidden files: %s.", "landing_type" => "Type", "folder_auto" => "(create automatically)", "file_uploaded" => "File has been uploaded!", "no_file" => "You must choose a file"]];
+
+?>

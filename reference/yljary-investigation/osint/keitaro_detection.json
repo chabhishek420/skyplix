@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://www.infoblox.com/blog/threat-intelligence/inside-keitaro-abuse-a-persistent-stream-of-ai-driven-investment-scams",
+    "name": "Inside Keitaro Abuse Part 1: Cloaking AI‑Enhanced Scams",
+    "snippet": "4 days ago — Infoblox and Confiant reveal how Keitaro is exploited for cloaking scams, targeting victims, and automating AI‑enhanced fraud in today's ...",
+    "host_name": "www.infoblox.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/walmartglobaltech/bypassing-malicious-tds-in-clickfix-campaigns-3be68fc2c14d",
+    "name": "Bypassing Malicious TDS in ClickFix Campaigns",
+    "snippet": "Gaterunner has proven to bypass TDS in various ClickFix and Strela Stealer campaigns, as well as bypassing specific TDS like Parrot and Keitaro . Read more",
+    "host_name": "medium.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://sublime.security/blog/keitaro-tds-abused-to-delivery-autoit-based-loader-targeting-german-speakers",
+    "name": "Keitaro TDS abused to deliver AutoIT-based loader",
+    "snippet": "Jul 24, 2025 — Detection signals. Sublime's AI-powered detection engine detected this attack. Some of the top signals for this attack were: Romance/explicit ... Read more",
+    "host_name": "sublime.security",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://keitaro.io",
+    "name": "Keitaro — Your Ad Performance Tracker",
+    "snippet": "Track Campaigns Across Platforms. All your marketing and sales data in one view is the visibility you need to scale without guesswork. Read more",
+    "host_name": "keitaro.io",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.esentire.com/blog/fake-browser-updates-distribute-lummac-stealer-amadey-and-privateloader-malware",
+    "name": "Fake Browser Updates Distribute LummaC Stealer",
+    "snippet": "Sep 1, 2023 — This new page contains a 6000+ line HTML document containing various scripts associated with Keitaro TDS and FingerprintJS. Figure 5 Comparison ... Read more",
+    "host_name": "www.esentire.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://phishdestroy.github.io/ScamIntelLogs/keitaro/checker.html",
+    "name": "Keitaro TDS Detector | PhishDestroy",
+    "snippet": "Online Keitaro TDS detection tool based on official documentation. 7 evidence checks, cloaking analysis with 27 profiles, mass scan, dark/light theme.",
+    "host_name": "phishdestroy.github.io",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.keitaro.io/en/maintenance/logs.html",
+    "name": "Logs | Keitaro",
+    "snippet": "The log contains information about the incoming traffic ( clicks ). There are two traffic logs in the tracker: Global. Shows a log for all incoming clicks to the ... Read more",
+    "host_name": "docs.keitaro.io",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.bridewell.com/insights/blogs/detail/clearfake-campaign",
+    "name": "ClearFake Campaign - Delivering Malware via “Fake",
+    "snippet": "Jan 23, 2024 — ClearFake is a relatively new, malicious JavaScript framework that was first identified in July 2023 by security researcher Randy McEoin. Read more",
+    "host_name": "www.bridewell.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.proofpoint.com/au/blog/threat-insight/are-you-sure-your-browser-date-current-landscape-fake-browser-updates",
+    "name": "The Dangers of Fake Updates for Browsers",
+    "snippet": "Oct 17, 2023 — Fake browser updates refer to compromised websites that display what appears to be a notification from the browser developer such as Chrome, Firefox, or Edge. Read more",
+    "host_name": "www.proofpoint.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.recordedfuture.com/blog/how-threat-actors-are-rizzing-up-your-ai-for-profit",
+    "name": "How Threat Actors Are Rizzing Up Your AI for Profit",
+    "snippet": "Aug 26, 2025 — A TDS that already fingerprints bots and visitors will happily add “LLM-aware” personalities to feed chatbots one thing and humans another. The ... Read more",
+    "host_name": "www.recordedfuture.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

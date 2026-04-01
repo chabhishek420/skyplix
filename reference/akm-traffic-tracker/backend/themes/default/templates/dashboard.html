@@ -1,0 +1,331 @@
+{% raw %}
+<script type="text/x-template" id="dashboard-template">
+    <v-container fluid>
+        <h2>Dashboard</h2>
+
+        <v-row dense class="mt-4">
+            <v-col
+                    v-for="metric in metrics"
+                    :key="metric.title"
+                    cols="12"
+                    sm="6"
+                    md="2"
+            >
+                <v-card class="pa-3"
+                        :color="metric.color"
+                >
+                    <v-card-text class="text-center">
+                        <div class="text-h5">{{ metric.title }}</div>
+                        <div class="text-h4 font-weight-bold mt-2">{{ metric.value }}</div>
+                    </v-card-text>
+                </v-card>
+            </v-col>
+        </v-row>
+        <v-row class="mt-4">
+            <v-col></v-col>
+            <v-col cols="2">
+                <v-menu
+                        v-model="date_menu2"
+                        :close-on-content-click="false"
+                        :nudge-right="40"
+                        transition="scale-transition"
+                        offset-y
+                        min-width="auto"
+                >
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-text-field
+                                v-model="dateRangeText"
+                                label="Date range"
+                                prepend-icon="mdi-calendar"
+                                readonly
+                                v-bind="attrs"
+                                v-on="on"
+                                range
+                                readonly
+                                outlined
+                                dense
+                        ></v-text-field>
+                    </template>
+                    <v-date-picker
+                            v-model="filters.date_range"
+                            @input="menu2 = false"
+                            range
+                    ></v-date-picker>
+                </v-menu>
+            </v-col>
+            <v-col cols="2">
+                <v-select
+                        :items="['Hours', 'Days', 'Weeks', 'Months']"
+                        label="Detalization"
+                        v-model="filters.detailLevel"
+                        outlined
+                        dense
+                ></v-select>
+            </v-col>
+            <v-col cols="2">
+                <v-select
+                        :items="campaigns"
+                        v-model="filters.campaigns"
+                        label="Select Campaigns"
+                        item-text="name"
+                        item-value="id"
+                        outlined
+                        dense
+                        multiple
+                        chips
+                ></v-select>
+            </v-col>
+            <v-col cols="2">
+                <v-btn
+                        color="primary"
+                        @click="loadData()"
+                        dense
+                >
+                    Apply Filters
+                </v-btn>
+            </v-col>
+        </v-row>
+        <v-row>
+            <v-col cols="12">
+                <v-card>
+                    <apexchart
+                            height="500"
+                            type="area"
+                            :options="mainChart.chartOptions"
+                            :series="mainChart.series"
+                    ></apexchart>
+                </v-card>
+            </v-col>
+        </v-row>
+        <v-row>
+            <v-col cols="8">
+                <v-card>
+                    <v-data-table
+                            :headers="headers"
+                            :items="visits"
+                            :items-per-page="5"
+                            class="elevation-1"
+                    ></v-data-table>
+                </v-card>
+            </v-col>
+            <v-col cols="4">
+                <v-card>
+                    <v-data-table
+                            :headers="headers2"
+                            :items="visits"
+                            :items-per-page="5"
+                            class="elevation-1"
+                    ></v-data-table>
+                </v-card>
+            </v-col>
+        </v-row>
+    </v-container>
+</script>
+
+<script type="application/javascript">
+    Vue.component('dashboard-component', {
+        template: '#dashboard-template',
+        data() {
+            return {
+                date_menu2: false,
+                filters: {
+                    campaigns: [],
+                    date_range: [
+                        new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+                        new Date().toISOString().split('T')[0]
+                    ],
+                    detailLevel: 'Days',
+                },
+                campaigns: [],
+                metrics: [
+                    {title: 'Clicks', value: 0, color: 'blue darken-2'},
+                    {title: 'Unique Clicks', value: 0, color: 'indigo darken-2'},
+                    {title: 'Conversions', value: 0, color: 'deep-purple darken-2'},
+                    {title: 'Cost', value: '$0', color: 'red darken-2'},
+                    {title: 'Revenue', value: '$0', color: 'green darken-2'},
+                    {title: 'ROI', value: '0%', color: 'teal darken-2'}
+                ],
+                mainChart: {
+                    series: [
+                        {
+                            name: 'Visits',
+                            data: []
+                        },
+                        {
+                            name: 'Unique Visits',
+                            data: []
+                        },
+                        {
+                            name: 'Clicks',
+                            data: []
+                        },
+                        {
+                            name: 'Conversions',
+                            data: []
+                        },
+                        {
+                            name: 'Unique Clicks',
+                            data: []
+                        },
+
+                    ],
+                    chartOptions: {
+                        chart: {
+                            background: 'None',
+                            id: 'basic-line',
+                            stacked: false,
+                            toolbar: {
+                                show: true
+                            },
+                            zoom: {
+                                enabled: false
+                            }
+                        },
+                        dataLabels: {
+                            enabled: false
+                        },
+                        stroke: {
+                            curve: 'monotoneCubic'
+                        },
+                        theme: {
+                            mode: 'dark'
+                        },
+                        xaxis: {
+                            categories: [],
+                            // type: 'datetime'
+                            type: 'category',
+                            labels: {
+                                rotate: -45,
+                                style: {
+                                    colors: '#ffffff'
+                                }
+                            }
+                        },
+                        yaxis: {
+                            labels: {
+                                style: {
+                                    colors: '#ffffff'
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                            horizontalAlign: 'left'
+                        },
+                    }
+                },
+                headers: [
+                    {text: 'IP', value: 'ip'},
+                    {text: 'Country', value: 'country'},
+                    {text: 'Url', value: 'url'},
+                    {text: 'Referrer', value: 'referrer'},
+                    {text: 'Time', value: 'received_at'},
+                ],
+                headers2: [
+                    {text: 'IP', value: 'ip'},
+                    {text: 'Country', value: 'country'},
+                    {text: 'Referrer', value: 'referrer'},
+                    {text: 'Time', value: 'received_at'},
+                ],
+                visits: [],
+
+            }
+        },
+        mounted() {
+            this.loadData();
+            this.$root.$on('load-dashboard', this.loadData);
+        },
+
+        computed: {
+            dateRangeText() {
+                return this.filters.date_range.join(' ~ ')
+            },
+        },
+
+        methods:
+            {
+                loadFiltersData() {
+                    // load campaigns
+                    fetch('/backend/api/campaigns/')
+                        .then(res => res.json())
+                        .then(data => {
+                            this.campaigns = data;
+                        });
+                },
+                loadData(date) {
+                    this.$root.$emit('show-overlay', 'Can take a while, 1+ minute');
+                    this.loadFiltersData();
+
+                    const payload = {
+                        campaigns: this.filters.campaigns,
+                        date_from: this.filters.date_range[0],
+                        date_to: this.filters.date_range[1],
+                        detail_level: this.filters.detailLevel
+                    };
+
+                    fetch('/backend/api/dashboard/visits', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            this.visits = data;
+                        });
+
+                    fetch('/backend/api/dashboard/metrics', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            this.metrics = [
+                                {title: 'Clicks', value: data.metrics.clicks, color: 'blue darken-2'},
+                                {title: 'Unique Clicks', value: data.metrics.unique_clicks, color: 'indigo darken-2'},
+                                {title: 'Conversions', value: data.metrics.conversions, color: 'deep-purple darken-2'},
+                                {title: 'Cost', value: `$${data.metrics.cost}`, color: 'red darken-2'},
+                                {title: 'Revenue', value: `$${data.metrics.revenue}`, color: 'green darken-2'},
+                                {title: 'ROI', value: data.metrics.roi, color: 'teal darken-2'}
+                            ];
+
+                            const categories = data.chart.labels;
+
+                            this.mainChart.series = [
+                                {
+                                    name: 'Visits',
+                                    data: categories.map((label, i) => ({x: label, y: data.chart.visits[i] || 0}))
+                                },
+                                {
+                                    name: 'Unique Visits',
+                                    data: categories.map((label, i) => ({x: label, y: data.chart.unique_visits[i] || 0}))
+                                },
+                                {
+                                    name: 'Clicks',
+                                    data: categories.map((label, i) => ({x: label, y: data.chart.clicks[i] || 0}))
+                                },
+                                {
+                                    name: 'Conversions',
+                                    data: categories.map((label, i) => ({x: label, y: data.chart.conversions[i] || 0}))
+                                },
+                                {
+                                    name: 'Unique Clicks',
+                                    data: categories.map((label, i) => ({
+                                        x: label,
+                                        y: data.chart.unique_clicks[i] || 0
+                                    }))
+                                }
+                            ];
+
+                            this.mainChart.chartOptions.xaxis.type = 'category';
+                            delete this.mainChart.chartOptions.xaxis.categories;
+
+                            this.$root.$emit('hide-overlay');
+                        });
+
+                },
+
+            }
+    });
+</script>
+{% endraw %}

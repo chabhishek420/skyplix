@@ -1,0 +1,51 @@
+# === Go ===
+/zai-tds
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+/vendor/
+
+# === Dependencies ===
+/legacy-nextjs/node_modules/
+
+# === Build ===
+/dist/
+/build/
+/bin/
+/tmp/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Environment ===
+.env
+.env.local
+.env.*.local
+
+# === Database ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === Logs ===
+*.log
+
+# === Next.js legacy ===
+/legacy-nextjs/.next/
+/legacy-nextjs/node_modules/
+/legacy-nextjs/tsconfig.tsbuildinfo
+
+# === GeoIP databases (downloaded at runtime) ===
+*.mmdb

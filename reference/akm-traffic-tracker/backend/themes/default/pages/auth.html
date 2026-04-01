@@ -1,0 +1,83 @@
+<script type="text/x-template" id="auth-page-template">
+  <v-row align="center" justify="center" style="min-height: 100vh;">
+    <v-col cols="12" sm="8" md="4">
+      <v-card outlined>
+        <v-card-title class="headline justify-center">
+          Welcome
+        </v-card-title>
+
+        <v-card-text>
+          <v-form @submit.prevent="login">
+            <v-text-field
+              label="Username"
+              v-model="username"
+              outlined
+              required
+            ></v-text-field>
+
+            <v-text-field
+              label="Password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              outlined
+              required
+              append-icon="mdi-eye"
+              @click:append="showPassword = !showPassword"
+            ></v-text-field>
+
+            <v-btn color="primary" class="mt-4" block outlined type="submit">
+              Login
+            </v-btn>
+          </v-form>
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
+</script>
+
+<!-- ================== -->
+<!-- Скрипт регистрации компонента -->
+<!-- ================== -->
+<script type="application/javascript">
+Vue.component('auth-page-component', {
+  template: '#auth-page-template',
+  data() {
+    return {
+      username: '',
+      password: '',
+      showPassword: false,
+    };
+  },
+  methods: {
+    async login() {
+      try {
+        const response = await fetch('/backend/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: this.username,
+            password: this.password
+          }),
+          credentials: 'include' // ОБЯЗАТЕЛЬНО! Чтобы куки передавались
+        });
+
+        if (!response.ok) {
+          throw new Error('Login failed');
+        }
+
+        const data = await response.json();
+        console.log('Login success:', data);
+
+        // Редирект на /backend/dashboard
+        window.location.href = '/backend/dashboard';
+
+      } catch (error) {
+        console.error('Error during login:', error);
+        alert('Wrong username or password!');
+      }
+    }
+  }
+});
+</script>

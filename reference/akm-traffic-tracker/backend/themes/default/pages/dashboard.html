@@ -1,0 +1,201 @@
+<script type="text/x-template" id="dashboard-page-template">
+    <v-container fluid style="height: 100%;">
+
+        <v-row class="align-center mb-2">
+            <v-col>
+                <h1 style="font-size: 20px; font-weight: 600; margin: 0;">
+                    Welcome, tracker_admin (admin)
+                </h1>
+            </v-col>
+
+            <v-col class="d-flex justify-end">
+                <v-btn
+                        color="error"
+                        outlined
+                        small
+                        @click="logout"
+                >
+                    Logout
+                </v-btn>
+            </v-col>
+        </v-row>
+        <v-tabs
+                v-model="tab"
+                height="48"
+                slider-color="white"
+                show-arrows
+                next-icon="mdi-arrow-right-bold-box-outline"
+                prev-icon="mdi-arrow-left-bold-box-outline"
+        >
+            <v-tab v-for="item in tabs" :key="item" v-text="item" style="font-size: 12px;"></v-tab>
+        </v-tabs>
+
+        <v-tabs-items v-model="tab" style="min-height: calc(100% - 100px); overflow-y: auto;">
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <dashboard-component></dashboard-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <campaigns-component></campaigns-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <landings-component></landings-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <affiliates-component></affiliates-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <offers-component></offers-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <sources-component></sources-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <reports-component></reports-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            {% if is_authenticated_user_type == 'admin' %}
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <domains-component></domains-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <settings-component></settings-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <users-component></users-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+            {% endif %}
+            <v-tab-item>
+                <v-card flat>
+                    <v-card-text>
+                        <about-component></about-component>
+                    </v-card-text>
+                </v-card>
+            </v-tab-item>
+
+        </v-tabs-items>
+    </v-container>
+</script>
+
+<script type="application/javascript">
+    Vue.component('dashboard-page-component', {
+        template: '#dashboard-page-template',
+        data() {
+            return {
+                tab: 0, // Active tab
+                tabs: [
+                    "Dashboard",
+                    "Campaigns",
+                    "Landing Pages",
+                    "Affiliate Networks",
+                    "Offers",
+                    "Sources",
+                    "Reports",
+{% if is_authenticated_user_type == 'admin' %}
+            "Domains",
+                "Settings",
+                "Users",
+{% endif %}
+            "Documentattion"
+        ],
+
+        }
+        },
+        watch: {
+            tab(newTab) {
+                switch (newTab) {
+                    case 0:
+                        this.$root.$emit('load-dashboard');
+                        break;
+                    case 1:
+                        this.$root.$emit('load-campaigns');
+                        break;
+                    case 2:
+                        this.$root.$emit('load-landings');
+                        break;
+                    case 3:
+                        this.$root.$emit('load-affiliates');
+                        break;
+                    case 4:
+                        this.$root.$emit('load-offers');
+                        break;
+                    case 5:
+                        this.$root.$emit('load-sources');
+                        break;
+                    case 6:
+                         this.$root.$emit('load-reports');
+                         break;
+                    case 7:
+                        this.$root.$emit('load-domains');
+                        break;
+                    case 8:
+                        this.$root.$emit('load-settings');
+                        break;
+                    case 9:
+                        this.$root.$emit('load-users');
+                        break;
+                }
+                localStorage.setItem('dashboard_tab', newTab);
+
+            }
+        },
+        mounted(){
+            const savedTab = localStorage.getItem('dashboard_tab');
+            if (savedTab !== null) {
+                this.tab = parseInt(savedTab, 10);
+            }
+        },
+        methods: {
+            async logout() {
+                document.cookie = "session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname + ";";
+                await fetch('/backend/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                // Редирект на страницу авторизации
+                window.location.href = '/backend/auth';
+            }
+        }
+    });
+</script>

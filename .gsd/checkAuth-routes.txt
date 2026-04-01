@@ -1,0 +1,16 @@
+src/app/api/admin/audit-logs/route.ts
+src/app/api/admin/settings/route.ts
+src/app/api/admin/offers/route.ts
+src/app/api/admin/domains/route.ts
+src/app/api/admin/landings/route.ts
+src/app/api/admin/conversions/route.ts
+src/app/api/admin/streams/route.ts
+src/app/api/admin/traffic-sources/route.ts
+src/app/api/admin/bot-rules/route.ts
+src/app/api/admin/users/route.ts
+src/app/api/admin/publishers/route.ts
+src/app/api/admin/campaigns/route.ts
+src/app/api/admin/AGENTS.md
+src/app/api/admin/affiliate-networks/route.ts
+src/app/api/admin/reports/route.ts
+src/app/api/admin/clicks/route.ts

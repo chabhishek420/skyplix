@@ -1,0 +1,734 @@
+// Traffic Distribution System (TDS) Schema
+// Based on yljary.com Keitaro TDS reverse engineering
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("admin") // admin, viewer
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  sessions Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// CAMPAIGN & OFFER MANAGEMENT
+// ============================================
+
+model Campaign {
+  id            String   @id @default(cuid())
+  campaignId    Int      @unique // External ID like 10115
+  name          String
+  alias         String?  // URL alias
+  description   String?
+  status        String   @default("active") // active, paused, deleted
+  
+  // Campaign type
+  type          String   @default("weight") // position, weight
+  
+  // Destination configuration
+  offerId       Int?     // HasOffers offer_id
+  affiliateId   String?  // Affiliate account ID
+  destinationUrl String? // Direct destination URL
+  
+  // Traffic settings
+  dailyCap      Int?
+  totalCap      Int?
+  cookiesTtl    Int      @default(24) // Cookie lifetime in hours
+  
+  // Visitor binding
+  bindVisitors         Boolean @default(false) // Bind stream to visitor
+  bindVisitorsLanding  Boolean @default(false) // Bind landing to visitor
+  bindVisitorsOffer    Boolean @default(false) // Bind offer to visitor
+  
+  // Safe page configuration
+  safePageUrl   String?
+  safePageType  String   @default("redirect") // redirect, content
+  
+  // Token for campaign access
+  token         String?  @unique
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  streams       Stream[]
+  clicks        Click[]
+  conversions   Conversion[]
+  publisherAccess CampaignPublisher[]
+  domains       Domain[]
+  trafficSources CampaignTrafficSource[]
+  
+  @@index([status])
+  @@index([campaignId])
+}
+
+model Stream {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  name        String
+  alias       String?  // Stream alias for URLs
+  
+  // Stream type: forced, regular, default
+  // forced: First matching stream wins (position-based)
+  // regular: Weight-based random selection
+  // default: Fallback stream
+  type        String   @default("regular") // forced, regular, default
+  
+  // Stream schema: url, landings, offers, action
+  // url: Direct URL redirect
+  // landings: Landing page rotator
+  // offers: Offer rotator
+  // action: Execute custom action
+  schema      String   @default("url") // url, landings, offers, action
+  
+  weight      Int      @default(100) // Traffic weight for A/B testing
+  position    Int      @default(0)   // Position for forced streams
+  
+  status      String   @default("active") // active, paused, deleted
+  
+  // Stream destination (for url schema)
+  actionType    String?   // http_redirect, meta, js, iframe, etc.
+  actionPayload String?   // URL or content
+  actionOptions String?   // JSON options
+  
+  // Stream settings
+  collectClicks Boolean @default(true) // Whether to store clicks
+  filterOr      Boolean @default(false) // Filter mode: AND (false) or OR (true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  clicks              Click[]
+  filters             StreamFilter[]
+  landingAssociations StreamLandingAssociation[]
+  offerAssociations   StreamOfferAssociation[]
+  
+  @@index([campaignId])
+  @@index([type])
+  @@index([status])
+}
+
+// ============================================
+// STREAM FILTERS (Geo, Device, etc.)
+// ============================================
+
+model StreamFilter {
+  id        String   @id @default(cuid())
+  streamId  String
+  stream    Stream   @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  
+  name      String   // Filter type: geo, device, language, ip, etc.
+  mode      String   // accept, reject
+  
+  // Filter payload (JSON)
+  // Example for geo: {"countries": ["US", "UK", "CA"]}
+  // Example for device: {"device_types": ["mobile", "tablet"]}
+  payload   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([streamId])
+  @@index([name])
+}
+
+// ============================================
+// LANDING PAGES
+// ============================================
+
+model Landing {
+  id        String   @id @default(cuid())
+  name      String
+  url       String?  // Landing page URL
+  
+  // Action configuration
+  actionType    String?   // http_redirect, iframe, etc.
+  actionPayload String?   // URL or content
+  actionOptions String?   // JSON options
+  
+  // Landing type
+  landingType String   @default("external") // external, local
+  
+  status    String   @default("active") // active, paused, deleted
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  streamAssociations StreamLandingAssociation[]
+  domains           Domain[]
+  
+  @@index([status])
+}
+
+// ============================================
+// OFFERS
+// ============================================
+
+model Offer {
+  id        String   @id @default(cuid())
+  name      String
+  url       String?  // Offer URL
+  
+  // Affiliate network
+  affiliateNetworkId String?
+  
+  // Payout configuration
+  payoutValue    Float    @default(0)
+  payoutCurrency String?  @default("USD")
+  payoutType     String?  @default("CPA") // CPA, CPC
+  payoutAuto     Boolean  @default(false) // Auto-detect payout from postback
+  
+  // Conversion cap
+  conversionCapEnabled Boolean @default(false)
+  dailyCap             Int?
+  alternativeOfferId   String? // Fallback offer when cap reached
+  
+  // Country targeting
+  country String? // Target country code
+  
+  // Action configuration
+  actionType    String?   // http_redirect, etc.
+  actionPayload String?   // URL or content
+  actionOptions String?   // JSON options
+  
+  // Offer type
+  offerType String   @default("external") // external, local
+  
+  status    String   @default("active") // active, paused, deleted
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  streamAssociations StreamOfferAssociation[]
+  
+  @@index([status])
+  @@index([affiliateNetworkId])
+}
+
+// ============================================
+// STREAM ASSOCIATIONS (Landing/Offer Rotator)
+// ============================================
+
+model StreamLandingAssociation {
+  id         String   @id @default(cuid())
+  streamId   String
+  stream     Stream   @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  landingId  String
+  landing    Landing  @relation(fields: [landingId], references: [id], onDelete: Cascade)
+  
+  share      Int      @default(100) // Traffic share percentage
+  status     String   @default("active") // active, paused
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@unique([streamId, landingId])
+  @@index([streamId])
+  @@index([landingId])
+}
+
+model StreamOfferAssociation {
+  id        String   @id @default(cuid())
+  streamId  String
+  stream    Stream   @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  
+  share     Int      @default(100) // Traffic share percentage
+  status    String   @default("active") // active, paused
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([streamId, offerId])
+  @@index([streamId])
+  @@index([offerId])
+}
+
+model CampaignPublisher {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  publisherId String
+  publisher   Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  status      String   @default("active") // active, blocked
+  createdAt   DateTime @default(now())
+  
+  @@unique([campaignId, publisherId])
+}
+
+// ============================================
+// PUBLISHER MANAGEMENT
+// ============================================
+
+model Publisher {
+  id            String   @id @default(cuid())
+  pubId         Int      @unique // External ID like 102214
+  name          String
+  email         String?
+  status        String   @default("active") // active, blocked, deleted
+  
+  // Traffic source
+  source        String?
+  referrer      String?
+  
+  // Stats
+  totalClicks   Int      @default(0)
+  totalConversions Int   @default(0)
+  totalRevenue  Float    @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  clicks        Click[]
+  campaignAccess CampaignPublisher[]
+}
+
+// ============================================
+// AFFILIATE NETWORK INTEGRATION
+// ============================================
+
+model AffiliateNetwork {
+  id            String   @id @default(cuid())
+  name          String   // e.g., "HasOffers", "Impact"
+  baseUrl       String   // e.g., "hostinger-elb.go2cloud.org"
+  
+  // API credentials
+  apiKey        String?
+  apiSecret     String?
+  
+  // Tracking parameters
+  clickParam    String   @default("clickid") // Parameter name for click ID
+  payoutParam   String   @default("payout")
+  statusParam   String   @default("status")
+  
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  conversions   Conversion[]
+}
+
+// ============================================
+// DOMAIN MANAGEMENT
+// ============================================
+
+model Domain {
+  id            String   @id @default(cuid())
+  name          String   @unique // Domain name (e.g., "example.com")
+  
+  // Domain type
+  type          String   @default("campaign") // campaign, landing, offer, default
+  
+  // Campaign association
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
+  // Landing page association
+  landingId     String?
+  landing       Landing? @relation(fields: [landingId], references: [id], onDelete: SetNull)
+  
+  // SSL configuration
+  sslEnabled    Boolean  @default(true)
+  sslAutoRenew  Boolean  @default(true)
+  
+  // Settings
+  isDefault     Boolean  @default(false)
+  redirectToWww Boolean  @default(false)
+  catchAll      Boolean  @default(false) // Catch all paths
+  
+  // Status
+  status        String   @default("active") // active, paused, error
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([name])
+  @@index([type])
+  @@index([status])
+}
+
+// ============================================
+// TRAFFIC SOURCE MANAGEMENT
+// ============================================
+
+model TrafficSource {
+  id            String   @id @default(cuid())
+  name          String
+  trafficSourceId Int?   @unique // External ID
+  
+  // Traffic source type
+  type          String   @default("general") // general, search, social, native, pop, push, adult
+  
+  // Keywords tracking
+  keywordParam  String   @default("keyword") // URL parameter for keyword
+  costParam     String   @default("cost")
+  sourceParam   String   @default("source")
+  
+  // Referrer handling
+  useReferrer   Boolean  @default(true)
+  referrerTemplate String?
+  
+  // Postback settings
+  postbackUrl   String?
+  postbackType  String   @default("get") // get, post
+  postbackParams String? // JSON: mapping of params to send
+  
+  // Impression tracking
+  impressionUrl String?
+  
+  // Status
+  status        String   @default("active")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  campaigns     CampaignTrafficSource[]
+  
+  @@index([type])
+  @@index([status])
+}
+
+// Junction table for Campaign-TrafficSource relationship
+model CampaignTrafficSource {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  trafficSourceId String
+  trafficSource   TrafficSource @relation(fields: [trafficSourceId], references: [id], onDelete: Cascade)
+  
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  
+  @@unique([campaignId, trafficSourceId])
+  @@index([campaignId])
+  @@index([trafficSourceId])
+}
+
+// ============================================
+// BOT DETECTION & CLOAKING
+// ============================================
+
+model BotRule {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // ip, user_agent, referrer, parameter, header
+  
+  // Rule configuration
+  pattern     String   // Regex pattern or exact match
+  matchType   String   @default("regex") // regex, exact, contains
+  
+  // Action
+  action      String   @default("safe_page") // safe_page, block, redirect
+  redirectUrl String?
+  
+  priority    Int      @default(100)
+  status      String   @default("active")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SafePage {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("redirect") // redirect, content, json
+  url         String?
+  content     String?  // HTML content for content type
+  language    String?  // e.g., "zh-CN", "ru", "de"
+  
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// CLICK & CONVERSION TRACKING
+// ============================================
+
+model Click {
+  id            String   @id @default(cuid())
+  clickId       String   @unique // 24-char hex: 8 timestamp + 16 random
+  visitorCode   String?  // Visitor identifier for session tracking
+  
+  // Source information
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  streamId      String?
+  stream        Stream?   @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  landingId     String?   // Selected landing page
+  offerId       String?   // Selected offer
+  publisherId   String?
+  publisher     Publisher? @relation(fields: [publisherId], references: [id], onDelete: SetNull)
+  parentCampaignId String? // For redirect to another campaign
+  
+  // Request data
+  ip            String?
+  userAgent     String?
+  referrer      String?
+  language      String?
+  
+  // Geo data
+  country       String?
+  region        String?
+  city          String?
+  isp           String?
+  operator      String?
+  connectionType String? // cellular, cable, dsl, etc.
+  
+  // Device data
+  deviceType    String?  // desktop, mobile, tablet
+  deviceModel   String?
+  deviceBrand   String?
+  browser       String?
+  browserVersion String?
+  os            String?
+  osVersion     String?
+  isMobile      Boolean  @default(false)
+  
+  // Traffic source params
+  source        String?
+  keyword       String?
+  sub1          String?
+  sub2          String?
+  sub3          String?
+  sub4          String?
+  sub5          String?
+  sub6          String?
+  sub7          String?
+  sub8          String?
+  sub9          String?
+  sub10         String?
+  sub11         String?
+  sub12         String?
+  sub13         String?
+  sub14         String?
+  sub15         String?
+  extraParam1   String?
+  extraParam2   String?
+  extraParam3   String?
+  
+  // Tracking IDs
+  creativeId    String?
+  adCampaignId  String?
+  externalId    String?
+  xRequestedWith String?
+  
+  // Destination
+  destinationUrl String?
+  landingUrl    String?
+  
+  // Cloaking
+  isBot         Boolean  @default(false)
+  botReason     String?
+  botType       String?  // crawler, scanner, tool, suspicious
+  showedSafePage Boolean @default(false)
+  isUsingProxy  Boolean  @default(false)
+  
+  // Uniqueness
+  isUniqueCampaign Boolean @default(true)
+  isUniqueStream   Boolean @default(true)
+  isUniqueGlobal   Boolean @default(true)
+  
+  // Landing clicked (for LP -> Offer flow)
+  landingClicked     Boolean  @default(false)
+  landingClickedAt   DateTime?
+  
+  // Revenue tracking
+  isLead         Boolean  @default(false)
+  isSale         Boolean  @default(false)
+  isRejected     Boolean  @default(false)
+  leadRevenue    Float    @default(0)
+  saleRevenue    Float    @default(0)
+  rejectedRevenue Float   @default(0)
+  cost           Float    @default(0)
+  
+  // Goals tracking (up to 4 goals)
+  goal1          Boolean  @default(false)
+  goal1At        DateTime?
+  goal2          Boolean  @default(false)
+  goal2At        DateTime?
+  goal3          Boolean  @default(false)
+  goal3At        DateTime?
+  goal4          Boolean  @default(false)
+  goal4At        DateTime?
+  
+  // Session
+  sessionId     String?
+  cookieSet     Boolean  @default(false)
+  token         String?  // LP token for offer tracking
+  
+  // Timestamp
+  clickedAt     DateTime @default(now())
+  
+  // Conversion relation
+  conversion    Conversion?
+  
+  @@index([clickId])
+  @@index([campaignId])
+  @@index([streamId])
+  @@index([publisherId])
+  @@index([clickedAt])
+  @@index([visitorCode])
+  @@index([country])
+}
+
+model Conversion {
+  id            String   @id @default(cuid())
+  clickId       String   @unique
+  click         Click    @relation(fields: [clickId], references: [clickId], onDelete: Cascade)
+  
+  // Campaign reference
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
+  // Network reference
+  networkId     String?
+  network       AffiliateNetwork? @relation(fields: [networkId], references: [id], onDelete: SetNull)
+  
+  // Conversion data
+  status        String   @default("pending") // pending, approved, rejected
+  payout        Float    @default(0)
+  revenue       Float    @default(0)
+  
+  // Postback data
+  postbackData  String?  // Raw postback data
+  postbackIp    String?
+  postbackAt    DateTime @default(now())
+  
+  // Additional tracking
+  transactionId String?
+  offerId       String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([clickId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([postbackAt])
+}
+
+// ============================================
+// ANALYTICS & REPORTING
+// ============================================
+
+model DailyStat {
+  id            String   @id @default(cuid())
+  date          DateTime
+  campaignId    String?
+  publisherId   String?
+  
+  clicks        Int      @default(0)
+  uniqueClicks  Int      @default(0)
+  bots          Int      @default(0)
+  conversions   Int      @default(0)
+  revenue       Float    @default(0)
+  cost          Float    @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([date, campaignId, publisherId])
+  @@index([date])
+}
+
+// ============================================
+// SYSTEM SETTINGS
+// ============================================
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  type        String   @default("string") // string, number, boolean, json
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  details     String?  // JSON
+  
+  ip          String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ============================================
+// PHASE 7: TRUE API PARITY EXTENSIONS
+// ============================================
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("campaigns") // campaigns, offers, etc.
+  position    Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([name, type])
+}
+
+model Label {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  color       String   @default("#000000") // Hex color
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Trigger {
+  id          String   @id @default(cuid())
+  name        String
+  targetType  String   // campaign, stream
+  targetId    String?  // Target entity
+  
+  condition   String   // JSON configuration for metric thresholds
+  action      String   // pause, start, etc
+  
+  status      String   @default("active")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([targetType, targetId])
+}

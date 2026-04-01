@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AKM TRACKER</title>
+
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.5.95/css/materialdesignicons.min.css" rel="stylesheet">
+
+    <!-- Vuetify CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+    <!-- Vue 2 -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js" type="application/javascript"></script>
+
+    <!-- Vuetify JS -->
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js" type="application/javascript"></script>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-apexcharts"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/terser@5.30.2/dist/bundle.min.js"></script>
+
+    <link href="/backend/backend/css/style.css" rel="stylesheet">
+</head>
+<body>
+{% raw %}
+    <script type="application/javascript">
+        async function minifyScript(code) {
+              const result = await Terser.minify(code, {
+                compress: true,
+                mangle: true,
+              });
+              return result.code;
+            }
+    </script>
+
+<div id="overlay">
+  <div class="spinner"></div>
+    <div class="overlay_message" id="overlay_message">Loading...</div>
+</div>
+<script type="application/javascript">
+    Vue.prototype.$formatDate = function(dateStr, locale = 'en-US') {
+      if (!dateStr) return '';
+      const options = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/New_York' // или оставить local
+      };
+      return new Date(dateStr).toLocaleString(locale, options);
+    };
+</script>
+<script type="application/javascript">
+    Vue.component('toast-list-component', {
+        template: `<div></div>`,
+        data() {
+            return {
+                toasts: []
+            };
+        },
+        mounted() {
+            this.$root.$on('show-message', (payload) => {
+                Toastify({
+                    text: payload.text || 'Something happened',
+                    className: payload.type || 'info',
+                    gravity: "top", // `top` or `bottom`
+                    position: "right", // `left`, `center` or `right`
+                    stopOnFocus: true, // Prevents dismissing of toast on hover
+                    duration: 3000,
+                    style: {
+                        background: this.getColor(payload.type),
+                    },
+                }).showToast();
+            });
+
+            this.$root.$on('show-overlay', (message) => { this.showOverlay(message)});
+            this.$root.$on('hide-overlay', this.hideOverlay);
+        },
+        methods: {
+            getColor(type) {
+                return {
+                    success: 'linear-gradient(to right, #00b09b, #96c93d)',
+                    error: 'linear-gradient(to right, #FF512F, #DD2476)',
+                    info: 'linear-gradient(to right, #00c6ff, #0072ff)',
+                    warning: 'linear-gradient(to right, #FF9800, #FF5722)',
+                }[type] || 'linear-gradient(to right, #00c6ff, #0072ff)';
+            },
+            showOverlay(message) {
+              document.getElementById('overlay').style.display = 'block';
+              document.getElementById('overlay_message').innerText = message || 'Loading...';
+            },
+            hideOverlay() {
+              document.getElementById('overlay').style.display = 'none';
+            }
+        }
+    });
+</script>
+
+{% endraw %}
+
+{% if is_authenticated_user_type %}
+    {% include "templates/about.html" %}
+    {% include "templates/dashboard.html" %}
+    {% include "templates/campaigns.html" %}
+    {% include "templates/landings.html" %}
+    {% include "templates/affiliates.html" %}
+    {% include "templates/offers.html" %}
+    {% include "templates/reports.html" %}
+    {% include "templates/sources.html" %}
+    {% if is_authenticated_user_type == 'admin' %}
+        {% include "templates/users.html" %}
+        {% include "templates/settings.html" %}
+        {% include "templates/domains.html" %}
+    {% endif %}
+{% endif %}
+
+{% include page_to_include %}
+<div id="app">
+    <v-app>
+        <v-main class="fill-height">
+            <v-container fluid class="pa-0" style="height: 100%">
+                {{ page_component | safe }}
+            </v-container>
+        </v-main>
+        <toast-list-component></toast-list-component>
+    </v-app>
+</div>
+<script type="application/javascript">
+    Vue.component('apexchart', VueApexCharts);
+    new Vue({
+        el: '#app',
+        vuetify: new Vuetify({
+            theme: {
+                dark: true,
+            }
+        })
+    });
+
+</script>
+
+</body>
+</html>
