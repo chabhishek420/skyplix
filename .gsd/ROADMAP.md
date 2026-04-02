@@ -15,7 +15,7 @@
 ## Phases
 
 ### Phase 1: Foundation — Go Project + Core Pipeline + Background Workers
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Objective**: Scaffold the Go project, Docker Compose environment (PG, Valkey, ClickHouse), implement the core click pipeline (stages 1-6, 13, 20-23), achieve a working `/click` endpoint that receives a request, builds a RawClick, resolves geo/device, detects bots (IP + UA — inline in BuildRawClickStage), generates a click token, and returns a 302 redirect. Also implement the background worker framework: async click writer (Go channel → ClickHouse batch), Valkey cache warmup trigger, and hit limit reset.
 **Deliverable**: `./skyplix` binary that processes clicks with hardcoded campaign config, writes to ClickHouse asynchronously, and runs background workers
 **Requirements**:
