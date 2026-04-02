@@ -1,47 +1,62 @@
+## Current Position
+- **Phase**: Phase 4 — Advanced Cloaking & Bot Detection
+- **Task**: Phase 4 P0 execution (just started)
+- **Status**: Paused at 2026-04-03 00:00 IST
+
 ## Last Session Summary
-Reference source code deep-dive complete (2026-04-02).
-Analyzed all 5 reference codebases + verified GSD accuracy against codebase.
+1. **Reference Analysis Complete** — Deep-dived all 5 reference codebases (Keitaro PHP, AKM Tracker, KeitaroCustomScripts, YellowCloaker, yljary-investigation). Created `reference_analysis.md` artifact.
+2. **GSD Audit Complete** — Found and fixed 7 inaccuracies across STATE/ROADMAP/TODO/RESEARCH/DECISIONS. Created `gsd_audit.md` artifact.
+3. **SkyPlix vs yljary Analysis** — Comprehensive comparison proving SkyPlix can handle yljary-scale (10K+ campaigns) after Phase 4 P0. Created `skyplix_vs_yljary.md` artifact.
+4. **Security Fix Committed** — Replaced `FIXME_HASH_` password with bcrypt cost-12 + `crypto/rand` API key generation. Committed `3aa30399`.
+5. **Phase 4 P0 Started** — Was about to begin IP range/CIDR management engine when paused.
+
+## In-Progress Work
+- Security fix committed and clean (`go build ./...` passes)
+- No uncommitted changes
+- Phase 4 P0 code NOT yet started (only planning done)
+
+## Blockers
+None — ready to execute.
+
+## Context Dump
 
 ### Codebase Metrics (verified)
-- 78 Go source files, 6,824 lines of code
-- 22 internal packages
-- 24 pipeline stage files (23 L1-mapped + l2_find_campaign + noop stubs)
-- 28 filter types registered (filter.go L31-48)
-- 19 action types registered (action.go L43-53)
-- 43 bot UA patterns (3_build_raw_click.go L146-158) — target: 54 (Keitaro full list)
-- 6 PostgreSQL migration pairs (001-006) + 2 ClickHouse migrations
-- 10 production dependencies in go.mod (Go 1.25.6)
+- 78 Go source files, 6,824 lines of code, 22 internal packages
+- 28 filter types, 19 action types, 24 pipeline stage files
+- 43 bot UA patterns (target: 54), 5 bot IP CIDR ranges
+- 6 PG migrations (001-006), 2 CH migrations
+- Go 1.25.6, 11 production dependencies
 
-### Reference Analysis
-1. **Keitaro PHP Source** — 54 bot UA signatures, IP CIDR management, Remote proxy (60s TTL), pipeline recursion (ToCampaign up to 10 levels), 28 stream filters, 19 action types
-2. **AKM Traffic Tracker** — ClickHouse daily aggregation pattern
-3. **KeitaroCustomScripts** — Epsilon-greedy MAB for landing optimization
-4. **YellowCloaker** — 12-layer cloaking engine
-5. **yljary-investigation** — Real-world: operator used infrastructure-level detection, NOT UA/referrer
+### Phase 4 P0 Attack Plan (approved by user)
+```
+Day 1-2:  IP range/CIDR management engine (port UserBotsService.php)
+Day 3-4:  Datacenter/VPN detection (MaxMind ASN + ipinfo.app API)
+Day 5-6:  Safe page system + Remote action TTL cache enhancement
+Day 7-8:  UA signature expansion (43→54+) + referrer/URL token filters
+Day 9-10: Integration testing + verification
+```
 
-## Current Phase
-Phase 4 — Advanced Cloaking & Bot Detection (Not Started)
+### Key Implementation Decisions
+- `RemoteProxyAction` already exists in `proxy.go` (59 lines) — needs TTL cache enhancement, NOT full rewrite
+- `ToCampaignAction` exists as simple 302 redirect — needs conversion to recursive pipeline (deferred to P3)
+- Bot detection runs inline in `BuildRawClickStage` (stage 3) per ADR-008
+- Safe page config should be per-stream via `ActionPayload` field (already a `map[string]interface{}`)
 
-## Phase 4 Requirements (from reference analysis)
-- P0: IP range/CIDR management (Keitaro UserBotsService pattern)
-- P0: Datacenter/VPN/Tor IP detection (YellowCloaker ipinfo.app pattern)
-- P0: **Enhance** existing Remote action with TTL cache (currently basic, no cache)
-- P0: Safe page configuration schema (per-stream)
-- P0: Expand UA signatures from 43 → 54+ (Keitaro full list)
-- P1: ISP blacklisting, referrer analysis, URL token blocking
-- P2: JS fingerprint challenges, third-party API integration
-- P3: Convert ToCampaign from 302 redirect → pipeline recursion with state reset
+### Key Reference Files
+- `reference/Keitaro_source_php/.../UserBotListService.php` — 54 bot signatures
+- `reference/Keitaro_source_php/.../UserBotsService.php` — IP range management
+- `reference/Keitaro_source_php/.../Remote.php` — reverse proxy with TTL cache
+- `reference/YellowCloaker/core.php` — 12-layer detection engine
 
-## Completed Phases
-- Phase 1: Foundation ✅
-- Phase 1.5: Reliability Hardening ✅
-- Phase 2: Campaign Engine ✅
-- Phase 3: Admin API ✅ (core CRUD for 9 entity types; advanced ops from Task 3.4 pending: cloning, domain state management, settings bulk-upsert)
-
-## Known Technical Debt
-- 🔴 Password hashing: `FIXME_HASH_` stub in `users.go:65`
-- 🔴 API key generation: placeholder in `users.go:69`
-- 🟡 Deprecated `strings.Title` in filter.go and action.go
-- 🟡 Stages 21-22 are NoOp stubs (PrepareRawClickToStore, CheckSendingToAnotherCampaign)
-- 🟡 Domain DNS validation stubbed in domains.go:176
+### Technical Debt (remaining)
+- 🟡 `strings.Title` deprecated in filter.go and action.go (cosmetic)
+- 🟡 Stages 21-22 are NoOp stubs
+- 🟡 Phase 3 Task 3.4 gaps (cloning, domain validation, settings bulk-upsert)
 - 🟢 SessionJanitorWorker is a no-op
+
+## Next Steps
+1. **Create `internal/botdb/` package** — IP range/CIDR management (binary search over sorted int ranges, supports single/CIDR/range, merge/exclude ops, Valkey-backed hot storage)
+2. **Wire into `BuildRawClickStage`** — Add check #4 after UA pattern match: `botdb.Contains(ip)` 
+3. **Add admin API endpoints** — `POST/DELETE /api/bots/ips`, `GET /api/bots/ips/list`
+4. **Expand UA signatures** — Port remaining 11 Keitaro patterns to `botUAPatterns` list
+5. **MaxMind ASN integration** — Load ASN database, check `IpInfoType` for hosting/datacenter classification

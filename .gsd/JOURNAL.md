@@ -364,3 +364,48 @@ Deep-dive into all 5 reference source codebases to extract architecture patterns
 - `reference/Keitaro_source_php/application/Traffic/Actions/Predefined/Remote.php` — reverse proxy action
 - `reference/YellowCloaker/core.php` — 12-layer detection engine
 - `reference/Keitaro_source_php/application/Traffic/Pipeline/Pipeline.php` — ToCampaign recursion
+
+---
+
+## Session: 2026-04-03 00:00
+
+### Objective
+Verify GSD accuracy, fix security debt, and begin Phase 4 P0 execution.
+
+### Accomplished
+- **GSD Accuracy Audit** — Cross-referenced every claim in 6 GSD files against actual codebase. Found 7 inaccuracies:
+  1. Phase 3 overclaimed as complete (Task 3.4 has 15 pending endpoints)
+  2. `RemoteProxyAction` already exists but listed as "implement" (changed to "enhance")
+  3. `ToCampaignAction` exists as 302 redirect but listed as "implement recursion" (changed to "convert")
+  4. Bot UA count was "35" in ROADMAP, actual is 43 (fixed)
+  5. RESEARCH.md listed sqlc/squirrel/golang-migrate — none in go.mod (corrected)
+  6. UA parser listed as `mssola/device-detector` — actual is `mileusna/useragent` (fixed)
+  7. No security debt tracking for FIXME password + placeholder API keys (added)
+- **Security Fix Committed** (`3aa30399`):
+  - Replaced `FIXME_HASH_` with `bcrypt.GenerateFromPassword(cost=12)`
+  - Replaced `sk_placeholder` with `crypto/rand` 24-byte hex
+  - Added `golang.org/x/crypto/bcrypt` dependency
+  - `go build ./...` clean ✅
+- **SkyPlix vs yljary Analysis** — Created comprehensive comparison artifact proving SkyPlix can handle 10K+ campaign operations after Phase 4 P0 (~10 days)
+- **Phase 4 P0 Attack Plan** — Approved by user, 10-day breakdown: IP management → VPN detection → safe pages → UA expansion → integration tests
+
+### Verification
+- [x] `go build ./...` clean after security fix
+- [x] All 7 GSD inaccuracies corrected
+- [x] Security commit `3aa30399` verified
+- [ ] Phase 4 P0 code — NOT started (paused before first line)
+
+### Paused Because
+User requested /pause. Session boundary.
+
+### Handoff Notes
+**Phase 4 P0 is ready to execute.** Security fix is done. GSD files are accurate.
+
+**First action next session:**
+1. Create `internal/botdb/` package — IP range/CIDR engine
+2. Implement `BotIPStore` with sorted int ranges, binary search, CIDR/range/single support
+3. Wire into `BuildRawClickStage` as check #4
+4. Add admin API endpoints for bot IP management
+
+**No blockers. No uncommitted changes. Clean state.**
+
