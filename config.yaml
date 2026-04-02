@@ -17,9 +17,9 @@ clickhouse:
   password: ""
 
 geoip:
-  country_db: ""
-  city_db: ""
-  asn_db: ""
+  country_db: "data/geoip/GeoLite2-Country.mmdb"
+  city_db: "data/geoip/GeoLite2-City.mmdb"
+  asn_db: "data/geoip/GeoLite2-ASN.mmdb"
 
 system:
   salt: "change-me-in-production-min-32-chars"
