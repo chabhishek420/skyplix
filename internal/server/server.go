@@ -21,6 +21,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/filter"
 	"github.com/skyplix/zai-tds/internal/geo"
 	"github.com/skyplix/zai-tds/internal/hitlimit"
+	"github.com/skyplix/zai-tds/internal/ratelimit"
 
 	"github.com/skyplix/zai-tds/internal/lptoken"
 	"github.com/skyplix/zai-tds/internal/pipeline"
@@ -46,6 +47,7 @@ type Server struct {
 	adminHandler *handler.Handler
 	botDB        *botdb.ValkeyStore
 	uaStore      *botdb.UAStore
+	ratelimiter  *ratelimit.Service
 
 	cache        *cache.Cache
 	filterEngine *filter.Engine
@@ -118,6 +120,8 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	}
 	s.uaStore = uaStore
 
+	s.ratelimiter = ratelimit.New(s.valkey, logger)
+
 	// Admin Handler
 	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
 
@@ -141,7 +145,14 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.pipelineL1 = pipeline.New(
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
-		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore, Geo: s.geo},
+		&stage.BuildRawClickStage{
+			BotDB:        s.botDB,
+			CustomUA:     s.uaStore,
+			Geo:          s.geo,
+			RateLimiter:  s.ratelimiter,
+			IPRateLimit:  cfg.System.RateLimitPerIP,
+			IPRateWindow: cfg.System.RateLimitWindow,
+		},
 		&stage.FindCampaignStage{Cache: s.cache, Logger: logger},
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
@@ -166,7 +177,14 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	)
 
 	s.pipelineL2 = pipeline.New(
-		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore, Geo: s.geo},
+		&stage.BuildRawClickStage{
+			BotDB:        s.botDB,
+			CustomUA:     s.uaStore,
+			Geo:          s.geo,
+			RateLimiter:  s.ratelimiter,
+			IPRateLimit:  cfg.System.RateLimitPerIP,
+			IPRateWindow: cfg.System.RateLimitWindow,
+		},
 		&stage.L2FindCampaignStage{LPToken: s.lpTokenSvc, Cache: s.cache, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.FindAffiliateNetworkStage{Cache: s.cache},

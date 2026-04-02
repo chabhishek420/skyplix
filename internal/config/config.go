@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -48,8 +49,10 @@ type GeoIPConfig struct {
 
 type SystemConfig struct {
 	Salt     string `yaml:"salt"`
-	Debug    bool   `yaml:"debug"`
-	LogLevel string `yaml:"log_level"`
+	Debug           bool          `yaml:"debug"`
+	LogLevel        string        `yaml:"log_level"`
+	RateLimitPerIP  int           `yaml:"rate_limit_per_ip"`
+	RateLimitWindow time.Duration `yaml:"rate_limit_window"`
 }
 
 // Load reads config from yamlPath and applies environment variable overrides.
@@ -113,8 +116,10 @@ func defaults() *Config {
 			Port: 8080,
 		},
 		System: SystemConfig{
-			LogLevel: "info",
-			Debug:    false,
+			LogLevel:        "info",
+			Debug:           false,
+			RateLimitPerIP:  60,
+			RateLimitWindow: time.Minute,
 		},
 		Valkey: ValkeyConfig{
 			DB: 0,

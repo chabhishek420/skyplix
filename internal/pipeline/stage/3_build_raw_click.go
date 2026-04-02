@@ -6,10 +6,12 @@
 package stage
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/skyplix/zai-tds/internal/model"
 	"github.com/skyplix/zai-tds/internal/pipeline"
@@ -22,9 +24,14 @@ import (
 //   - UA pattern match (known crawlers/bots)
 //   - IP blocklist check (upgraded in Phase 4 with botdb)
 type BuildRawClickStage struct {
-	BotDB    interface{ Contains(net.IP) bool }
-	CustomUA interface{ Patterns() []string }
-	Geo      interface{ IsDatacenter(net.IP) bool }
+	BotDB       interface{ Contains(net.IP) bool }
+	CustomUA    interface{ Patterns() []string }
+	Geo         interface{ IsDatacenter(net.IP) bool }
+	RateLimiter interface {
+		CheckIPLimit(context.Context, net.IP, int, time.Duration) (bool, int64, error)
+	}
+	IPRateLimit  int
+	IPRateWindow time.Duration
 }
 
 func (s *BuildRawClickStage) AlwaysRun() bool { return false }
@@ -130,6 +137,31 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 	if s.Geo != nil && ip != nil {
 		if s.Geo.IsDatacenter(ip) {
 			return true
+		}
+	}
+
+	// 7. Per-IP Rate Limiting (Phase 4 upgrade)
+	if s.RateLimiter != nil && ip != nil {
+		limit := s.IPRateLimit
+		if limit <= 0 {
+			limit = 60 // Default 60 req/min
+		}
+		window := s.IPRateWindow
+		if window <= 0 {
+			window = time.Minute
+		}
+
+		// Use a 500ms timeout for Valkey/Network rate limit hit
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		allowed, _, err := s.RateLimiter.CheckIPLimit(ctx, ip, limit, window)
+		if err != nil {
+			// Fail open on rate limiting error
+			return false
+		}
+		if !allowed {
+			return true // Flag as bot if rate limited
 		}
 	}
 
