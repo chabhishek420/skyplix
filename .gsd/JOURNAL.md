@@ -172,3 +172,39 @@ curl -s "http://localhost:8123/?database=zai_analytics" \
 # 4. Commit final
 git add -A && git commit -m "feat(phase-1): plan 1.3 FINAL — CH storage verified end-to-end"
 ```
+
+---
+
+## Session: 2026-04-02 09:40
+
+### Objective
+Set up `.planning` ↔ `.gsd` sync infrastructure so opencode always has current project context.
+
+### Accomplished
+- Created `.agent/scripts/sync-planning.sh` — one-way sync from `.gsd/` → `.planning/codebase/`
+- Wired sync into `/pause` workflow (step 3b, `// turbo`) and `/execute` workflow (step 9b)
+- File mapping: ARCHITECTURE.md, STACK.md, STATE.md→CONCERNS.md, SPEC.md→CONVENTIONS.md, ROADMAP.md
+- Initial full sync run — all 5 files up to date in `.planning/codebase/`
+- Committed `b271eb56`
+
+### Verification
+- [x] `bash .agent/scripts/sync-planning.sh` runs cleanly
+- [x] All 5 files present and timestamped correctly in `.planning/codebase/`
+- [x] `/pause` and `/execute` workflows updated
+
+### Paused Because
+User requested /pause.
+
+### Handoff Notes
+**Sync is live and automated.** Just run `/pause` or complete `/execute` and sync fires automatically.
+
+**Still pending from Plan 1.3:**
+```bash
+pkill -f /tmp/zai-tds 2>/dev/null
+curl -s "http://localhost:8123/?database=zai_analytics" --data "TRUNCATE TABLE clicks"
+go build -o /tmp/zai-tds ./cmd/zai-tds
+DATABASE_URL="postgres://zai:zai_dev_pass@localhost:5432/zai_tds?sslmode=disable" \
+  VALKEY_URL="localhost:6379" CLICKHOUSE_URL="localhost:9000" /tmp/zai-tds &
+sleep 4
+go test -v -tags integration ./test/integration/ -run TestEndToEndClick -timeout 60s
+```
