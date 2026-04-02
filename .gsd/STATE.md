@@ -1,59 +1,77 @@
+# GSD State
+
 ## Current Position
-- **Phase**: Phase 4 — Advanced Cloaking & Bot Detection
-- **Task**: Planning complete
-- **Status**: Ready for execution (resumed 2026-04-03 00:03 IST)
+- **Phase**: 4 — Advanced Cloaking & Bot Detection
+- **Task**: Plan 4.5 Task 2 (Integration Tests) — partially written, not yet runnable
+- **Status**: Paused at 2026-04-03T01:50:00+05:30
 
 ## Last Session Summary
-1. **Reference Analysis Complete** — Deep-dived all 5 reference codebases (Keitaro PHP, AKM Tracker, KeitaroCustomScripts, YellowCloaker, yljary-investigation). Created `reference_analysis.md` artifact.
-2. **GSD Audit Complete** — Found and fixed 7 inaccuracies across STATE/ROADMAP/TODO/RESEARCH/DECISIONS. Created `gsd_audit.md` artifact.
-3. **SkyPlix vs yljary Analysis** — Comprehensive comparison proving SkyPlix can handle yljary-scale (10K+ campaigns) after Phase 4 P0. Created `skyplix_vs_yljary.md` artifact.
-4. **Security Fix Committed** — Replaced `FIXME_HASH_` password with bcrypt cost-12 + `crypto/rand` API key generation. Committed `3aa30399`.
-5. **Phase 4 P0 Started** — Was about to begin IP range/CIDR management engine when paused.
+Executed Phase 4 Plans 4.2 through 4.5 (Task 1). All code compiles cleanly (`go build ./...` and `go vet ./...` both pass). Manual curl verification confirmed cloaking works (human→302 redirect, bot→200 safe page).
+
+## Completed Plans
+| Plan | Name | Commit | Status |
+|------|------|--------|--------|
+| 4.1 | BotDB Engine (store.go) | Previous session | ✅ |
+| 4.2 | Valkey Persistence + Pipeline + Admin API | `20970716` | ✅ |
+| 4.3 | Safe Page TTL Cache + Custom UA Store | `ab3a32fb` | ✅ |
+| 4.4 | Datacenter/ASN Detection + P1 Filters | `eb2d5e55` | ✅ |
+| 4.5 | Rate Limiting + Integration Tests | N/A | ⏳ Task 1 done, Task 2 partial |
 
 ## In-Progress Work
-- Security fix committed and clean (`go build ./...` passes)
-- No uncommitted changes
-- Phase 4 P0 code NOT yet started (only planning done)
+- **Rate Limiter** (`internal/ratelimit/ratelimit.go`): Fully implemented, compiles, wired into server and pipeline
+- **Integration Test** (`test/integration/cloaking_test.go`): Written but NOT yet run successfully
+- **Seed SQL** (`test/integration/testdata/seed_phase4.sql`): Fixed (password_hash column), seeded into DB
+
+### Files Modified (uncommitted)
+- `internal/ratelimit/ratelimit.go` — NEW: Valkey-based IP rate limiting
+- `internal/config/config.go` — Added `RateLimitPerIP`, `RateLimitWindow` fields + `time` import
+- `internal/pipeline/stage/3_build_raw_click.go` — Added `context`/`time` imports, `RateLimiter` field, check #7
+- `internal/server/server.go` — Added `ratelimit` import, wired `ratelimiter` into Server + pipelines
+- `test/integration/cloaking_test.go` — NEW: 6 cloaking test cases + ClickHouse verification
+- `test/integration/testdata/seed_phase4.sql` — NEW: Cloaking campaign seed with test user
+- `.gsd/phases/4/4-SUMMARY.md` — Plan 4.4 completion summary
+
+### Tests Status
+- `go build ./...` ✅ CLEAN
+- `go vet ./...` ✅ CLEAN
+- `go vet -tags integration ./test/integration/` ✅ CLEAN
+- Integration tests: NOT RUN (terminal processes frozen)
 
 ## Blockers
-None — ready to execute.
+**Terminal process freezing** — Commands hang indefinitely in the terminal. Root cause: backgrounding `go run` with `&` in a persistent terminal caused cascading hangs. New commands sent to the same terminal queue behind stuck processes.
+
+**Fix for next session:**
+1. Kill ALL zombie processes first: `pkill -9 -f "zai-tds"; pkill -9 -f "go test"`
+2. Start server in a DEDICATED terminal (not backgrounded with `&`)
+3. Run curl and test commands in a SEPARATE terminal
 
 ## Context Dump
 
-### Codebase Metrics (verified)
-- 78 Go source files, 6,824 lines of code, 22 internal packages
-- 28 filter types, 19 action types, 24 pipeline stage files
-- 43 bot UA patterns (target: 54), 5 bot IP CIDR ranges
-- 6 PG migrations (001-006), 2 CH migrations
-- Go 1.25.6, 11 production dependencies
+### Decisions Made
+- **Rate limit defaults**: 60 req/min per IP, 1-minute window (matches Keitaro behavior)
+- **Rate limit fail-open**: If Valkey is unreachable, allow traffic (don't block)
+- **Datacenter detection heuristic**: 18 keywords (aws, hosting, datacenter, etc.) substring-matched against ASN org name
+- **Custom UA patterns**: Stored in Valkey as JSON array (`botdb:ua_patterns` key), loaded on startup
+- **RemoteProxyAction cache**: In-memory `sync.Map` with 60s TTL, 10MB body limit, stale-on-error
 
-### Phase 4 P0 Attack Plan (approved by user)
-```
-Day 1-2:  IP range/CIDR management engine (port UserBotsService.php)
-Day 3-4:  Datacenter/VPN detection (MaxMind ASN + ipinfo.app API)
-Day 5-6:  Safe page system + Remote action TTL cache enhancement
-Day 7-8:  UA signature expansion (43→54+) + referrer/URL token filters
-Day 9-10: Integration testing + verification
-```
+### Manual Verification Results (from server logs)
+- Human UA (`Chrome/120`) from `8.8.8.8` → `302 Found`, `Location: https://real-offer.com` ✅
+- Googlebot UA from `66.249.66.1` → `200 OK`, `ShowHtml` action, `is_bot: true` ✅
+- Empty UA from `2.2.2.2` → `200 OK`, `ShowHtml` action, `is_bot: true` ✅
+- SputnikBot (expanded pattern) → `is_bot: true` ✅
 
-### Key Implementation Decisions
-- `RemoteProxyAction` already exists in `proxy.go` (59 lines) — needs TTL cache enhancement, NOT full rewrite
-- `ToCampaignAction` exists as simple 302 redirect — needs conversion to recursive pipeline (deferred to P3)
-- Bot detection runs inline in `BuildRawClickStage` (stage 3) per ADR-008
-- Safe page config should be per-stream via `ActionPayload` field (already a `map[string]interface{}`)
-
-### Key Reference Files
-- `reference/Keitaro_source_php/.../UserBotListService.php` — 54 bot signatures
-- `reference/Keitaro_source_php/.../UserBotsService.php` — IP range management
-- `reference/Keitaro_source_php/.../Remote.php` — reverse proxy with TTL cache
-- `reference/YellowCloaker/core.php` — 12-layer detection engine
-
-### Technical Debt (remaining)
-- 🟡 `strings.Title` deprecated in filter.go and action.go (cosmetic)
-- 🟡 Stages 21-22 are NoOp stubs
-- 🟡 Phase 3 Task 3.4 gaps (cloning, domain validation, settings bulk-upsert)
-- 🟢 SessionJanitorWorker is a no-op
+### Files of Interest
+- `internal/pipeline/stage/3_build_raw_click.go` — The 7-layer bot detection pipeline (UA, IP prefix, BotDB, CustomUA, Datacenter, Rate Limit)
+- `internal/action/proxy.go` — RemoteProxyAction with TTL cache for safe page serving
+- `internal/botdb/uastore.go` — Custom UA signature management with Valkey persistence
+- `internal/geo/geo.go` — Enhanced with ASN database + `IsDatacenter()` heuristic
+- `internal/filter/traffic.go` — New `ReferrerStopwordFilter` and `UrlTokenFilter`
+- `internal/filter/network.go` — New `IspBlacklistFilter`
 
 ## Next Steps
-1. /execute 4 — Run Phase 4 plans (IP engine, VPN detection, safe pages, UA expansion, integration tests)
-2. /verify 4 — Verify production cloaking
+1. **Kill all zombie processes** — Start clean
+2. **Commit Plan 4.5 Task 1** — Rate limiting code is done, just needs git commit
+3. **Run integration tests** — Start server in dedicated terminal, run tests in separate one
+4. **Complete Plan 4.5 verification** — Write 5-SUMMARY.md
+5. **Phase 4 verification** — Run full `go build/vet/test` and create VERIFICATION.md
+6. **Update ROADMAP.md** — Mark Phase 4 complete
