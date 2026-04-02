@@ -24,6 +24,7 @@ import (
 type BuildRawClickStage struct {
 	BotDB    interface{ Contains(net.IP) bool }
 	CustomUA interface{ Patterns() []string }
+	Geo      interface{ IsDatacenter(net.IP) bool }
 }
 
 func (s *BuildRawClickStage) AlwaysRun() bool { return false }
@@ -47,6 +48,7 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 
 	// Sub IDs from query params
 	q := r.URL.Query()
+	rc.RawQuery = r.URL.RawQuery
 	rc.SubID1 = q.Get("sub_id_1")
 	if rc.SubID1 == "" {
 		rc.SubID1 = q.Get("sub1")
@@ -121,6 +123,13 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 			if strings.Contains(uaLower, pattern) {
 				return true
 			}
+		}
+	}
+
+	// 6. Datacenter/VPN heuristic check (Phase 4 upgrade)
+	if s.Geo != nil && ip != nil {
+		if s.Geo.IsDatacenter(ip) {
+			return true
 		}
 	}
 

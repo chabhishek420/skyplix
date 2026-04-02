@@ -26,11 +26,50 @@ func (f *ReferrerFilter) Match(rc *model.RawClick, payload map[string]interface{
 	return true
 }
 
+type ReferrerStopwordFilter struct{}
+func (f *ReferrerStopwordFilter) Type() string { return "ReferrerStopword" }
+func (f *ReferrerStopwordFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	stopwords, ok := payload["stopwords"].([]interface{})
+	if !ok || len(stopwords) == 0 {
+		return true
+	}
+
+	target := strings.ToLower(rc.Referrer)
+	for _, v := range stopwords {
+		if s, ok := v.(string); ok && s != "" {
+			if strings.Contains(target, strings.ToLower(s)) {
+				return false // Blocked
+			}
+		}
+	}
+	return true
+}
+
 type EmptyReferrerFilter struct{}
 func (f *EmptyReferrerFilter) Type() string { return "EmptyReferrer" }
 func (f *EmptyReferrerFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
 	if val, ok := payload["empty"].(bool); ok {
 		return (rc.Referrer == "") == val
+	}
+	return true
+}
+
+type UrlTokenFilter struct{}
+func (f *UrlTokenFilter) Type() string { return "UrlToken" }
+func (f *UrlTokenFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	tokens, ok := payload["blocked_params"].([]interface{})
+	if !ok || len(tokens) == 0 {
+		return true
+	}
+
+	query := strings.ToLower(rc.RawQuery)
+	for _, v := range tokens {
+		if s, ok := v.(string); ok && s != "" {
+			pattern := strings.ToLower(s)
+			if strings.Contains(query, pattern+"=") || strings.HasPrefix(query, pattern+"=") || strings.Contains(query, "&"+pattern+"=") {
+				return false // Blocked
+			}
+		}
 	}
 	return true
 }

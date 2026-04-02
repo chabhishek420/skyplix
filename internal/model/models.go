@@ -15,6 +15,7 @@ type RawClick struct {
 	IP        net.IP
 	UserAgent string
 	Referrer  string
+	RawQuery  string
 
 	// --- Campaign routing ---
 	CampaignAlias string
@@ -27,10 +28,13 @@ type RawClick struct {
 	ClickToken string
 
 	// --- Geo (populated in stage 6 via GeoIP) ---
-	CountryCode string
-	Region      string
-	City        string
-	ISP         string
+	CountryCode  string
+	Region       string
+	City         string
+	ISP          string
+	ASN          uint
+	ASNOrg       string
+	IsDatacenter bool
 
 	// --- Device (populated in stage 6 via UA parser) ---
 	DeviceType     string

@@ -37,6 +37,9 @@ func (s *UpdateRawClickStage) Process(payload *pipeline.Payload) error {
 		rc.CountryCode = result.CountryCode
 		rc.City = result.City
 		rc.ISP = result.ISP
+		rc.ASN = result.ASN
+		rc.ASNOrg = result.ASNOrg
+		rc.IsDatacenter = result.IsDatacenter
 	}
 
 	// Test overrides (Stage 6 support for integration tests)

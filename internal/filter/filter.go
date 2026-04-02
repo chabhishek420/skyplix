@@ -34,9 +34,9 @@ func NewEngine() *Engine {
 		// Device (device.go)
 		&DeviceTypeFilter{}, &DeviceModelFilter{}, &BrowserFilter{}, &BrowserVersionFilter{}, &OsFilter{}, &OsVersionFilter{},
 		// Network (network.go)
-		&IpFilter{}, &Ipv6Filter{}, &IspFilter{}, &OperatorFilter{}, &ConnectionTypeFilter{}, &ProxyFilter{},
+		&IpFilter{}, &Ipv6Filter{}, &IspFilter{}, &OperatorFilter{}, &ConnectionTypeFilter{}, &ProxyFilter{}, &IspBlacklistFilter{},
 		// Traffic (traffic.go)
-		&ReferrerFilter{}, &EmptyReferrerFilter{}, &LanguageFilter{}, &UserAgentFilter{},
+		&ReferrerFilter{}, &EmptyReferrerFilter{}, &ReferrerStopwordFilter{}, &UrlTokenFilter{}, &LanguageFilter{}, &UserAgentFilter{},
 		// Tracking (tracking.go)
 		&UniquenessFilter{}, &LimitFilter{}, &IntervalFilter{},
 		// Parameters (params.go)

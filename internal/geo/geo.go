@@ -2,6 +2,7 @@ package geo
 
 import (
 	"net"
+	"strings"
 
 	"github.com/oschwald/geoip2-golang"
 	"go.uber.org/zap"
@@ -12,19 +13,21 @@ type Result struct {
 	CountryCode string
 	City        string
 	ISP         string
+	ASN         uint
+	ASNOrg      string
+	IsDatacenter bool
 }
 
 // Resolver holds the in-memory GeoIP databases.
-// Both databases are loaded once at startup — zero disk I/O on hot path.
 type Resolver struct {
 	countryDB *geoip2.Reader
 	cityDB    *geoip2.Reader
+	asnDB     *geoip2.Reader
 	logger    *zap.Logger
 }
 
 // New loads GeoIP databases from the given file paths.
-// Either path can be empty — that database is skipped with a warning.
-func New(countryPath, cityPath string, logger *zap.Logger) (*Resolver, error) {
+func New(countryPath, cityPath, asnPath string, logger *zap.Logger) (*Resolver, error) {
 	r := &Resolver{logger: logger}
 
 	if countryPath != "" {
@@ -34,8 +37,6 @@ func New(countryPath, cityPath string, logger *zap.Logger) (*Resolver, error) {
 		}
 		r.countryDB = db
 		logger.Info("GeoIP country database loaded", zap.String("path", countryPath))
-	} else {
-		logger.Warn("GeoIP country database not configured — country_code will be empty")
 	}
 
 	if cityPath != "" {
@@ -45,15 +46,21 @@ func New(countryPath, cityPath string, logger *zap.Logger) (*Resolver, error) {
 		}
 		r.cityDB = db
 		logger.Info("GeoIP city database loaded", zap.String("path", cityPath))
-	} else {
-		logger.Warn("GeoIP city database not configured — city will be empty")
+	}
+
+	if asnPath != "" {
+		db, err := geoip2.Open(asnPath)
+		if err != nil {
+			return nil, err
+		}
+		r.asnDB = db
+		logger.Info("GeoIP ASN database loaded", zap.String("path", asnPath))
 	}
 
 	return r, nil
 }
 
 // Lookup resolves GeoIP data for the given IP address.
-// Returns empty Result if databases are not loaded or IP is private/loopback.
 func (r *Resolver) Lookup(ip net.IP) Result {
 	if ip == nil || ip.IsLoopback() || ip.IsPrivate() {
 		return Result{}
@@ -78,7 +85,50 @@ func (r *Resolver) Lookup(ip net.IP) Result {
 		}
 	}
 
+	if r.asnDB != nil {
+		if rec, err := r.asnDB.ASN(ip); err == nil {
+			result.ASN = rec.AutonomousSystemNumber
+			result.ASNOrg = rec.AutonomousSystemOrganization
+			result.ISP = rec.AutonomousSystemOrganization
+			result.IsDatacenter = r.checkIsDatacenter(rec.AutonomousSystemOrganization)
+		}
+	}
+
 	return result
+}
+
+// IsDatacenter returns true if the IP belongs to a known datacenter ASN.
+func (r *Resolver) IsDatacenter(ip net.IP) bool {
+	if ip == nil || ip.IsLoopback() || ip.IsPrivate() {
+		return false
+	}
+	if r.asnDB == nil {
+		return false
+	}
+	rec, err := r.asnDB.ASN(ip)
+	if err != nil {
+		return false
+	}
+	return r.checkIsDatacenter(rec.AutonomousSystemOrganization)
+}
+
+func (r *Resolver) checkIsDatacenter(org string) bool {
+	if org == "" {
+		return false
+	}
+	orgLower := strings.ToLower(org)
+	keywords := []string{
+		"amazon", "aws", "google cloud", "microsoft azure", "digitalocean",
+		"linode", "vultr", "ovh", "hetzner", "contabo", "scaleway",
+		"hosting", "datacenter", "data center", "cloud", "server",
+		"colocation", "dedicated", "vps",
+	}
+	for _, kw := range keywords {
+		if strings.Contains(orgLower, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // Close releases the GeoIP database file handles.
@@ -88,5 +138,8 @@ func (r *Resolver) Close() {
 	}
 	if r.cityDB != nil {
 		r.cityDB.Close()
+	}
+	if r.asnDB != nil {
+		r.asnDB.Close()
 	}
 }

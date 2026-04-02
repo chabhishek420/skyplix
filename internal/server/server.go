@@ -88,7 +88,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.valkey = vk
 
 	// GeoIP
-	geoResolver, _ := geo.New(cfg.GeoIP.CountryDB, cfg.GeoIP.CityDB, logger)
+	geoResolver, _ := geo.New(cfg.GeoIP.CountryDB, cfg.GeoIP.CityDB, cfg.GeoIP.ASNDB, logger)
 	s.geo = geoResolver
 
 	// ClickHouse
@@ -141,7 +141,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.pipelineL1 = pipeline.New(
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
-		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore},
+		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore, Geo: s.geo},
 		&stage.FindCampaignStage{Cache: s.cache, Logger: logger},
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
@@ -166,7 +166,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	)
 
 	s.pipelineL2 = pipeline.New(
-		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore},
+		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore, Geo: s.geo},
 		&stage.L2FindCampaignStage{LPToken: s.lpTokenSvc, Cache: s.cache, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.FindAffiliateNetworkStage{Cache: s.cache},

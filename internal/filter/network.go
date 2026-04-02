@@ -48,6 +48,25 @@ func (f *ProxyFilter) Match(rc *model.RawClick, payload map[string]interface{}) 
 	return true
 }
 
+type IspBlacklistFilter struct{}
+func (f *IspBlacklistFilter) Type() string { return "IspBlacklist" }
+func (f *IspBlacklistFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	isps, ok := payload["isps"].([]interface{})
+	if !ok || len(isps) == 0 {
+		return true
+	}
+
+	target := strings.ToLower(rc.ISP + " " + rc.ASNOrg)
+	for _, v := range isps {
+		if s, ok := v.(string); ok && s != "" {
+			if strings.Contains(target, strings.ToLower(s)) {
+				return false // Blocked
+			}
+		}
+	}
+	return true
+}
+
 func matchIP(ip net.IP, payload map[string]interface{}) bool {
 	if ip == nil {
 		return false
