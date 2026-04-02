@@ -1,7 +1,7 @@
 ## Current Position
 - **Phase**: 1 — Foundation
 - **Task**: Plan 1.3 — Fix ClickHouse batch INSERT (UUID type error)
-- **Status**: Paused at 2026-04-02T09:07 IST
+- **Status**: Active (resumed 2026-04-02T09:42 IST)
 
 ## Last Session Summary
 Resumed after previous pause. Diagnosed 2 layered bugs in `internal/queue/writer.go`:

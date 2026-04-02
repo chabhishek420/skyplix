@@ -8,6 +8,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/model"
@@ -263,8 +264,8 @@ func (w *Writer) flush(records []ClickRecord) {
 			r.SubID3,
 			r.SubID4,
 			r.SubID5,
-			r.Cost,
-			r.Payout,
+			decimal.NewFromFloat(r.Cost),
+			decimal.NewFromFloat(r.Payout),
 			r.ActionType,
 			r.ClickToken,
 		); err != nil {
