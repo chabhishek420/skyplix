@@ -20,8 +20,25 @@ func (s *Server) routes() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(s.requestLogger())
 
-	// Admin / health
+	// Health check
 	r.Get("/api/v1/health", s.handleHealth)
+
+	// Admin API
+	r.Route("/api/v1/admin", func(r chi.Router) {
+		r.Use(s.adminAuth)
+		r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+			s.jsonResponse(w, r, http.StatusOK, map[string]string{"message": "pong"})
+		})
+
+		// Campaigns
+		r.Route("/campaigns", func(r chi.Router) {
+			r.Get("/", s.handleAdminListCampaigns)
+			r.Post("/", s.handleAdminCreateCampaign)
+			r.Get("/{id}", s.handleAdminGetCampaign)
+			r.Put("/{id}", s.handleAdminUpdateCampaign)
+			r.Delete("/{id}", s.handleAdminDeleteCampaign)
+		})
+	})
 
 	// Click traffic routes (hot path)
 	r.Get("/lp/{token}/click", s.handleClickL2) // Level 2 (Landing → Offer)

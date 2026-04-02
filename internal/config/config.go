@@ -47,9 +47,10 @@ type GeoIPConfig struct {
 }
 
 type SystemConfig struct {
-	Salt     string `yaml:"salt"`
-	Debug    bool   `yaml:"debug"`
-	LogLevel string `yaml:"log_level"`
+	Salt        string `yaml:"salt"`
+	AdminAPIKey string `yaml:"admin_api_key"`
+	Debug       bool   `yaml:"debug"`
+	LogLevel    string `yaml:"log_level"`
 }
 
 // Load reads config from yamlPath and applies environment variable overrides.
@@ -87,6 +88,9 @@ func Load(yamlPath string) (*Config, error) {
 	}
 	if v := os.Getenv("SYSTEM_SALT"); v != "" {
 		cfg.System.Salt = v
+	}
+	if v := os.Getenv("ADMIN_API_KEY"); v != "" {
+		cfg.System.AdminAPIKey = v
 	}
 	if v := os.Getenv("DEBUG"); v == "true" || v == "1" {
 		cfg.System.Debug = true
