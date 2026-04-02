@@ -101,6 +101,17 @@ git commit -m "docs: pause session - {brief reason}"
 
 ---
 
+## 3b. Sync .planning (Always Run This)
+
+// turbo
+```bash
+bash .agent/scripts/sync-planning.sh
+```
+
+This keeps `.planning/codebase/` in sync with `.gsd/` so opencode always has current context.
+
+---
+
 ## 4. Display Handoff
 
 ```

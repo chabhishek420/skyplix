@@ -1,204 +1,465 @@
 # Architecture
 
-**Analysis Date:** 2026-04-02
-
-## Pattern Overview
-
-**Overall:** Pipeline Architecture with Stage-Based Processing
-
-**Key Characteristics:**
-- Request-response model with a 23-stage pipeline for click processing
-- Each stage is a discrete, testable unit with a shared `Payload` context
-- Stages execute sequentially; pipeline supports abort control via `Abort` flag
-- "AlwaysRun" pattern allows critical stages (e.g., ClickHouse storage) to execute after abort
-- Separation between hot path (click processing) and admin operations
-
-## Layers
-
-**HTTP/Routing Layer:**
-- Purpose: Receive HTTP requests and dispatch to pipeline
-- Location: `internal/server/`
-- Contains: `server.go`, `routes.go`
-- Depends on: All internal packages, chi router
-- Used by: External HTTP clients, load balancers
-
-**Pipeline Layer:**
-- Purpose: Orchestrate 23-stage click processing pipeline
-- Location: `internal/pipeline/`, `internal/pipeline/stage/`
-- Contains: Core pipeline logic, stage definitions
-- Depends on: `internal/model`, `internal/server`
-- Used by: `routes.go` handleClick
-
-**Stage Layer:**
-- Purpose: Individual processing steps in the pipeline
-- Location: `internal/pipeline/stage/*.go`
-- Contains: Stage implementations (FindCampaign, ExecuteAction, etc.)
-- Depends on: Database clients, geo resolver, device detector
-- Used by: Pipeline via `New()` constructor
-
-**Data Access Layer:**
-- Purpose: PostgreSQL queries and ClickHouse writes
-- Location: `db/postgres/`, `internal/queue/`
-- Contains: SQL migrations, ClickHouse writer
-- Depends on: pgx driver, clickhouse-go
-- Used by: Pipeline stages
-
-**Infrastructure Services:**
-- Purpose: Cross-cutting concerns (geo IP, device detection, caching, workers)
-- Location: `internal/geo/`, `internal/device/`, `internal/worker/`, `internal/cache/`
-- Contains: GeoIP resolver, UA parser, background worker manager
-- Depends on: External databases (GeoIP, Redis)
-- Used by: Pipeline stages, server initialization
-
-**Configuration Layer:**
-- Purpose: YAML-based configuration with environment variable overrides
-- Location: `internal/config/`
-- Contains: Config struct, Load function
-- Depends on: YAML parser
-- Used by: All packages via server dependency injection
-
-## Data Flow
-
-**Click Processing Flow:**
-
-```
-HTTP Request
-    ↓
-[1] DomainRedirectStage     - Check for bare domain redirect
-    ↓
-[2] CheckPrefetchStage      - Detect prefetch requests
-    ↓
-[3] BuildRawClickStage      - Extract IP, UA, referrer, sub_ids, bot detection
-    ↓
-[4] FindCampaignStage        - Lookup campaign from PostgreSQL by alias
-    ↓
-[5] CheckDefaultCampaignStage - Handle domain-level default campaigns
-    ↓
-[6] UpdateRawClickStage      - Enrich with GeoIP + device detection
-    ↓
-[7-12] NoOp Stages          - Stream selection (Phase 2)
-    ↓
-[13] GenerateTokenStage      - Create cryptographic click token
-    ↓
-[14-19] NoOp Stages         - Cost, payout, cookies (Phase 2)
-    ↓
-[20] ExecuteActionStage     - Execute HTTP response action (redirect)
-    ↓
-[21-22] NoOp Stages         - Final processing (Phase 2)
-    ↓
-[23] StoreRawClicksStage     - Async write to ClickHouse (AlwaysRun)
-    ↓
-HTTP Response (302 redirect or error)
-```
-
-**State Management:**
-- `Payload` struct threads through all stages as shared context
-- `RawClick` progressively populated as pipeline advances
-- `Campaign`, `Stream`, `Offer`, `Landing` resolved entities stored in payload
-- `Abort` flag controls early termination (except AlwaysRun stages)
-- Redis (Valkey) used for session/uniqueness state (Phase 2)
-
-## Key Abstractions
-
-**Pipeline Interface:**
-```go
-type Stage interface {
-    Process(payload *Payload) error
-    Name() string
-    AlwaysRun() bool
-}
-```
-- Purpose: Define contract for all pipeline stages
-- Examples: `internal/pipeline/stage/4_find_campaign.go`, `stage/20_execute_action.go`
-- Pattern: Functional options with struct embedding for dependencies
-
-**Payload:**
-```go
-type Payload struct {
-    Ctx, Request, Writer  // HTTP context
-    RawClick               // Progressive click data
-    Campaign, Stream, Offer, Landing  // Resolved entities
-    Response              // Final HTTP response
-    Abort, AbortCode       // Pipeline control
-}
-```
-- Purpose: Shared state container threaded through pipeline
-- Examples: `internal/pipeline/pipeline.go`
-- Pattern: Mutable context object passed by pointer
-
-**Worker Interface:**
-```go
-type Worker interface {
-    Name() string
-    Run(ctx context.Context) error
-}
-```
-- Purpose: Background task abstraction
-- Examples: `internal/worker/worker.go`, `cache_warmup.go`, `hitlimit_reset.go`
-- Pattern: Goroutine-based workers managed by WorkerManager
-
-**ClickRecord:**
-```go
-type ClickRecord struct {
-    // 31 columns for ClickHouse INSERT
-}
-```
-- Purpose: Flat representation of RawClick for analytics storage
-- Examples: `internal/queue/writer.go`
-- Pattern: Separate from domain model for storage optimization
-
-## Entry Points
-
-**Main Application:**
-- Location: `cmd/zai-tds/main.go`
-- Triggers: Binary execution
-- Responsibilities: Config loading, logger initialization, server bootstrap, signal handling
-
-**HTTP Server:**
-- Location: `internal/server/server.go`
-- Triggers: `server.New()` from main
-- Responsibilities: DB connections, worker startup, HTTP server lifecycle
-
-**Click Handler:**
-- Location: `internal/server/routes.go` (`handleClick`)
-- Triggers: GET request to `/{alias}` or `/`
-- Responsibilities: Pipeline instantiation, execution, telemetry logging
-
-**Health Check:**
-- Location: `internal/server/routes.go` (`handleHealth`)
-- Triggers: GET request to `/api/v1/health`
-- Responsibilities: Return server status and version
-
-## Error Handling
-
-**Strategy:** Abort-based pipeline control with error propagation
-
-**Patterns:**
-- Stages return `nil` on success, set `payload.Abort = true` + `AbortCode` for controlled aborts
-- Unrecoverable errors return Go `error` and are logged at server level
-- ClickHouse writer failures are logged but don't affect HTTP response (async)
-- NoOp stages for unimplemented Phase 2 features log debug messages
-
-## Cross-Cutting Concerns
-
-**Logging:** Zap logger
-- Production: JSON structured logs
-- Development: Human-readable format
-- Per-request logging via chi middleware
-
-**Validation:** Inline per-stage
-- Campaign alias existence checked in `FindCampaignStage`
-- Bot detection inline in `BuildRawClickStage`
-- Config validation on startup in `config.go`
-
-**Authentication:** Not implemented (Phase 1)
-- Admin API endpoints in `internal/admin/` are stubs
-- Future: Token-based auth for admin endpoints
-
-**Observability:** Structured logging + health endpoint
-- Health check at `/api/v1/health`
-- Per-click telemetry logged with latency
+> Auto-generated by /map on 2026-04-02
+> Source: Keitaro PHP v9.13.9 (reference/Keitaro_source_php/) — 1,705 PHP files
+> Implementation Status: **PRE-PHASE 1 — No Go source written yet**
 
 ---
 
-*Architecture analysis: 2026-04-02*
+## Overview
+
+ZAI TDS (`zai-tds`) is a production-grade, open-source Go rewrite of Keitaro TDS v9 — a closed-source PHP Traffic Distribution System used by affiliate marketers to route, track, and optimize paid traffic. The system will process incoming HTTP clicks in real-time, apply campaign routing rules, detect bots, select offers/landings via weighted rotation, and redirect visitors — all in under 5ms.
+
+**Specification status:** `FINALIZED` (see `.gsd/SPEC.md`)
+**Architecture decisions:** 7 ADRs finalized (see `.gsd/DECISIONS.md`)
+**Implementation status:** `NOT STARTED` — Phase 1 execution pending
+
+---
+
+## System Diagram (Target Architecture)
+
+```
+                    ┌─────────────────────────────────────────────────────────┐
+                    │                  ZAI TDS (Single Go Binary)             │
+                    │                                                         │
+│ TRAFFIC PATH (hot, <5ms)              ADMIN PATH (cold, <200ms)            │
+│ ─────────────────────────             ────────────────────────────          │
+│ GET /CAMPAIGN_ALIAS                   GET/POST /api/v1/admin/*              │
+│      ↓                                     ↓                               │
+│ [Level-1 Pipeline — 23 stages]        [Admin API Router]                   │
+│      ↓                                     ↓                               │
+│ 302 → Landing Page                    JSON Response                        │
+│                                                                             │
+│ GET /lp/{token}/click (landing link)  GET /admin/*                         │
+│      ↓                                     ↓                               │
+│ [Level-2 Pipeline — 13 stages]       [Static React SPA (go:embed)]        │
+│      ↓                                                                      │
+│ 302 → Affiliate Offer URL                                                   │
+│                                                                             │
+│ POST /postback/{network}/{token}                                             │
+│      ↓                                                                      │
+│ [Conversion Handler]                                                        │
+                    └──────┬──────────────┬──────────────┬────────────────────┘
+                           │              │              │
+                    ┌──────┴──────┐ ┌─────┴──────┐ ┌────┴────────────┐
+                    │   Valkey 8  │ │ PostgreSQL  │ │  ClickHouse 24  │
+                    │ (cache +    │ │ 16 (config  │ │  (click log +   │
+                    │  queue +    │ │  + entities)│ │   analytics)    │
+                    │  sessions)  │ └─────────────┘ └────────────────┘
+                    └─────────────┘
+                    ┌─────────────────────────────────────────────────────┐
+                    │  In-Memory Files (process memory, loaded at boot)   │
+                    │  GeoLite2-Country.mmdb  GeoLite2-City.mmdb          │
+                    │  GeoLite2-ASN.mmdb      IP2Location-LITE-ASN.BIN    │
+                    └─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Current Repository Layout
+
+```
+zai-yt-keitaro/           ← Workspace root (Git repo)
+├── .gsd/                 ← Project planning (SPEC, ARCH, STACK, ROADMAP…)
+├── reference/            ← Read-only reference material
+│   ├── Keitaro_source_php/     ← 1,705 PHP files (source of truth for porting)
+│   ├── legacy-nextjs/          ← Deprecated Next.js prototype (archived)
+│   ├── architecture-flows/     ← Flow diagrams for click/bot/postback paths
+│   ├── yljary-investigation/   ← TDS investigation research
+│   ├── YellowCloaker/          ← Cloaker reference implementation
+│   ├── akm-traffic-tracker/    ← Tracker reference
+│   ├── pp_adsensor/            ← AdSensor reference
+│   └── ideacore.md             ← 297KB research dump
+├── project_status.md     ← Human-readable status log
+└── .gitignore
+```
+
+**No Go source code exists yet.** The target structure below is the planned layout for Phase 1+.
+
+---
+
+## Target Go Project Structure (Phase 1+)
+
+```
+zai-tds/                     ← Will be the Go module root (go.mod)
+├── cmd/
+│   └── zai-tds/
+│       └── main.go          ← Binary entry point
+├── internal/
+│   ├── server/              ← HTTP server, Chi router, middleware
+│   ├── pipeline/            ← 23+13 stage click pipeline framework
+│   │   ├── stage/           ← Individual stage implementations
+│   │   └── payload.go       ← Pipeline state: RawClick, Campaign, Stream, Response
+│   ├── action/              ← 15 response action types (redirect, proxy, etc.)
+│   ├── model/               ← Domain models: Campaign, Stream, Offer, Click, User
+│   ├── cache/               ← Valkey entity preloading (campaigns, offers)
+│   ├── queue/               ← Async click write buffer (RPUSH → batch ClickHouse)
+│   ├── filter/              ← 27 stream filter type implementations
+│   ├── rotator/             ← Weighted rotation: stream, landing, offer
+│   ├── geo/                 ← GeoIP resolution (MaxMind mmdb, in-memory)
+│   ├── device/              ← UA parsing + device/browser/OS detection
+│   ├── macro/               ← URL token substitution ({click_id}, {country}…)
+│   ├── session/             ← Uniqueness tracking (campaign/stream/global)
+│   ├── hitlimit/            ← Daily/total click cap management (Valkey)
+│   ├── cookie/              ← Visitor code + session cookie management
+│   ├── lptoken/             ← Landing → Offer click linking (Level 1 → Level 2)
+│   ├── auth/                ← Session-based auth (Valkey-backed tokens)
+│   ├── admin/               ← Admin API handlers (~110 endpoints)
+│   ├── config/              ← YAML config loading + env override
+│   ├── metrics/             ← Prometheus instrumentation
+│   └── valkey/              ← Valkey client wrapper (go-redis v9)
+├── db/
+│   ├── postgres/
+│   │   ├── queries/         ← sqlc .sql files → generated Go
+│   │   └── migrations/      ← golang-migrate up/down SQL files
+│   └── clickhouse/
+│       └── migrations/      ← ClickHouse schema (clicks, conversions)
+├── admin-ui/                ← Vite + React 19 SPA
+│   ├── src/
+│   └── dist/                ← Build output → embedded via go:embed
+├── reference/               ← (moved to workspace root during Phase 1)
+├── .gsd/                    ← GSD planning docs
+├── go.mod
+├── go.sum
+├── Dockerfile
+├── docker-compose.yml
+└── config.yaml
+```
+
+---
+
+## Keitaro PHP Source Analysis (What We're Porting)
+
+### Module Breakdown (1,705 PHP files)
+
+| Module | Files | Purpose |
+|--------|-------|---------| 
+| **Traffic/** | 506 | Click processing engine — pipeline, actions, cache, geo, device, redis, session, macros |
+| **Component/** | 735 | 51 feature modules — campaigns, streams, offers, reports, bot detection, etc. |
+| **Core/** | 114 | Framework — DB, router, kernel, entity system, validators, security |
+| **Admin/** | 17 | Admin API router, admin context, admin middleware |
+| *Vendor* | ~2,000+ | 3rd-party: ADODB, Spiral/RoadRunner, Laminas, AltoRouter |
+
+### Traffic Engine Subsystems → Go Mapping
+
+| PHP Subsystem | Purpose | Go Package |
+|---------------|---------|------------|
+| `Traffic/Pipeline/` | 23-stage + 13-stage click pipelines | `internal/pipeline/` |
+| `Traffic/Actions/` | 19 response types (redirect, proxy, iframe, etc.) | `internal/action/` |
+| `Traffic/RawClick.php` | Click data model (~60 fields) | `internal/model/click.go` |
+| `Traffic/CachedData/` | Valkey entity cache (campaigns, streams, offers) | `internal/cache/` |
+| `Traffic/CommandQueue/` | Async Redis write buffer (RPUSH → batch pop) | `internal/queue/` |
+| `Traffic/Session/` | Uniqueness tracking (campaign/stream/global) | `internal/session/` |
+| `Traffic/HitLimit/` | Daily/total click caps per stream | `internal/hitlimit/` |
+| `Traffic/Device/` | UA parsing, device type, browser, OS | `internal/device/` |
+| `Traffic/GeoDb/` | IP-to-Geo resolution (MaxMind/IP2Location) | `internal/geo/` |
+| `Traffic/Macros/` | URL token substitution ({click_id}, {country}, etc.) | `internal/macro/` |
+| `Traffic/LpToken/` | Landing page → offer click linking | `internal/lptoken/` |
+| `Traffic/Cookies/` | Visitor code + session cookie management | `internal/cookie/` |
+| `Traffic/Redis/` | Redis connection + operations wrapper | `internal/valkey/` |
+| `Traffic/Profiler/` | Pipeline performance instrumentation | `internal/metrics/` |
+| `Traffic/Settings/` | Cached system settings from DB | `internal/config/` |
+
+---
+
+## Click Pipeline
+
+### Level 1 — Campaign Click (23 stages)
+Triggered when a visitor hits `/{campaign_alias}`.
+
+```
+ 1.  DomainRedirect              — Handle domain-level campaign redirects
+ 2.  CheckPrefetch               — Detect and discard browser prefetch requests
+ 3.  BuildRawClick               — Extract IP, UA, referrer, sub_ids, costs from request
+                                    ↳ ALSO runs inline bot detection (_checkIfBot + _checkIfProxy)
+                                    ↳ Bot flag feeds IsBot stream filter in stage 9
+ 4.  FindCampaign                — Lookup campaign from Valkey cache by alias/id
+ 5.  CheckDefaultCampaign        — Fall back to default campaign if none found
+ 6.  UpdateRawClick              — Enrich click with geo (GeoIP), device (UA parser)
+ 7.  CheckParamAliases           — Resolve traffic source parameter aliases
+ 8.  UpdateCampaignUniqueness    — Check/set unique visitor flag (campaign-level)
+ 9.  ChooseStream                — 3-tier selection: FORCED → REGULAR → DEFAULT
+                                    REGULAR uses position OR weight (campaign.type)
+                                    Weight mode + bindVisitors: binds visitor→stream in Valkey
+10.  UpdateStreamUniqueness      — Check/set unique visitor flag (stream-level)
+11.  ChooseLanding               — Rotate landing page (weighted round-robin)
+12.  ChooseOffer                 — Rotate offer (weighted round-robin)
+13.  GenerateToken               — Generate cryptographically random click token
+14.  FindAffiliateNetwork        — Resolve affiliate network postback config
+15.  UpdateHitLimit              — Check daily/total click caps (Valkey counters)
+16.  UpdateCosts                 — Apply cost model from traffic source params
+17.  UpdatePayout                — Calculate expected payout
+18.  SaveUniquenessSession       — Persist uniqueness flags to Valkey session
+19.  SetCookie                   — Write visitor_code + session cookies
+20.  ExecuteAction               — Build response (302, meta-redirect, proxy, HTML, 404)
+21.  PrepareRawClickToStore      — Serialize click data for async storage
+22.  CheckSendingToAnotherCampaign — Handle ToCampaign action recursion (max 10 hops)
+23.  StoreRawClicks              — Push to async channel → ClickHouse batch writer
+```
+
+### Level 2 — Landing Click (13 stages)
+Triggered when visitor clicks through from landing page to offer.
+The `visitor_code` cookie ties Level 1 and Level 2 together.
+
+```
+ 1.  FindCampaign
+ 2.  UpdateParamsFromLanding     — Merge landing-level params into click
+ 3.  CheckDefaultCampaign
+ 4.  CheckParamAliases
+ 5.  ChooseStream
+ 6.  ChooseOffer                 — Pick final offer URL
+ 7.  FindAffiliateNetwork
+ 8.  UpdateCosts
+ 9.  UpdatePayout
+10.  SetCookie
+11.  ExecuteAction               — 302 redirect to affiliate offer URL
+12.  CheckSendingToAnotherCampaign
+13.  StoreRawClicks
+```
+
+### Action Types (19 response formats, from `Traffic/Actions/Predefined/`)
+`HttpRedirect`, `Meta`, `DoubleMeta`, `BlankReferrer`, `Frame`, `Iframe`,
+`Js`, `JsForIframe`, `JsForScript`, `FormSubmit`, `Curl`,
+`Remote` (reverse proxy — fetches remote URL, critical for cloaking safe pages),
+`LocalFile`, `ShowHtml`, `ShowText`, `Status404`, `DoNothing`,
+`SubId` (sub_id routing), `ToCampaign` (inter-campaign redirect)
+
+---
+
+## Component Modules (51 total — Keitaro parity map)
+
+### P0 — Required for V1 (core TDS)
+
+| Component | Controllers | Status |
+|-----------|-------------|--------|
+| `Campaigns` | CampaignsController | ⬜ Phase 1 |
+| `Streams` | StreamsController + 5 sub-controllers | ⬜ Phase 2 |
+| `StreamFilters` | StreamFiltersController (27 filter types) | ⬜ Phase 2 |
+| `StreamActions` | StreamActionsController (15 action types) | ⬜ Phase 2 |
+| `Offers` | OffersController | ⬜ Phase 3 |
+| `Landings` | LandingsController | ⬜ Phase 3 |
+| `Clicks` | ClicksController | ⬜ Phase 5 |
+| `BotDetection` | BotlistController | ⬜ Phase 4 |
+| `Domains` | DomainsController | ⬜ Phase 3 |
+
+### P1 — Required for V1 (tracking + analytics)
+
+| Component | Controllers | Status |
+|-----------|-------------|--------|
+| `Conversions` | ConversionsController | ⬜ Phase 5 |
+| `Postback` | PostbackTemplatesController | ⬜ Phase 5 |
+| `AffiliateNetworks` | AffiliateNetworksController | ⬜ Phase 3 |
+| `TrafficSources` | TrafficSourcesController + TemplatesController | ⬜ Phase 3 |
+| `Stats` | (internal aggregation engine) | ⬜ Phase 5 |
+| `Reports` | ReportsController + 3 sub-controllers | ⬜ Phase 5 |
+| `Users` | UsersController + 5 sub-controllers | ⬜ Phase 3 |
+| `Settings` | SettingsController + DicsController | ⬜ Phase 3 |
+
+### P2 — V1.1 | P3 — V2/Never
+
+| Component | Target |
+|-----------|--------|
+| Groups, Macros, Triggers, StreamEvents, Trends, GeoProfiles | V1.1 |
+| CampaignIntegration, ThirdPartyIntegration, Simulation, Editor | V2 |
+| SelfUpdate, Branding, Av (license check) | Never |
+
+---
+
+## Stream Filters (27 Types — Phase 2)
+
+| Category | Filter Types |
+|----------|-------------|
+| **Geo** | Country, Region, City |
+| **Device** | DeviceType, DeviceModel, Browser, BrowserVersion, Os, OsVersion |
+| **Network** | Ip, Ipv6, Isp, Operator, ConnectionType, Proxy |
+| **Traffic** | Referrer, EmptyReferrer, Language, UserAgent |
+| **Tracking** | Uniqueness, Limit (click caps), Interval (time-based) |
+| **Parameters** | AnyParam, Parameter (custom sub_id matching) |
+| **Schedule** | Schedule (time-of-day / day-of-week) |
+| **Detection** | IsBot, HideClickDetect, ImkloDetect |
+
+---
+
+## Data Flow
+
+### Hot Path — Click Processing (<5ms target)
+
+```
+1. HTTP GET /{campaign_alias}?sub_id=X&cost=Y
+2. Chi router → Traffic handler (not admin)
+3. Level-1 Pipeline runs (23 stages):
+   a. Build RawClick from request headers/params
+   b. Inline bot detection: IP list check + UA pattern match + proxy detection
+   c. Lookup Campaign from Valkey cache (NOT Postgres, never on hot path)
+   d. Resolve Geo: MaxMind .mmdb loaded into process memory → sub-ms lookup
+   e. Resolve Device: UA parser (robicode/device-detector or mileusna/useragent)
+   f. 3-tier stream selection: FORCED → REGULAR → DEFAULT
+      Stream filters evaluate IsBot flag from step (b)
+   g. Entity binding: if bindVisitors enabled, lock visitor→stream/landing/offer
+   h. Rotate landing/offer (weighted round-robin, weights in Valkey)
+   i. Generate click token (crypto/rand)
+   j. Set visitor_code + session cookies + binding cookies
+   k. Build 302 response (most common action type)
+4. Async: push RawClick to buffered Go channel
+5. Return HTTP 302 + Set-Cookie (done, <5ms)
+6. Background: batch channel → INSERT INTO ClickHouse every 500ms
+```
+
+### Landing Click Path
+
+```
+1. Visitor on landing page clicks CTA link: GET /lp/{token}/click
+2. Level-2 Pipeline (13 stages):
+   a. Resolve campaign from LP token (Valkey)
+   b. Re-evaluate stream/offer for this visitor
+   c. Execute 302 to final affiliate offer URL
+3. Store landing click to ClickHouse
+```
+
+### Admin Path — CRUD Operations (~50-200ms)
+
+```
+1. HTTP POST /api/v1/campaigns
+2. Auth middleware: validate session token (Valkey lookup)
+3. Controller validates POST body, writes to PostgreSQL
+4. On save: schedule Valkey cache warmup (WarmupScheduler pattern from Keitaro)
+   NOTE: Keitaro does this async via cron, not inline. Either approach works.
+5. Return JSON 201
+```
+
+### Postback / Conversion Path
+
+```
+1. HTTP GET /postback/{network}/{token}?payout=X&status=lead
+2. Resolve click by token (Valkey → ClickHouse fallback)
+3. Insert conversion record into ClickHouse
+4. Fire configured network postback URL (fire-and-forget goroutine)
+```
+
+### Background Workers (Critical — 20+ cron tasks in Keitaro)
+
+Keitaro runs a cron system (`cron.php` + `CronTaskRunner`) with channel-based
+task routing. Our Go equivalent: long-running goroutines + ticker-based scheduling.
+
+```
+CRITICAL (required for pipeline to function):
+1. Click Writer          — buffered channel → batch INSERT ClickHouse (every 500ms)
+2. DelayedCommand Runner — flushes Redis command queue to DB (Keitaro: ExecuteDelayedCommand)
+3. Cache Warmup          — rebuilds Valkey entity cache when scheduled (WarmupCacheTask)
+4. Cache Flush           — evicts stale entries, prevents Valkey memory overflow
+5. Hit Limit Reset       — daily reset of Valkey click cap counters
+
+IMPORTANT (required for production):
+6. Click Pruner          — ClickHouse data retention (PruneClicks)
+7. Session Janitor       — expire old uniqueness sessions from Valkey
+8. Domain Checker        — validate custom domain DNS (CheckDomains)
+9. SSL Provisioner       — auto-provision Let's Encrypt certs (EnableSSLTask)
+10. Log Cleaner          — rotate/prune application logs
+
+OPTIONAL (Phase 5+):
+11. GeoIP Updater        — weekly: replace .mmdb files + reload
+12. Trigger Runner       — event-based campaign automation (RunTriggersTask)
+13. Stats Refresher      — refresh materialized aggregation views
+```
+
+### Gateway Context
+
+```
+Entry: GET / (bare domain, no campaign alias)
+Keitaro: gateway.php → GatewayRedirectContext → DomainRedirectStage
+Purpose: Route traffic that hits the tracker's domain directly without a
+         campaign alias. Uses domain→campaign mapping from Domains table.
+Go: handled by DomainRedirectStage (pipeline stage 1), not a separate handler.
+```
+
+---
+
+## Integration Points
+
+| Service | Type | Purpose | On Hot Path? |
+|---------|------|---------|--------------|
+| Valkey 8 | TCP (RESP) | Entity cache, click buffer, sessions, uniqueness | ✅ Yes |
+| PostgreSQL 16 | TCP | Config storage — all entity CRUD | ❌ Admin only |
+| ClickHouse 24 | TCP | Click + conversion analytics storage | ❌ Async write |
+| MaxMind GeoLite2 | `.mmdb` file | IP → Country / City / ASN | ✅ Memory-mapped |
+| IP2Location LITE | `.BIN` file | IP → ISP / Proxy detection | ✅ Memory-mapped |
+
+---
+
+## Admin API
+
+Source: `Admin/AdminApi/AdminApiRouter.php` — AltoRouter
+Base path: `/api/v1/` (renamed from Keitaro's `/admin_api/v1/`)
+**55 controller files → ~110+ REST endpoints.**
+
+Auth: HTTP-only session cookie + `X-Api-Key` header (for programmatic access). 
+
+---
+
+## Database Schema Notes
+
+**PostgreSQL** (config layer):
+- Tables: campaigns (with `type` field: POSITION/WEIGHT, `bind_visitors` flag),
+  streams, stream_filters, offers, landings, domains,
+  affiliate_networks, traffic_sources, users, api_keys, settings, conversions_meta
+- **Association tables**: `stream_landings` (stream_id, landing_id, weight),
+  `stream_offers` (stream_id, offer_id, weight) — join tables with rotation weights
+- JSONB columns for filter rules and stream action configs
+- golang-migrate for schema management (embedded in binary)
+
+**ClickHouse** (analytics layer):
+- `clicks` table: partitioned by `toYYYYMM(created_at)`, ordered by `(campaign_id, created_at)`
+- `conversions` table: join-able to clicks via `click_token`
+- Sub-second aggregation for reporting via materialized views
+- NOTE: Keitaro v9 has ClickHouse dictionary support (MySQL-backed), but click writes
+  still go to MySQL. SkyPlix writes clicks directly to ClickHouse.
+
+**Valkey** key namespaces:
+- `campaign:{id}` → serialized Campaign struct (TTL: 1h, refreshed on admin save)
+- `campaign_aliases` → hash of alias→campaign_id mappings
+- `streams:{campaign_id}` → cached active streams for campaign
+- `sess:{visitor_code}` → uniqueness session
+- `bind:{type}:{uniqueness_id}` → entity binding (stream/landing/offer per visitor)
+- `clicks:queue` → RPUSH list for async batch writes
+- `hitlimit:{stream_id}:{date}` → click counter (INCR)
+- `session:{token}` → admin session data (TTL: 24h)
+- `warmup:scheduled` → flag indicating cache warmup is needed
+
+---
+
+## Conventions (Keitaro PHP → Go Mapping)
+
+| Keitaro PHP | Go Equivalent |
+|-------------|---------------|
+| `namespace Traffic\Pipeline\Stage` | `package stage` in `internal/pipeline/stage/` |
+| `class ChooseStreamStage implements StageInterface` | `type ChooseStreamStage struct{}` with `Process(*Payload) error` |
+| `Payload` object threaded through pipeline | `*Payload` struct: `RawClick, Campaign, Stream, Offer, Landing, Response` |
+| `::instance()` singletons everywhere | Constructor injection / functional options |
+| `ADODB raw SQL` with string concatenation | `sqlc` generated typed functions |
+| `config.ini.php` | `config.yaml` + env override |
+| `sess_*` PHP cookies | `_zai_vid` visitor code, `_zai_sess` session |
+| `keitaro_` table prefix | No prefix (own dedicated database) |
+| `admin_api/v1/` route prefix | `/api/v1/` |
+
+---
+
+## Technical Debt (From Keitaro PHP Source — Items We Fix)
+
+- [ ] **MySQL for click storage** — Keitaro stores clicks in MySQL (with optional ClickHouse dictionaries for reporting). Scalability ceiling at ~10M click rows. We write directly to ClickHouse.
+- [ ] **Synchronous click writes** — `StoreRawClicksStage` writes to DB inline, partially buffered via Redis queue but still blocks on flush.
+- [ ] **ADODB legacy** — Raw SQL string concatenation with `Db::quote()`. No parameterized queries, SQL injection risk.
+- [ ] **IonCube encryption** — Source was encrypted. Decoded quality varies; silent bugs possible.
+- [ ] **Singleton pattern everywhere** — `::instance()` on every service. Hard to test, impossible to mock.
+- [ ] **No dependency injection** — Services construct their own dependencies in constructors.
+- [ ] **PHP session handling** — Relies on PHP's session mechanism. Not distributed-safe.
+- [ ] **License enforcement** — `Component/Av/` and `Component/Branding/` enforce commercial licensing. Removed.
+- [ ] **Telemetry** — `Component/SelfUpdate/SelfChecker/` phones home. Removed.
+
+## Open Research Items
+
+- [ ] `robicode/device-detector` vs `mileusna/useragent` — evaluate PCRE dependency vs feature coverage for 6 device stream filters
+- [ ] FingerprintJS open-source alternatives for JS-based bot detection (Phase 4)
+- [ ] ClickHouse partitioning strategy for click table at scale
+- [ ] IP2Location PROXY database (paid) for VPN/proxy detection accuracy
+- [ ] Investigate Keitaro's `rbooster` ClickHouse config section for schema patterns we can reuse
+- [ ] Clarify `Remote` vs `Curl` action type semantics (both exist in source — are they different actions?)

@@ -235,6 +235,17 @@ git commit -m "docs(phase-{N}): complete {phase-name}"
 
 ---
 
+## 9b. Sync .planning
+
+// turbo
+```bash
+bash .agent/scripts/sync-planning.sh
+```
+
+Keeps `.planning/codebase/` current so opencode sees the latest architecture, stack, and state.
+
+---
+
 ## 10. Offer Next Steps
 
 </process>
