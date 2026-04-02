@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-> **Current Phase**: Not started
+> **Current Phase**: 3 — Admin API
 > **Milestone**: v1.0 — Production TDS
 
 ## Must-Haves (from SPEC)
@@ -43,23 +43,25 @@
 - **Technical Debt Logging**: Formally acknowledge the "default-duplicate" analytics status of Phase 1 traffic.
 
 ### Phase 2: Campaign Engine — Streams, Filters, Rotators, Entity Binding
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Objective**: Implement the campaign routing engine — 3-tier stream selection (FORCED → REGULAR → DEFAULT), stream filter matching (27 filter types including IsBot), position-based AND weight-based rotation, offer/landing weighted rotation, affiliate network resolution, entity binding (bind returning visitors to same stream/landing/offer via Valkey + cookies). Pipeline stages 7-12, 14-18.
 **Deliverable**: Full traffic routing: click → bot check → match filters → pick stream → rotate offer → bind visitor → redirect
 **Requirements**:
-- Stream filter engine (27 types: geo, device, network, traffic, tracking, parameters, schedule, detection)
-- **3-tier stream selection**: FORCED streams (position), REGULAR streams (position or weight by campaign type), DEFAULT stream (fallback)
-- Weighted rotator for streams, landings, offers
-- **Entity binding service**: bind visitor→stream, visitor→landing, visitor→offer in Valkey with cookie fallback (EntityBindingService pattern from Keitaro)
-- Macro replacement engine ({click_id}, {country}, {sub_id_1}, etc.)
-- **All 19 action types** including `Remote` (reverse proxy for safe pages) and `SubId`
-- Level 2 pipeline (13 stages — landing→offer click linking via LpToken)
-- Uniqueness tracking (campaign-level, stream-level)
-- Hit limit enforcement (daily/total caps)
-- Gateway context handling (bare domain → campaign redirect)
+- [x] Correct test seed data casing and JSON structure in `seed.sql.bak`
+- [x] Add case-insensitive normalization to filter engine in `filter.go`
+- [x] Refine `ExecuteActionStage` (logic + logging) in `20_execute_action.go`
+- [x] Add GeoIP test-override headers in `6_update_raw_click.go`
+- [x] Implement case-insensitive normalization in `action.go`
+- [x] Update integration tests in `routing_test.go`
+- [x] Fix critical pointer bugs across all selection stages (heap-copy)
+- [x] Implement cache fallbacks in `cache.go` for reliability
+- [x] Integrate `SaveLPTokenStage` and brute-force L2 resolution
+- [x] Resolve Level 2 landing-to-offer redirect
+- [x] Verify full Phase 2 routing engine (100% GREEN)
+- [x] Phase 2 Hardened Foundation Complete
 
 ### Phase 3: Admin API — CRUD for All P0/P1 Entities
-**Status**: ⬜ Not Started
+**Status**: 🏗️ In Progress
 **Objective**: RESTful JSON API for managing campaigns, streams, stream filters, offers, landings, domains, affiliate networks, traffic sources, users, settings. Auth via API key + session cookies. On entity save: trigger Valkey cache warmup (async via warmup scheduler, matching Keitaro's `WarmupScheduler` pattern).
 **Deliverable**: Complete admin API that the frontend can consume, with entity save → Valkey cache invalidation
 **Requirements**: All P0+P1 entity CRUD, validation, pagination, filtering, auth middleware, **cache warmup trigger on entity mutations**

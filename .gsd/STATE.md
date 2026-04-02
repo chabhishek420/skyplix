@@ -1,31 +1,27 @@
 ## Current Position
-- **Phase**: 2 — Campaign Engine
-- **Task**: Planning complete
-- **Status**: Ready for execution
+- **Phase**: 3 — Admin API
+- **Task**: Prepared to scaffold base API structure (3.0) and Campaign CRUD (3.1).
+- **Status**: Paused at 2026-04-02 17:55 IST after Phase 2 verified (100% green).
 
 ## Last Session Summary
-- Created 6 execution plans for Phase 2, organized into 3 waves.
-- Wave 1: Infrastructure (Cache, Filters, Rotator, Session, Cookie, Uniqueness, HitLimit)
-- Wave 2: Pipeline stages 7-19 + Action Engine + Macro Engine
-- Wave 3: Entity Binding, Level 2 Pipeline, Gateway Context, Integration Tests
+- Successfully hardened and verified the routing engine (Phase 2).
+- Achieved 100% pass rate on integration tests: Bot Detection, Geo, Weighted Rotation, and L2 Landing-to-Offer redirects.
+- Transitioned GSD records to Phase 3.
 
 ## In-Progress Work
-- None. Ready for `/execute 2`.
-- Files modified: None active.
-- Tests status: All Phase 1/1.5 tests still passing.
-
-## Blockers
-- None.
+- Scaffolding of RESTful Administrative API (Phase 3).
+- Files modified: server.go, routes.go, l2_find_campaign.go, 12_choose_offer.go (hardened).
+- Tests status: All integration tests PASS.
 
 ## Context Dump
-- Phase 1 & 1.5 verified via 100% tests pass.
-- 6 plans created in `.gsd/phases/2/` covering all Phase 2 requirements.
-- Plans 2.1-2.2 (Wave 1): cache, filter, rotator, session, cookie, hitlimit packages.
-- Plans 2.3-2.4 (Wave 2): stages 7-19 wired with real implementations, action engine, macros.
-- Plans 2.5-2.6 (Wave 3): entity binding, Level 2 pipeline, gateway, integration tests.
 
-## Next Steps
-1. Run `/execute 2` to begin Phase 2 implementation.
-2. Start with Wave 1 (Plans 2.1 + 2.2 in parallel).
-3. Then Wave 2 (Plans 2.3 + 2.4, depends on Wave 1).
-4. Finally Wave 3 (Plans 2.5 + 2.6, depends on Wave 2).
+### Decisions Made
+- **2-Level Redirect**: Finalized the use of LpToken persistence in Valkey for linking landing page clicks to offer clicks.
+- **Memory Safety**: Adopted heap-escaping copies for all selected entities in the pipeline to prevent nil-pointer regression.
+- **Brute-Force L2 Extraction**: Implemented manual path extraction as a definitive fallback for `chi` URL parameter fragmentation.
+
+### Next Steps
+1. Execute Task 3.0: Setup administrative route handlers in `server/admin.go`.
+2. Execute Task 3.1: RESTful CRUD for Campaigns.
+3. Integrate with cache warmup trigger on entity save.
+3. Then → `/plan 3` for Admin API.

@@ -1,3 +1,8 @@
+/*
+ * MODIFIED: internal/pipeline/stage/3_build_raw_click.go
+ * PURPOSE: Extracts request data into RawClick. Added nil-check for 
+ *          RawClick initialization to prevent panics in L2 pipelines.
+ */
 package stage
 
 import (
@@ -6,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/skyplix/zai-tds/internal/model"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
@@ -22,6 +28,9 @@ func (s *BuildRawClickStage) Name() string { return "BuildRawClick" }
 
 func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	r := payload.Request
+	if payload.RawClick == nil {
+		payload.RawClick = &model.RawClick{}
+	}
 	rc := payload.RawClick
 
 	// Extract real IP (respects X-Forwarded-For, X-Real-IP)

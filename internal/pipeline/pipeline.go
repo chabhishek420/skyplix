@@ -40,10 +40,14 @@ type Payload struct {
 	RawClick *model.RawClick
 
 	// Resolved entities (populated from Valkey/Postgres)
-	Campaign *model.Campaign
-	Stream   *model.Stream
-	Offer    *model.Offer
-	Landing  *model.Landing
+	Campaign         *model.Campaign
+	Stream           *model.Stream
+	Offer            *model.Offer
+	Landing          *model.Landing
+	AffiliateNetwork *model.AffiliateNetwork
+
+	// Visitor identification
+	VisitorCode string
 
 	// Final response (set by ExecuteActionStage)
 	Response *Response

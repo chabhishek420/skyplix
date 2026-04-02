@@ -1,3 +1,8 @@
+/*
+ * MODIFIED: internal/pipeline/stage/20_execute_action.go
+ * PURPOSE: Resolves final redirect URL (Landing > Offer > ActionPayload)
+ *          and executes the action. Added diagnostic logging.
+ */
 package stage
 
 import (
@@ -5,44 +10,87 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/skyplix/zai-tds/internal/action"
+	"github.com/skyplix/zai-tds/internal/macro"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
-// ExecuteActionStage — Pipeline Stage 20
-// Executes the response action. Phase 1 implements HttpRedirect only.
-// The redirect URL comes from:
-//  1. Offer URL (if an offer was selected in Stage 12)
-//  2. Hardcoded fallback for Phase 1 (when no offer selected yet)
+// ExecuteActionStage is the final routing stage.
+// It decides between Landing, Offer, or direct Stream URL.
 type ExecuteActionStage struct {
-	Logger *zap.Logger
+	ActionEngine *action.Engine
+	Logger       *zap.Logger
 }
 
+func (s *ExecuteActionStage) Name() string    { return "ExecuteAction" }
 func (s *ExecuteActionStage) AlwaysRun() bool { return false }
-func (s *ExecuteActionStage) Name() string { return "ExecuteAction" }
 
 func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
-	var redirectURL string
-
-	if payload.Offer != nil {
-		redirectURL = payload.Offer.URL
-	} else if payload.Campaign != nil {
-		// Phase 1 fallback: no offer selected (stream selection in Phase 2)
-		// Use a placeholder — Phase 2 will wire real offer rotation
-		redirectURL = "https://example.com"
-		s.Logger.Debug("no offer selected — using fallback URL",
-			zap.String("campaign", payload.Campaign.Alias),
-		)
-	} else {
-		payload.Abort = true
-		payload.AbortCode = http.StatusNotFound
+	if payload.Abort {
 		return nil
 	}
 
-	payload.RawClick.ActionType = "HttpRedirect"
+	stream := payload.Stream
+	if stream == nil {
+		s.Logger.Error("pipeline stream is nil in ExecuteActionStage")
+		payload.Abort = true
+		payload.Response = &pipeline.Response{StatusCode: http.StatusInternalServerError}
+		return nil
+	}
 
-	// Send the redirect — set Abort to stop remaining stages from overwriting
-	http.Redirect(payload.Writer, payload.Request, redirectURL, http.StatusFound)
+	// 1. Determine target URL hierarchy (Landing > Offer > action_payload)
+	targetURL := ""
+	if payload.Landing != nil {
+		targetURL = payload.Landing.URL
+	} else if payload.Offer != nil {
+		targetURL = payload.Offer.URL
+	} else if stream.ActionPayload != nil {
+		if url, ok := stream.ActionPayload["url"].(string); ok {
+			targetURL = url
+		}
+	}
+
+	// 2. Perform macro replacement
+	finalURL := ""
+	if targetURL != "" {
+		finalURL = macro.Replace(targetURL, payload.RawClick, payload.Campaign)
+	}
+
+	// 3. Execute the action
+	ctx := &action.ActionContext{
+		RedirectURL: finalURL,
+		Click:       payload.RawClick,
+		Campaign:    payload.Campaign,
+		Stream:      stream,
+		Ctx:         payload.Ctx,
+	}
+
+	if _, ok := s.ActionEngine.Get(stream.ActionType); !ok {
+		// Log warning but let ActionEngine handle the fallback
+		s.Logger.Warn("unknown action type, falling back to HttpRedirect", zap.String("type", stream.ActionType))
+	}
+
+	err := s.ActionEngine.Execute(stream.ActionType, payload.Writer, payload.Request, ctx)
+	if err != nil {
+		s.Logger.Error("action execution failed", zap.Error(err), zap.String("type", stream.ActionType))
+		return err
+	}
+
+	s.Logger.Debug("action executed", 
+		zap.String("type", stream.ActionType),
+		zap.String("target_url", targetURL),
+		zap.String("final_url", finalURL),
+	)
+
+	// 4. Mark payload as finished
 	payload.Abort = true
+	payload.RawClick.ActionType = stream.ActionType
+	
+	// We set a response placeholder so the pipeline knows we've handled the client
+	payload.Response = &pipeline.Response{
+		StatusCode: http.StatusOK, // Status set by Action.Execute
+		ActionType: stream.ActionType,
+	}
 
 	return nil
 }

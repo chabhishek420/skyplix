@@ -28,6 +28,7 @@ type RawClick struct {
 
 	// --- Geo (populated in stage 6 via GeoIP) ---
 	CountryCode string
+	Region      string
 	City        string
 	ISP         string
 
@@ -38,6 +39,9 @@ type RawClick struct {
 	OSVersion      string
 	Browser        string
 	BrowserVersion string
+
+	// --- Traffic ---
+	Language string
 
 	// --- Bot detection (populated in stage 3) ---
 	IsBot   bool
@@ -75,6 +79,7 @@ type Campaign struct {
 	Type            CampaignType // POSITION or WEIGHT
 	BindVisitors    bool
 	State           string
+	TrafficSourceID *uuid.UUID
 	DefaultStreamID *uuid.UUID
 }
 
@@ -98,8 +103,19 @@ type Stream struct {
 	State         string
 	ActionType    string
 	ActionPayload map[string]interface{}
-	Filters       []interface{}
+	Filters       []StreamFilter
+	DailyLimit    int64
+	TotalLimit    int64
 }
+
+// StreamFilter represents a single filter condition for a stream.
+type StreamFilter struct {
+	Type    string                 `json:"type"`
+	Payload map[string]interface{} `json:"payload"`
+}
+
+func (s Stream) GetWeight() int    { return s.Weight }
+func (s Stream) GetID() uuid.UUID { return s.ID }
 
 // StreamType controls the 3-tier selection hierarchy.
 type StreamType string
@@ -120,10 +136,51 @@ type Offer struct {
 	State             string
 }
 
+func (o Offer) GetWeight() int    { return 100 }
+func (o Offer) GetID() uuid.UUID { return o.ID }
+
 // Landing represents a landing page for Level 1 → Level 2 click linking.
 type Landing struct {
 	ID    uuid.UUID
 	Name  string
 	URL   string
 	State string
+}
+
+func (l Landing) GetID() uuid.UUID { return l.ID }
+func (l Landing) GetWeight() int    { return 100 }
+
+// WeightedOffer pairs an offer with its rotation weight.
+type WeightedOffer struct {
+	Offer  Offer
+	Weight int
+}
+
+func (wo WeightedOffer) GetWeight() int    { return wo.Weight }
+func (wo WeightedOffer) GetID() uuid.UUID { return wo.Offer.ID }
+
+// WeightedLanding pairs a landing with its rotation weight.
+type WeightedLanding struct {
+	Landing Landing
+	Weight  int
+}
+
+func (wl WeightedLanding) GetWeight() int    { return wl.Weight }
+func (wl WeightedLanding) GetID() uuid.UUID { return wl.Landing.ID }
+
+// AffiliateNetwork represents an affiliate network entity.
+type AffiliateNetwork struct {
+	ID          uuid.UUID
+	Name        string
+	PostbackURL string
+	State       string
+}
+
+// TrafficSource represents a traffic source entity.
+type TrafficSource struct {
+	ID          uuid.UUID
+	Name        string
+	PostbackURL string
+	Params      map[string]string
+	State       string
 }

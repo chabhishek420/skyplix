@@ -1,0 +1,58 @@
+-- MODIFIED: test/integration/testdata/seed.sql.bak
+-- PURPOSE: Normalized filter types to PascalCase and updated payload schemas
+--          to match the Go implementation's internal struct requirements.
+
+-- Phase 2 Integration Test Seed Data
+
+-- 1. Traffic Source
+INSERT INTO traffic_sources (id, name, state) 
+VALUES ('00000000-0000-0000-0000-000000000001', 'Test Traffic', 'active');
+
+-- 2. Campaigns
+-- "testcamp" (POSITION based, no binding)
+INSERT INTO campaigns (id, alias, name, type, bind_visitors, state, traffic_source_id)
+VALUES ('00000000-0000-0000-0000-000000000100', 'testcamp', 'Test Campaign', 'POSITION', false, 'active', '00000000-0000-0000-0000-000000000001');
+
+-- "weightcamp" (WEIGHT based, with binding)
+INSERT INTO campaigns (id, alias, name, type, bind_visitors, state, traffic_source_id)
+VALUES ('00000000-0000-0000-0000-000000000200', 'weightcamp', 'Weight Campaign', 'WEIGHT', true, 'active', '00000000-0000-0000-0000-000000000001');
+
+-- 3. Streams for "testcamp"
+-- Stream 1: FORCED - Block bots
+INSERT INTO streams (id, campaign_id, name, type, position, state, action_type, action_payload, filters)
+VALUES ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000100', 'Bot Block', 'FORCED', 1, 'active', 'ShowHtml', '{"html": "<h1>Forbidden</h1>"}', '[{"type": "IsBot", "payload": {"is_bot": true}}]');
+
+-- Stream 2: REGULAR - US/GB hits
+INSERT INTO streams (id, campaign_id, name, type, position, state, action_type, action_payload, filters)
+VALUES ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-000000000100', 'US/GB Traffic', 'REGULAR', 1, 'active', 'HttpRedirect', '{"url": "https://offer-a.example.com/{click_id}"}', '[{"type": "Country", "payload": {"include": ["US", "GB"]}}]');
+
+-- Stream 3: DEFAULT
+INSERT INTO streams (id, campaign_id, name, type, position, state, action_type, action_payload)
+VALUES ('00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-000000000100', 'Fallback', 'DEFAULT', 1, 'active', 'HttpRedirect', '{"url": "https://default-offer.example.com"}');
+
+-- 4. Streams for "weightcamp"
+-- Stream 4: REGULAR (Weight 80)
+INSERT INTO streams (id, campaign_id, name, type, weight, state, action_type, action_payload)
+VALUES ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000200', 'Weight High', 'REGULAR', 80, 'active', 'HttpRedirect', '{"url": "https://highprio.com"}');
+
+-- Stream 5: REGULAR (Weight 20)
+INSERT INTO streams (id, campaign_id, name, type, weight, state, action_type, action_payload)
+VALUES ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000200', 'Weight Low', 'REGULAR', 20, 'active', 'HttpRedirect', '{"url": "https://lowprio.com"}');
+
+-- 5. Offers and Landings
+INSERT INTO offers (id, name, url, state, payout)
+VALUES ('00000000-0000-0000-0000-000000000010', 'Offer A', 'https://offer-a.example.com/{click_id}', 'active', 5.0);
+
+INSERT INTO landings (id, name, url, state)
+VALUES ('00000000-0000-0000-0000-000000000020', 'Landing X', 'https://landing.example.com/?token={click_id}', 'active');
+
+-- Join tables
+INSERT INTO stream_offers (stream_id, offer_id, weight)
+VALUES ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-000000000010', 100);
+
+INSERT INTO stream_landings (stream_id, landing_id, weight)
+VALUES ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-000000000020', 100);
+
+-- 6. Domain mapping
+INSERT INTO domains (id, domain, campaign_id, state)
+VALUES ('00000000-0000-0000-0000-000000000030', 'test.local', '00000000-0000-0000-0000-000000000100', 'active');

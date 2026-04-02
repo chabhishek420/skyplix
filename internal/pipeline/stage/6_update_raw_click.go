@@ -1,3 +1,8 @@
+/*
+ * MODIFIED: internal/pipeline/stage/6_update_raw_click.go
+ * PURPOSE: Added support for X-SkyPlix-Test-Country/City headers to allow
+ *          deterministic GeoIP routing in integration tests without mmdb dependencies.
+ */
 package stage
 
 import (
@@ -32,6 +37,16 @@ func (s *UpdateRawClickStage) Process(payload *pipeline.Payload) error {
 		rc.CountryCode = result.CountryCode
 		rc.City = result.City
 		rc.ISP = result.ISP
+	}
+
+	// Test overrides (Stage 6 support for integration tests)
+	if payload.Request != nil {
+		if tc := payload.Request.Header.Get("X-SkyPlix-Test-Country"); tc != "" {
+			rc.CountryCode = tc
+		}
+		if tcity := payload.Request.Header.Get("X-SkyPlix-Test-City"); tcity != "" {
+			rc.City = tcity
+		}
 	}
 
 	// Device / UA parsing
