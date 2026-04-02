@@ -20,8 +20,10 @@ import (
 // ALSO runs inline basic bot detection per ADR-008:
 //   - Empty UA check
 //   - UA pattern match (known crawlers/bots)
-//   - IP blocklist check (starter list — Phase 4 upgrades with full DB)
-type BuildRawClickStage struct{}
+//   - IP blocklist check (upgraded in Phase 4 with botdb)
+type BuildRawClickStage struct {
+	BotDB interface{ Contains(net.IP) bool }
+}
 
 func (s *BuildRawClickStage) AlwaysRun() bool { return false }
 func (s *BuildRawClickStage) Name() string { return "BuildRawClick" }
@@ -74,14 +76,14 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	}
 
 	// --- Inline Bot Detection (ADR-008) ---
-	rc.IsBot = detectBot(rc.IP, rc.UserAgent)
+	rc.IsBot = s.detectBot(rc.IP, rc.UserAgent)
 
 	return nil
 }
 
 // detectBot runs the basic bot detection checks inline.
 // Returns true if any check triggers.
-func detectBot(ip net.IP, ua string) bool {
+func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 	// 1. Empty User-Agent
 	if strings.TrimSpace(ua) == "" {
 		return true
@@ -95,12 +97,19 @@ func detectBot(ip net.IP, ua string) bool {
 		}
 	}
 
-	// 3. Known bot IP ranges (hardcoded starter list — upgraded in Phase 4)
+	// 3. Known bot IP ranges (hardcoded starter list — fallback/fast-path)
 	if ip != nil {
 		for _, prefix := range botIPPrefixes {
 			if prefix.Contains(ip) {
 				return true
 			}
+		}
+	}
+
+	// 4. Advanced bot IP database (Phase 4 upgrade)
+	if s.BotDB != nil && ip != nil {
+		if s.BotDB.Contains(ip) {
+			return true
 		}
 	}
 
@@ -141,20 +150,24 @@ func parseFloat(s string, dest *float64) (float64, error) {
 }
 
 // botUAPatterns is a curated list of known bot/crawler UA substrings.
-// Source: cross-referenced with YellowCloaker reference implementation.
-// Phase 4 will replace with a more complete, database-backed approach.
+// Source: cross-referenced with Keitaro UserBotListService reference implementation.
 var botUAPatterns = []string{
-	"googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider",
-	"yandexbot", "sogou", "exabot", "facebot", "ia_archiver",
-	"facebookexternalhit", "twitterbot", "rogerbot", "linkedinbot",
-	"embedly", "quora link preview", "outbrain", "pinterest",
-	"slackbot", "vkshare", "w3c_validator", "whatsapp",
-	"ahrefsbot", "semrushbot", "dotbot", "petalbot",
-	"mj12bot", "archive.org_bot", "seznambot", "blexbot",
-	"curl/", "python-requests", "python-urllib", "go-http-client",
-	"libwww-perl", "wget/", "java/", "scrapy",
-	"headlesschrome", "phantomjs", "selenium", "webdriver",
+	"googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider", "yandexbot",
+	"sogou", "exabot", "facebot", "ia_archiver", "facebookexternalhit", "twitterbot",
+	"rogerbot", "linkedinbot", "embedly", "quora link preview", "outbrain", "pinterest",
+	"slackbot", "vkshare", "w3c_validator", "whatsapp", "ahrefsbot", "semrushbot",
+	"dotbot", "petalbot", "mj12bot", "archive.org_bot", "seznambot", "blexbot",
+	"curl/", "python-requests", "python-urllib", "go-http-client", "libwww-perl",
+	"wget/", "java/", "scrapy", "headlesschrome", "phantomjs", "selenium", "webdriver",
 	"bot", "crawler", "spider", "scan", "scraper",
+	// Keitaro expansion (Plan 4.2)
+	"advisorbot", "obot", "ezooms", "flipboardproxy", "chtml proxy", "tweetmemebot",
+	"sputnikbot", "webindex", "adsbot", "/bots", "ru_bot", "orangebot",
+	"synapse", "seostats", "owler", "ltx71", "winhttprequest", "pageanalyzer",
+	"openlinkprofiler", "bot for jce", "bubing", "nutch", "megaindex",
+	"coccoc", "sleuth", "cmcm.com", "yandexmobilebot", "google-youtube-links",
+	"mailruconnect", "surveybot", "appengine", "netcraftsurveyagent",
+	"exabot-thumbnails", "bingpreview",
 }
 
 // botIPPrefixes are known datacenter/bot IP ranges (starter list).

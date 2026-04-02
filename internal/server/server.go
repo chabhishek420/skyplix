@@ -14,6 +14,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/action"
 	"github.com/skyplix/zai-tds/internal/admin/handler"
 	"github.com/skyplix/zai-tds/internal/binding"
+	"github.com/skyplix/zai-tds/internal/botdb"
 	"github.com/skyplix/zai-tds/internal/cache"
 	"github.com/skyplix/zai-tds/internal/config"
 	"github.com/skyplix/zai-tds/internal/device"
@@ -43,6 +44,7 @@ type Server struct {
 	chWriter     *queue.Writer
 	workers      *worker.Manager
 	adminHandler *handler.Handler
+	botDB        *botdb.ValkeyStore
 
 	cache        *cache.Cache
 	filterEngine *filter.Engine
@@ -102,8 +104,15 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.bindingSvc = binding.New(s.valkey, logger)
 	s.lpTokenSvc = lptoken.New(s.valkey, logger)
 
+	// Bot IP Database (Plan 4.1/4.2)
+	botDB, err := botdb.NewValkeyStore(s.valkey)
+	if err != nil {
+		return nil, fmt.Errorf("botdb init: %w", err)
+	}
+	s.botDB = botDB
+
 	// Admin Handler
-	s.adminHandler = handler.NewHandler(s.db, s.cache, logger)
+	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, logger)
 
 	// Workers (AUDIT FIX #5)
 	s.workers = worker.NewManager(logger,
@@ -125,7 +134,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.pipelineL1 = pipeline.New(
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
-		&stage.BuildRawClickStage{},
+		&stage.BuildRawClickStage{BotDB: s.botDB},
 		&stage.FindCampaignStage{Cache: s.cache, Logger: logger},
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
@@ -150,7 +159,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	)
 
 	s.pipelineL2 = pipeline.New(
-		&stage.BuildRawClickStage{},
+		&stage.BuildRawClickStage{BotDB: s.botDB},
 		&stage.L2FindCampaignStage{LPToken: s.lpTokenSvc, Cache: s.cache, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.FindAffiliateNetworkStage{Cache: s.cache},

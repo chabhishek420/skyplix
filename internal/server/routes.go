@@ -112,6 +112,17 @@ func (s *Server) routes() http.Handler {
 			})
 		})
 
+		r.Route("/bots", func(r chi.Router) {
+			r.Route("/ips", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetBotIPs)
+				r.Post("/", s.adminHandler.HandleAddBotIPs)
+				r.Put("/", s.adminHandler.HandleReplaceBotIPs)
+				r.Delete("/", s.adminHandler.HandleExcludeBotIPs)
+				r.Delete("/all", s.adminHandler.HandleClearBotIPs)
+				r.Post("/check", s.adminHandler.HandleCheckBotIP)
+			})
+		})
+
 		r.Get("/settings", s.adminHandler.HandleGetSettings)
 		r.Put("/settings", s.adminHandler.HandleUpdateSettings)
 	})

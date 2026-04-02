@@ -139,6 +139,32 @@ func (s *Store) Count() int {
 	return len(s.ranges)
 }
 
+// StringList returns a list of raw strings representing the non-overlapping ranges.
+func (s *Store) StringList() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	res := make([]string, 0, len(s.ranges))
+	for _, r := range s.ranges {
+		if r.Raw != "" {
+			res = append(res, r.Raw)
+		} else {
+			// If Raw is empty (merged range), recreate it
+			if r.Min == r.Max {
+				res = append(res, s.uint32ToIP(r.Min).String())
+			} else {
+				res = append(res, fmt.Sprintf("%s-%s", s.uint32ToIP(r.Min), s.uint32ToIP(r.Max)))
+			}
+		}
+	}
+	return res
+}
+
+func (s *Store) uint32ToIP(val uint32) net.IP {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, val)
+	return ip
+}
+
 // --- Internal Helpers ---
 
 func (s *Store) parseInput(content string) ([]IPRange, error) {

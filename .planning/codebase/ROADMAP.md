@@ -26,7 +26,7 @@
 - Pipeline framework (ordered stage slice, Payload struct, abort/early-exit)
 - GeoIP integration (MaxMind mmdb, in-memory)
 - Device detection (evaluate `robicode/device-detector` vs `mileusna/useragent`)
-- **Basic bot detection** (IP list check + UA pattern match + empty UA check + proxy detection — runs inside BuildRawClickStage)
+- **Basic bot detection** (5 IP CIDR ranges + 43 UA pattern matches + empty UA check — runs inside BuildRawClickStage, per ADR-008)
 - PostgreSQL schema + migrations (campaigns, streams, offers, landings — core entity tables)
 - **Stream↔Landing and Stream↔Offer association tables** (join tables with weights)
 - ClickHouse click schema + async batch writer (buffered Go channel, flush every 500ms or 5000 clicks)
@@ -62,15 +62,31 @@
 
 ### Phase 3: Admin API — CRUD for All P0/P1 Entities
 **Status**: ✅ Complete
-**Objective**: RESTful JSON API for managing campaigns, streams, stream filters, offers, landings, domains, affiliate networks, traffic sources, users, settings. Auth via API key + session cookies. On entity save: trigger Valkey cache warmup (async via warmup scheduler, matching Keitaro's `WarmupScheduler` pattern).
+**Objective**: RESTful JSON API for managing campaigns, streams, stream filters, offers, landings, domains, affiliate networks, traffic sources, users, settings. Auth via API key (session cookies deferred to Phase 6). On entity save: trigger Valkey cache warmup (async via warmup scheduler, matching Keitaro's `WarmupScheduler` pattern).
 **Deliverable**: Complete admin API that the frontend can consume, with entity save → Valkey cache invalidation
 **Requirements**: All P0+P1 entity CRUD, validation, pagination, filtering, auth middleware, **cache warmup trigger on entity mutations**
 
 ### Phase 4: Advanced Cloaking & Bot Detection
 **Status**: ⬜ Not Started
-**Objective**: Upgrade bot detection beyond Phase 1's basic IP+UA checks: datacenter/VPN/Tor IP databases, ISP blacklisting, JS fingerprint challenges, rate limiting per IP/campaign. Safe page system with configurable strategies per campaign (Remote proxy of real site, LocalFile, Status404, ShowHtml). This builds on the basic bot detection already running in BuildRawClickStage.
+**Objective**: Upgrade bot detection beyond Phase 1's basic IP+UA checks. Implement production-grade cloaking with multi-layer detection (modeled after YellowCloaker's 12-check engine + Keitaro's bot system) and safe page delivery (modeled after Keitaro's `Remote` action). This builds on the basic bot detection already running in BuildRawClickStage.
 **Deliverable**: Production cloaking — compliance bots/scanners see safe pages, real users see offers
-**Requirements**: Bot IP databases (datacenter ranges, VPN providers), FingerprintJS open-source alternative, safe page configuration per campaign/stream, `Remote` action type fully wired for reverse-proxying real websites
+**Requirements**:
+- **P0 — Bot IP Management**: IP range/CIDR/single management with merge/exclude ops (port Keitaro `UserBotsService.php` pattern — sorted int ranges with binary search)
+- **P0 — Datacenter/VPN/Tor Detection**: Integrate datacenter IP database (MaxMind ASN type lookup) + optional external VPN detection API (YellowCloaker uses `ipinfo.app/lookup`)
+- **P0 — UA Signature Expansion**: Expand from 43 to 54+ patterns (full Keitaro `UserBotListService.php` list) + user-defined custom UA signatures stored in Valkey
+- **P0 — Safe Page System**: Configurable per stream — 4 modes from Keitaro reference:
+  - `Remote` — **enhance** existing `RemoteProxyAction` with TTL cache (60s, Keitaro `Remote.php` pattern — basic proxy already implemented in `proxy.go`)
+  - `LocalFile` — serve static HTML from filesystem
+  - `Status404` / `DoNothing` — return HTTP error codes (already implemented)
+  - `ShowHtml` — inline HTML content (already implemented)
+- **P1 — ISP Blacklisting**: Filter by ISP name (substring match against MaxMind ASN/ISP data)
+- **P1 — Referrer Analysis**: Empty referrer blocking + referrer stopword matching (YellowCloaker pattern)
+- **P1 — URL Token Blacklisting**: Block clicks containing specific URL query parameters (debug tokens, scanner tokens)
+- **P1 — Rate Limiting**: Per-IP and per-campaign rate limiting via Valkey counters
+- **P2 — JS Fingerprint Challenges**: Browser verification via JS challenge page (timezone check, basic WebGL/Canvas fingerprint)
+- **P2 — Third-Party API Integration**: HideClick/IMKLO-style external detection APIs (Keitaro `StreamFilters/Filter/ImkloDetect.php` pattern)
+- **P3 — Pipeline Recursion**: **Convert** existing `ToCampaignAction` from simple 302 redirect → recursive pipeline re-entry with state reset (up to 10 levels, Keitaro `Pipeline.php` L60-73)
+- **P3 — Behavioral Analysis**: Request timing, header consistency checks (lesson from yljary investigation — operators don't rely on UA/referrer alone)
 
 ### Phase 5: Conversion Tracking & Analytics
 **Status**: ⬜ Not Started
