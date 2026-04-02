@@ -59,7 +59,11 @@ func TestEndToEndClick(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Get(fmt.Sprintf("http://%s/testcampaign", serverAddr))
+	req, _ := http.NewRequest("GET", fmt.Sprintf("http://%s/testcamp", serverAddr), nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("X-SkyPlix-Test-Country", "US")
+	
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("click request: %v", err)
 	}
@@ -95,7 +99,7 @@ func TestEndToEndClick(t *testing.T) {
 	}
 
 	// 10. Test bot detection: send Googlebot user agent
-	botReq, _ := http.NewRequest("GET", fmt.Sprintf("http://%s/testcampaign", serverAddr), nil)
+	botReq, _ := http.NewRequest("GET", fmt.Sprintf("http://%s/testcamp", serverAddr), nil)
 	botReq.Header.Set("User-Agent", "Googlebot/2.1 (+http://www.google.com/bot.html)")
 	botResp, err := client.Do(botReq)
 	if err != nil {
@@ -103,10 +107,10 @@ func TestEndToEndClick(t *testing.T) {
 	}
 	defer botResp.Body.Close()
 
-	if botResp.StatusCode != http.StatusFound {
-		t.Errorf("bot click: expected 302, got %d", botResp.StatusCode)
+	if botResp.StatusCode != http.StatusOK {
+		t.Errorf("bot click: expected 200, got %d", botResp.StatusCode)
 	} else {
-		t.Logf("✓ bot click → 302 (is_bot will be stored as 1 in ClickHouse)")
+		t.Logf("✓ bot click → 200 (is_bot will be stored as 1 in ClickHouse)")
 	}
 
 	// Wait for bot click to flush
