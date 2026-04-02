@@ -24,6 +24,7 @@ func NewNoOp(number int, name string, logger *zap.Logger) *NoOpStage {
 }
 
 func (s *NoOpStage) Name() string { return s.StageName }
+func (s *NoOpStage) AlwaysRun() bool { return false }
 
 func (s *NoOpStage) Process(payload *pipeline.Payload) error {
 	s.logger.Debug("stage no-op",

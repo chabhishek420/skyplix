@@ -18,6 +18,7 @@ type FindCampaignStage struct {
 	Logger *zap.Logger
 }
 
+func (s *FindCampaignStage) AlwaysRun() bool { return false }
 func (s *FindCampaignStage) Name() string { return "FindCampaign" }
 
 func (s *FindCampaignStage) Process(payload *pipeline.Payload) error {

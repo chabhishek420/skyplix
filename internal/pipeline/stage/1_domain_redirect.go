@@ -12,6 +12,7 @@ import (
 // Handles the "gateway context" — bare domain access (GET /).
 type DomainRedirectStage struct{}
 
+func (s *DomainRedirectStage) AlwaysRun() bool { return false }
 func (s *DomainRedirectStage) Name() string { return "DomainRedirect" }
 
 func (s *DomainRedirectStage) Process(payload *pipeline.Payload) error {

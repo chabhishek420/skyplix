@@ -7,45 +7,46 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
 // ClickRecord is the serialized form of a RawClick, ready for ClickHouse batch INSERT.
+// UUID fields are stored as strings and converted to [16]byte at flush time.
 type ClickRecord struct {
-	ClickID         string
-	CreatedAt       time.Time
-	CampaignID      string
-	CampaignAlias   string
-	StreamID        string
-	OfferID         string
-	LandingID       string
-	IP              string
-	CountryCode     string
-	City            string
-	ISP             string
-	DeviceType      string
-	DeviceModel     string
-	OS              string
-	OSVersion       string
-	Browser         string
-	BrowserVersion  string
-	UserAgent       string
-	Referrer        string
-	IsBot           uint8
-	IsUniqueGlobal  uint8
+	CreatedAt        time.Time
+	CampaignID       string
+	CampaignAlias    string
+	StreamID         string
+	OfferID          string
+	LandingID        string
+	IP               string
+	CountryCode      string
+	City             string
+	ISP              string
+	DeviceType       string
+	DeviceModel      string
+	OS               string
+	OSVersion        string
+	Browser          string
+	BrowserVersion   string
+	UserAgent        string
+	Referrer         string
+	IsBot            uint8
+	IsUniqueGlobal   uint8
 	IsUniqueCampaign uint8
-	IsUniqueStream  uint8
-	SubID1          string
-	SubID2          string
-	SubID3          string
-	SubID4          string
-	SubID5          string
-	Cost            float64
-	Payout          float64
-	ActionType      string
-	ClickToken      string
+	IsUniqueStream   uint8
+	SubID1           string
+	SubID2           string
+	SubID3           string
+	SubID4           string
+	SubID5           string
+	Cost             float64
+	Payout           float64
+	ActionType       string
+	ClickToken       string
 }
 
 // FromRawClick converts a RawClick to a ClickRecord for ClickHouse insertion.
@@ -75,7 +76,6 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 		ClickToken:     rc.ClickToken,
 	}
 
-	// Booleans → UInt8 for ClickHouse
 	if rc.IsBot {
 		r.IsBot = 1
 	}
@@ -89,13 +89,11 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 		r.IsUniqueStream = 1
 	}
 
-	// UUIDs → strings
 	r.CampaignID = rc.CampaignID.String()
 	r.StreamID = rc.StreamID.String()
 	r.OfferID = rc.OfferID.String()
 	r.LandingID = rc.LandingID.String()
 
-	// IP → string (ClickHouse IPv6 type accepts string)
 	if rc.IP != nil {
 		r.IP = rc.IP.String()
 	}
@@ -146,13 +144,11 @@ func NewWriter(addr, database string, logger *zap.Logger) (*Writer, error) {
 }
 
 // Chan returns the write-only channel for sending click records.
-// Stages push to this channel; the Writer owns the receive side.
 func (w *Writer) Chan() chan<- ClickRecord {
 	return w.clickChan
 }
 
 // Run starts the batch writer loop. Blocks until ctx is cancelled.
-// Flushes any remaining records before returning.
 func (w *Writer) Run(ctx context.Context) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -175,7 +171,7 @@ func (w *Writer) Run(ctx context.Context) error {
 			}
 
 		case <-ctx.Done():
-			// Drain the channel and flush remaining
+			// Drain remaining and flush before exit
 			for len(w.clickChan) > 0 {
 				batch = append(batch, <-w.clickChan)
 			}
@@ -189,35 +185,65 @@ func (w *Writer) Run(ctx context.Context) error {
 }
 
 // flush performs the actual ClickHouse batch INSERT.
+//
+// KEY DESIGN DECISIONS:
+// 1. Named column list — skip click_id (CH DEFAULT generateUUIDv4() handles it)
+// 2. UUID columns require [16]byte — parse from string at flush time
+// 3. IPv6 column requires net.IP with To16() (always 16 bytes)
+// 4. FixedString(2) requires exactly 2 bytes — pad/truncate country_code
 func (w *Writer) flush(records []ClickRecord) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	b, err := w.conn.PrepareBatch(ctx, "INSERT INTO clicks")
+	// Named INSERT: skip click_id (auto-generated), list all 31 other columns explicitly.
+	// This is the critical fix — positional INSERT hit click_id (UUID) with a string.
+	b, err := w.conn.PrepareBatch(ctx, `INSERT INTO clicks
+		(created_at, campaign_id, campaign_alias, stream_id, offer_id, landing_id,
+		 ip, country_code, city, isp, device_type, device_model, os, os_version,
+		 browser, browser_version, user_agent, referrer,
+		 is_bot, is_unique_global, is_unique_campaign, is_unique_stream,
+		 sub_id_1, sub_id_2, sub_id_3, sub_id_4, sub_id_5,
+		 cost, payout, action_type, click_token)`)
 	if err != nil {
 		w.logger.Error("clickhouse prepare batch failed", zap.Error(err))
 		return
 	}
 
 	for _, r := range records {
-		var ip net.IP
-		if r.IP != "" {
-			ip = net.ParseIP(r.IP)
+		// UUID columns: clickhouse-go v2 accepts string directly via AppendRow
+		// (it calls uuid.Parse internally — see column/uuid.go AppendRow case string:)
+		campaignID := r.CampaignID
+		if campaignID == "" {
+			campaignID = "00000000-0000-0000-0000-000000000000"
 		}
-		if ip == nil {
-			ip = net.IPv6zero
+		streamID := r.StreamID
+		if streamID == "" {
+			streamID = "00000000-0000-0000-0000-000000000000"
+		}
+		offerID := r.OfferID
+		if offerID == "" {
+			offerID = "00000000-0000-0000-0000-000000000000"
+		}
+		landingID := r.LandingID
+		if landingID == "" {
+			landingID = "00000000-0000-0000-0000-000000000000"
 		}
 
+		// IPv6 column: always 16-byte form
+		ip := parseIPv6(r.IP)
+
+		// FixedString(2): must be exactly 2 bytes
+		cc := fixedString2(r.CountryCode)
+
 		if err := b.Append(
-			r.ClickToken,        // click_id (using token for now)
 			r.CreatedAt,
-			r.CampaignID,
+			campaignID,
 			r.CampaignAlias,
-			r.StreamID,
-			r.OfferID,
-			r.LandingID,
+			streamID,
+			offerID,
+			landingID,
 			ip,
-			r.CountryCode,
+			cc,
 			r.City,
 			r.ISP,
 			r.DeviceType,
@@ -242,7 +268,7 @@ func (w *Writer) flush(records []ClickRecord) {
 			r.ActionType,
 			r.ClickToken,
 		); err != nil {
-			w.logger.Error("append to batch failed", zap.Error(err))
+			w.logger.Error("batch append failed", zap.Error(err), zap.String("token", r.ClickToken))
 		}
 	}
 
@@ -254,5 +280,45 @@ func (w *Writer) flush(records []ClickRecord) {
 		return
 	}
 
-	w.logger.Debug("clicks flushed to ClickHouse", zap.Int("count", len(records)))
+	w.logger.Info("clicks flushed to ClickHouse", zap.Int("count", len(records)))
+}
+
+// parseUUID parses a UUID string to [16]byte. Returns fallback on parse error.
+func parseUUID(s string, fallback [16]byte) [16]byte {
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return fallback
+	}
+	return id
+}
+
+// parseIPv6 converts an IP string to a 16-byte IPv6 net.IP.
+// Returns the IPv6 zero address if parsing fails.
+func parseIPv6(s string) net.IP {
+	if s == "" {
+		return net.IPv6zero
+	}
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return net.IPv6zero
+	}
+	// Ensure always 16-byte IPv6 form (IPv4 addresses get IPv4-mapped)
+	if ip16 := ip.To16(); ip16 != nil {
+		return ip16
+	}
+	return net.IPv6zero
+}
+
+// fixedString2 returns a string of exactly 2 bytes for ClickHouse FixedString(2).
+// Empty or unknown → two spaces ("  "). Truncates if longer.
+func fixedString2(s string) string {
+	switch len(s) {
+	case 2:
+		return s
+	case 0:
+		return "  "
+	default:
+		// Truncate to 2 bytes (should not happen for ISO country codes)
+		return s[:2]
+	}
 }

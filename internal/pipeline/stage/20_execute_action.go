@@ -17,6 +17,7 @@ type ExecuteActionStage struct {
 	Logger *zap.Logger
 }
 
+func (s *ExecuteActionStage) AlwaysRun() bool { return false }
 func (s *ExecuteActionStage) Name() string { return "ExecuteAction" }
 
 func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {

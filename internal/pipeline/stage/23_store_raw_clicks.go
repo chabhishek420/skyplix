@@ -15,7 +15,8 @@ type StoreRawClicksStage struct {
 	ClickChan chan<- queue.ClickRecord
 }
 
-func (s *StoreRawClicksStage) Name() string { return "StoreRawClicks" }
+func (s *StoreRawClicksStage) Name() string      { return "StoreRawClicks" }
+func (s *StoreRawClicksStage) AlwaysRun() bool   { return true }
 
 func (s *StoreRawClicksStage) Process(payload *pipeline.Payload) error {
 	rc := payload.RawClick

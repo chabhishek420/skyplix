@@ -17,6 +17,7 @@ import (
 //   - IP blocklist check (starter list — Phase 4 upgrades with full DB)
 type BuildRawClickStage struct{}
 
+func (s *BuildRawClickStage) AlwaysRun() bool { return false }
 func (s *BuildRawClickStage) Name() string { return "BuildRawClick" }
 
 func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {

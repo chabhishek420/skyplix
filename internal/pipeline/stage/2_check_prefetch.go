@@ -11,6 +11,7 @@ import (
 // Prefetch requests silently return 200 — they must NOT be counted as real clicks.
 type CheckPrefetchStage struct{}
 
+func (s *CheckPrefetchStage) AlwaysRun() bool { return false }
 func (s *CheckPrefetchStage) Name() string { return "CheckPrefetch" }
 
 func (s *CheckPrefetchStage) Process(payload *pipeline.Payload) error {

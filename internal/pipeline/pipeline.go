@@ -14,6 +14,9 @@ import (
 type Stage interface {
 	Process(payload *Payload) error
 	Name() string
+	// AlwaysRun returns true for stages that must execute even after Abort is set
+	// (e.g., StoreRawClicks must fire even after ExecuteAction sends the HTTP redirect).
+	AlwaysRun() bool
 }
 
 // Response holds the final HTTP response to send to the visitor.
@@ -62,12 +65,12 @@ func New(stages ...Stage) *Pipeline {
 }
 
 // Run executes each stage in order.
-// Stops early if payload.Abort is set to true.
-// Returns the first error encountered (from any stage).
+// Stops early if payload.Abort is set to true, UNLESS the stage implements
+// AlwaysRun() == true (used for storage stages that must fire after redirect).
 func (p *Pipeline) Run(payload *Payload) error {
 	for _, stage := range p.stages {
-		if payload.Abort {
-			break
+		if payload.Abort && !stage.AlwaysRun() {
+			continue
 		}
 		if err := stage.Process(payload); err != nil {
 			return fmt.Errorf("stage %s: %w", stage.Name(), err)

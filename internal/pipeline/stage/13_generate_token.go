@@ -12,6 +12,7 @@ import (
 // This token is used for conversion postback attribution.
 type GenerateTokenStage struct{}
 
+func (s *GenerateTokenStage) AlwaysRun() bool { return false }
 func (s *GenerateTokenStage) Name() string { return "GenerateToken" }
 
 func (s *GenerateTokenStage) Process(payload *pipeline.Payload) error {

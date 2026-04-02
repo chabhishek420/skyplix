@@ -19,6 +19,7 @@ type UpdateRawClickStage struct {
 	Logger *zap.Logger
 }
 
+func (s *UpdateRawClickStage) AlwaysRun() bool { return false }
 func (s *UpdateRawClickStage) Name() string { return "UpdateRawClick" }
 
 func (s *UpdateRawClickStage) Process(payload *pipeline.Payload) error {

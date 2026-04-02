@@ -9,6 +9,7 @@ import (
 // fall back to it. Phase 1: simple abort if no campaign.
 type CheckDefaultCampaignStage struct{}
 
+func (s *CheckDefaultCampaignStage) AlwaysRun() bool { return false }
 func (s *CheckDefaultCampaignStage) Name() string { return "CheckDefaultCampaign" }
 
 func (s *CheckDefaultCampaignStage) Process(payload *pipeline.Payload) error {
