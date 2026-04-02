@@ -1,7 +1,7 @@
 ## Current Position
 - **Phase**: Phase 4 — Advanced Cloaking & Bot Detection
-- **Task**: Phase 4 P0 execution (just started)
-- **Status**: Paused at 2026-04-03 00:00 IST
+- **Task**: Planning complete
+- **Status**: Ready for execution (resumed 2026-04-03 00:03 IST)
 
 ## Last Session Summary
 1. **Reference Analysis Complete** — Deep-dived all 5 reference codebases (Keitaro PHP, AKM Tracker, KeitaroCustomScripts, YellowCloaker, yljary-investigation). Created `reference_analysis.md` artifact.
@@ -55,8 +55,5 @@ Day 9-10: Integration testing + verification
 - 🟢 SessionJanitorWorker is a no-op
 
 ## Next Steps
-1. **Create `internal/botdb/` package** — IP range/CIDR management (binary search over sorted int ranges, supports single/CIDR/range, merge/exclude ops, Valkey-backed hot storage)
-2. **Wire into `BuildRawClickStage`** — Add check #4 after UA pattern match: `botdb.Contains(ip)` 
-3. **Add admin API endpoints** — `POST/DELETE /api/bots/ips`, `GET /api/bots/ips/list`
-4. **Expand UA signatures** — Port remaining 11 Keitaro patterns to `botUAPatterns` list
-5. **MaxMind ASN integration** — Load ASN database, check `IpInfoType` for hosting/datacenter classification
+1. /execute 4 — Run Phase 4 plans (IP engine, VPN detection, safe pages, UA expansion, integration tests)
+2. /verify 4 — Verify production cloaking
