@@ -126,3 +126,49 @@ Root cause in `internal/queue/writer.go` `flush()` function (lines 192–258):
 4. Ensure IP is always 16-byte IPv6 form via `.To16()`
 5. Rebuild, rerun integration test, commit as Plan 1.3 final
 
+
+---
+
+## Session: 2026-04-02 09:07
+
+### Objective
+Fix ClickHouse batch INSERT so clicks actually land in the database (integration test passing).
+
+### Accomplished
+- **Diagnosed Bug 1** — Stage 23 (StoreRawClicks) was never executing. Root cause: `ExecuteAction` sets `payload.Abort = true`, and the pipeline's `Run()` used `break` on abort, so stage 23 was skipped entirely.
+  - **Fixed:** Added `AlwaysRun() bool` to the `Stage` interface. Pipeline `Run()` now uses `continue` (skips non-AlwaysRun stages) instead of `break`. `StoreRawClicksStage.AlwaysRun() = true`.
+- **Diagnosed Bug 2** — ClickHouse `AppendRow` error: `converting [16]uint8 to UUID is unsupported`. Root cause: `parseUUID()` returned `[16]byte` which is the underlying type of `uuid.UUID` but the driver's type switch matches on the *named type* `uuid.UUID`, not the underlying `[16]byte`.
+  - **Fixed:** Pass UUID values as strings directly. The driver's `AppendRow` for UUID columns has an explicit `case string:` that calls `uuid.Parse()` internally.
+- **go build ./... CLEAN, go vet ./... CLEAN** after both fixes.
+- Committed `3f9879b2`.
+
+### Verification
+- [x] `go build ./...` clean
+- [x] `go vet ./...` clean
+- [x] Stage 23 errors visible in logs (confirmed it runs now)
+- [ ] Integration test passing (NOT YET — server not restarted with latest binary before pause)
+
+### Paused Because
+User requested /pause before re-running integration test.
+
+### Handoff Notes
+**Exactly one step to complete Plan 1.3:**
+```bash
+# 1. Rebuild and start server
+pkill -f /tmp/zai-tds 2>/dev/null
+curl -s "http://localhost:8123/?database=zai_analytics" --data "TRUNCATE TABLE clicks"
+go build -o /tmp/zai-tds ./cmd/zai-tds
+DATABASE_URL="postgres://zai:zai_dev_pass@localhost:5432/zai_tds?sslmode=disable" \
+VALKEY_URL="localhost:6379" CLICKHOUSE_URL="localhost:9000" /tmp/zai-tds &
+sleep 4
+
+# 2. Run integration test
+go test -v -tags integration ./test/integration/ -run TestEndToEndClick -timeout 60s
+
+# 3. If passing: verify CH directly
+curl -s "http://localhost:8123/?database=zai_analytics" \
+  --data "SELECT click_token, is_bot, action_type FROM clicks LIMIT 5 FORMAT TabSeparated"
+
+# 4. Commit final
+git add -A && git commit -m "feat(phase-1): plan 1.3 FINAL — CH storage verified end-to-end"
+```
