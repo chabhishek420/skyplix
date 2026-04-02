@@ -34,14 +34,22 @@ type Handler struct {
 		Count() int
 		Contains(net.IP) bool
 	}
+	uaStore interface {
+		Add(string) error
+		Remove(string) error
+		Replace(string) error
+		Clear() error
+		Patterns() []string
+	}
 }
 
 // NewHandler creates a new admin handler.
-func NewHandler(db *pgxpool.Pool, cache *cache.Cache, botDB *botdb.ValkeyStore, logger *zap.Logger) *Handler {
+func NewHandler(db *pgxpool.Pool, cache *cache.Cache, botDB *botdb.ValkeyStore, uaStore *botdb.UAStore, logger *zap.Logger) *Handler {
 	return &Handler{
 		db:        db,
 		cache:     cache,
 		botDB:     botDB,
+		uaStore:   uaStore,
 		logger:    logger,
 		campaigns: repository.NewCampaignRepository(db),
 		streams:   repository.NewStreamRepository(db),

@@ -22,7 +22,8 @@ import (
 //   - UA pattern match (known crawlers/bots)
 //   - IP blocklist check (upgraded in Phase 4 with botdb)
 type BuildRawClickStage struct {
-	BotDB interface{ Contains(net.IP) bool }
+	BotDB    interface{ Contains(net.IP) bool }
+	CustomUA interface{ Patterns() []string }
 }
 
 func (s *BuildRawClickStage) AlwaysRun() bool { return false }
@@ -110,6 +111,16 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 	if s.BotDB != nil && ip != nil {
 		if s.BotDB.Contains(ip) {
 			return true
+		}
+	}
+
+	// 5. Custom UA signatures from Valkey/Admin
+	if s.CustomUA != nil {
+		customPatterns := s.CustomUA.Patterns()
+		for _, pattern := range customPatterns {
+			if strings.Contains(uaLower, pattern) {
+				return true
+			}
 		}
 	}
 

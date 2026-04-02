@@ -18,6 +18,16 @@ type BotIPCheckRequest struct {
 	IP string `json:"ip"`
 }
 
+// BotUARequest represents the payload for Add UA operation.
+type BotUARequest struct {
+	Patterns string `json:"patterns"`
+}
+
+// BotUADeleteRequest represents the payload for Delete UA operation.
+type BotUADeleteRequest struct {
+	Pattern string `json:"pattern"`
+}
+
 // HandleGetBotIPs returns the current list of bot IP ranges.
 // GET /api/v1/bots/ips
 func (h *Handler) HandleGetBotIPs(w http.ResponseWriter, r *http.Request) {
@@ -119,5 +129,53 @@ func (h *Handler) HandleCheckBotIP(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
 		"ip":     req.IP,
 		"is_bot": isBot,
+	})
+}
+
+// HandleGetBotUA returns the current list of custom UA patterns.
+// GET /api/v1/bots/ua
+func (h *Handler) HandleGetBotUA(w http.ResponseWriter, r *http.Request) {
+	patterns := h.uaStore.Patterns()
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"count":    len(patterns),
+		"patterns": patterns,
+	})
+}
+
+// HandleAddBotUA adds new custom UA patterns.
+// POST /api/v1/bots/ua
+func (h *Handler) HandleAddBotUA(w http.ResponseWriter, r *http.Request) {
+	var req BotUARequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.uaStore.Add(req.Patterns); err != nil {
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"count": len(h.uaStore.Patterns()),
+	})
+}
+
+// HandleDeleteBotUA removes a custom UA pattern.
+// DELETE /api/v1/bots/ua
+func (h *Handler) HandleDeleteBotUA(w http.ResponseWriter, r *http.Request) {
+	var req BotUADeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.uaStore.Remove(req.Pattern); err != nil {
+		h.respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"count": len(h.uaStore.Patterns()),
 	})
 }

@@ -45,6 +45,7 @@ type Server struct {
 	workers      *worker.Manager
 	adminHandler *handler.Handler
 	botDB        *botdb.ValkeyStore
+	uaStore      *botdb.UAStore
 
 	cache        *cache.Cache
 	filterEngine *filter.Engine
@@ -111,8 +112,14 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	}
 	s.botDB = botDB
 
+	uaStore, err := botdb.NewUAStore(s.valkey)
+	if err != nil {
+		return nil, fmt.Errorf("uastore init: %w", err)
+	}
+	s.uaStore = uaStore
+
 	// Admin Handler
-	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, logger)
+	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
 
 	// Workers (AUDIT FIX #5)
 	s.workers = worker.NewManager(logger,
@@ -134,7 +141,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.pipelineL1 = pipeline.New(
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
-		&stage.BuildRawClickStage{BotDB: s.botDB},
+		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore},
 		&stage.FindCampaignStage{Cache: s.cache, Logger: logger},
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
@@ -159,7 +166,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	)
 
 	s.pipelineL2 = pipeline.New(
-		&stage.BuildRawClickStage{BotDB: s.botDB},
+		&stage.BuildRawClickStage{BotDB: s.botDB, CustomUA: s.uaStore},
 		&stage.L2FindCampaignStage{LPToken: s.lpTokenSvc, Cache: s.cache, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.FindAffiliateNetworkStage{Cache: s.cache},
