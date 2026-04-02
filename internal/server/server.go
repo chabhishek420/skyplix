@@ -101,6 +101,11 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 // Run starts workers, then the HTTP server.
 // Blocks until ctx is cancelled, then performs graceful shutdown.
 func (s *Server) Run(ctx context.Context) error {
+	// Create a separate context for workers that we can cancel independently
+	// after the HTTP server has finished draining existing requests.
+	workerCtx, stopWorkers := context.WithCancel(context.Background())
+	defer stopWorkers()
+
 	// Start background workers
 	workers := []worker.Worker{
 		worker.NewHitLimitResetWorker(s.valkey, s.logger),
@@ -112,7 +117,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	mgr := worker.NewManager(s.logger, workers...)
-	mgr.StartAll(ctx)
+	mgr.StartAll(workerCtx)
 
 	// Start HTTP server
 	errCh := make(chan error, 1)
@@ -131,14 +136,22 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Graceful HTTP shutdown
+	// Step 1: Graceful HTTP shutdown (stop accepting new requests, wait for active ones to finish)
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	s.logger.Info("shutting down HTTP server")
 	if err := s.http.Shutdown(shutdownCtx); err != nil {
-		s.logger.Error("shutdown error", zap.Error(err))
+		s.logger.Error("server shutdown error", zap.Error(err))
 	}
+
+	// Step 2: Signal workers to stop (now that no new clicks are coming from HTTP handlers)
+	s.logger.Info("stopping background workers")
+	stopWorkers()
+
+	// Step 3: Wait for all workers (including click-writer drain/flush) to finish
+	mgr.Wait()
+	s.logger.Info("all workers stopped")
 
 	// Close dependencies
 	if s.db != nil {

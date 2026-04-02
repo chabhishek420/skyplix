@@ -211,24 +211,12 @@ func (w *Writer) flush(records []ClickRecord) {
 	}
 
 	for _, r := range records {
-		// UUID columns: clickhouse-go v2 accepts string directly via AppendRow
-		// (it calls uuid.Parse internally — see column/uuid.go AppendRow case string:)
-		campaignID := r.CampaignID
-		if campaignID == "" {
-			campaignID = "00000000-0000-0000-0000-000000000000"
-		}
-		streamID := r.StreamID
-		if streamID == "" {
-			streamID = "00000000-0000-0000-0000-000000000000"
-		}
-		offerID := r.OfferID
-		if offerID == "" {
-			offerID = "00000000-0000-0000-0000-000000000000"
-		}
-		landingID := r.LandingID
-		if landingID == "" {
-			landingID = "00000000-0000-0000-0000-000000000000"
-		}
+		// UUID columns: validate before appending to ensure the batch doesn't fail due to type mismatch.
+		zero := uuid.Nil
+		campaignID := w.parseUUIDVal(r.CampaignID, zero)
+		streamID := w.parseUUIDVal(r.StreamID, zero)
+		offerID := w.parseUUIDVal(r.OfferID, zero)
+		landingID := w.parseUUIDVal(r.LandingID, zero)
 
 		// IPv6 column: always 16-byte form
 		ip := parseIPv6(r.IP)
@@ -284,10 +272,14 @@ func (w *Writer) flush(records []ClickRecord) {
 	w.logger.Info("clicks flushed to ClickHouse", zap.Int("count", len(records)))
 }
 
-// parseUUID parses a UUID string to [16]byte. Returns fallback on parse error.
-func parseUUID(s string, fallback [16]byte) [16]byte {
+// parseUUIDVal parses a UUID string to uuid.UUID. Returns fallback on parse error.
+func (w *Writer) parseUUIDVal(s string, fallback uuid.UUID) uuid.UUID {
+	if s == "" {
+		return fallback
+	}
 	id, err := uuid.Parse(s)
 	if err != nil {
+		w.logger.Warn("invalid UUID detected — falling back", zap.String("uuid", s))
 		return fallback
 	}
 	return id

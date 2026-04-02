@@ -33,6 +33,15 @@
 - **Background worker goroutines**: click writer, cache warmup, hit limit daily reset
 - Campaign type field (POSITION vs WEIGHT) in data model
 
+### Phase 1.5: Maintenance — Reliability & Robustness
+**Status**: ✅ Complete
+**Objective**: Fix critical flaws in shutdown, data integrity, and analytics to ensure Phase 1 foundation is truly solid before adding campaign complexity.
+**Deliverable**: Bulletproof shutdown logic, hardened ClickHouse ingestion, and acknowledged uniqueness debt.
+**Requirements**:
+- **Inverted Shutdown Dependency**: Cancel HTTP server first, then drain workers.
+- **UUID Validation**: Validate all incoming UUID strings in `writer.go` to prevent batch-level ingestion failures.
+- **Technical Debt Logging**: Formally acknowledge the "default-duplicate" analytics status of Phase 1 traffic.
+
 ### Phase 2: Campaign Engine — Streams, Filters, Rotators, Entity Binding
 **Status**: ⬜ Not Started
 **Objective**: Implement the campaign routing engine — 3-tier stream selection (FORCED → REGULAR → DEFAULT), stream filter matching (27 filter types including IsBot), position-based AND weight-based rotation, offer/landing weighted rotation, affiliate network resolution, entity binding (bind returning visitors to same stream/landing/offer via Valkey + cookies). Pipeline stages 7-12, 14-18.
