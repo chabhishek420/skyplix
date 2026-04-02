@@ -33,7 +33,11 @@ a stream with weights).
     internal/server/routes.go (MODIFY — wire routes)
   </files>
   <action>
-    1. Offers CRUD (6 endpoints):
+    1. Register repositories:
+       - Update `internal/admin/handler/handler.go` struct to include `offers`, `landings`, `networks`
+       - Update `NewHandler` to initialize them.
+
+    2. Offers CRUD (6 endpoints):
        - GET /offers — list with pagination
        - GET /offers/:id — show
        - POST /offers — create (name, url, affiliate_network_id, payout)
@@ -87,7 +91,11 @@ a stream with weights).
     internal/server/routes.go (MODIFY — wire association routes)
   </files>
   <action>
-    1. Create `internal/admin/repository/associations.go`:
+    1. Register repository:
+       - Update `internal/admin/handler/handler.go` struct to include `associations *repository.AssociationRepo`
+       - Update `NewHandler` to initialize it.
+
+    2. Create `internal/admin/repository/associations.go`:
        - `AddOfferToStream(ctx, streamID, offerID, weight) error`
          — INSERT INTO stream_offers (stream_id, offer_id, weight) VALUES (...)
          — ON CONFLICT (stream_id, offer_id) DO UPDATE SET weight = EXCLUDED.weight

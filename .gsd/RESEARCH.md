@@ -469,20 +469,20 @@ Only external dependencies are the three databases.
 
 | Layer | Technology | Version | Reason |
 |-------|-----------|---------|--------|
-| Language | Go | 1.23+ | Single binary, goroutines, ad-tech standard |
+| Language | Go | 1.25.6 | Single binary, goroutines, ad-tech standard |
 | HTTP Router | Chi | v5 | net/http compatible, idiomatic, no magic |
 | Click Queue | Valkey | 8 | Open-source Redis fork, async write buffer |
 | Config Cache | Valkey | 8 | Entity pre-loading (campaigns/streams/offers) |
 | Transactional DB | PostgreSQL | 16 | ACID, JSONB, row locking |
 | DB Driver | pgx | v5 | Native PostgreSQL, pgxpool, zero overhead |
-| SQL Layer | sqlc | latest | Compile-time type-safe SQL, zero ORM |
-| Dynamic Queries | squirrel | v2 | Admin list filters only |
-| Migrations | golang-migrate | latest | SQL files, embedded in binary |
+| SQL Layer | raw pgx | — | Hand-written SQL (sqlc planned but not adopted) |
+| ~~Dynamic Queries~~ | ~~squirrel~~ | — | ~~Not used — raw SQL with pgx instead~~ |
+| Migrations | manual SQL | — | Up/down SQL files applied via pgx (golang-migrate not adopted) |
 | Analytics DB | ClickHouse | 24 | Columnar, billions of rows, sub-second agg |
 | CH Driver | clickhouse-go | v2 | High-level, production-ready |
 | GeoIP | MaxMind GeoLite2 | current | Free, mmdb format, memory-mapped |
 | ISP/Proxy | IP2Location LITE | current | Better ASN/ISP than GeoLite2 free |
-| UA Parser | mssola/device-detector | latest | Matomo-quality, Go port |
+| UA Parser | mileusna/useragent | v1.3.5 | Pure Go, no CGo, covers Browser/OS/Device |
 | Admin UI | Vite + React 19 | latest | Static SPA, embedded in Go binary |
 | UI Components | shadcn/ui | latest | Accessible, composable, customizable |
 | Server State | TanStack Query | v5 | Caching, polling, background refresh |
@@ -493,3 +493,66 @@ Only external dependencies are the three databases.
 | Metrics | Prometheus client | v2 | Standard Go instrumentation |
 | Deployment | Docker Compose | v2 | Single `docker compose up` |
 | License | MIT | — | No restrictions, no telemetry |
+
+---
+
+## LAYER 13 — Reference Source Code Analysis (Phase 4 Preparation)
+
+> **Date**: 2026-04-02
+> **Method**: Deep reading of 5 reference codebases
+> **Status**: FINALIZED
+
+### Source 1: Keitaro PHP (Decoded IonCube)
+**Bot Detection Architecture:**
+- `UserBotListService.php`: 54 hardcoded UA signatures, 3-tier detection (empty UA → UA match → IP list)
+- `UserBotsService.php`: IP range management — supports single IPs, CIDR (`/24`), ranges (`1.2.3.4-1.2.3.10`), with merge/exclude operations over sorted int ranges
+- `CheckInList.php`: Versioned matching engine — v0 (line-by-line IP/CIDR), v1 (regex IP), v2 (UA substring)
+- `BuildRawClickStage.php` L58-80: Bot + proxy detection runs inline during click processing
+- GeoIP `IpInfoType::BOT_TYPE` check runs BEFORE UA/IP checks (MaxMind returns bot_type for known bots)
+
+**Cloaking via Actions:**
+- `Remote.php`: Reverse-proxies a URL via cURL, caches response in filesystem for 60s (TTL), serves as local content. This is how bots see "safe pages" — a real website proxied through the tracker.
+- `Pipeline.php` L60-73: `ToCampaign` action triggers recursive pipeline re-entry (up to 10 levels). Payload fields are reset between recursions.
+
+**Stream Filters (28):**
+`HideClickDetect` and `ImkloDetect` are third-party API integrations — they send IP + headers to external services for bot classification. Both support Black/White modes.
+
+### Source 2: YellowCloaker (BinomoCloaker)
+**12-Layer Detection Engine (`core.php`):**
+1. IP base (bots.txt CIDR list)
+2. Custom IP blacklist (user-provided file)
+3. VPN/Tor detection (`ipinfo.app/lookup` API — returns "Y" for VPN/Tor)
+4. User-Agent blacklist (substring matching)
+5. OS whitelist (must be in allowed list)
+6. Country whitelist (GeoIP)
+7. Language whitelist (Accept-Language)
+8. Empty referrer blocking
+9. Referrer stopwords
+10. URL token blacklist
+11. URL must-contain check
+12. ISP blacklist
+
+**Safe Page Delivery Modes:**
+- `folder` — serve local HTML folder
+- `curl` — reverse-proxy a real website
+- `redirect` — 301/302 to safe URL
+- `error` — return HTTP error code (404)
+
+### Source 3: yljary-investigation (Real-World Intelligence)
+**Critical finding:** TDS operator did NOT use UA or referrer for bot detection. Detection was behavioral/infrastructure-level. The operator detected our testing and modified behavior in real-time (disabled debug parameter, changed server IPs).
+
+**Implication:** Relying solely on UA patterns is insufficient. Infrastructure-level detection (datacenter IPs, VPN databases, TLS fingerprinting) is what real operators use.
+
+### Source 4: KeitaroCustomScripts
+**Epsilon-Greedy Multi-Armed Bandit (`ywbegfilter.php`):**
+- Reads landing IDs for current stream
+- With ε% probability → random selection (exploration)
+- With (100-ε)% probability → queries Keitaro API for best metric (LP CTR, EPC, CR)
+- Uses Redis cache (5-min TTL) to avoid API spam
+- Sets 100% weight on winner landing, 0% on others
+
+**Candidate for SkyPlix Phase 5+ — automatic offer/landing optimization.**
+
+### Source 5: AKM Traffic Tracker
+**ClickHouse daily aggregation pattern** with date gap filling — relevant for Phase 5 reporting.
+

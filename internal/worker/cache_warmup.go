@@ -6,6 +6,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+
+	"github.com/skyplix/zai-tds/internal/cache"
 )
 
 // CacheWarmupWorker checks every 30s if a cache warmup has been scheduled.
@@ -13,11 +15,12 @@ import (
 // Phase 1 stub: detects the warmup flag and logs it.
 type CacheWarmupWorker struct {
 	valkey *redis.Client
+	cache  *cache.Cache
 	logger *zap.Logger
 }
 
-func NewCacheWarmupWorker(valkey *redis.Client, logger *zap.Logger) *CacheWarmupWorker {
-	return &CacheWarmupWorker{valkey: valkey, logger: logger}
+func NewCacheWarmupWorker(valkey *redis.Client, cache *cache.Cache, logger *zap.Logger) *CacheWarmupWorker {
+	return &CacheWarmupWorker{valkey: valkey, cache: cache, logger: logger}
 }
 
 func (w *CacheWarmupWorker) Name() string { return "cache-warmup" }
@@ -36,8 +39,11 @@ func (w *CacheWarmupWorker) Run(ctx context.Context) error {
 				continue
 			}
 			if exists > 0 {
-				w.logger.Info("cache warmup triggered — Phase 1 stub, full warmup in Phase 2")
-				// Delete the flag — in Phase 2 this triggers actual Valkey population
+				w.logger.Info("cache warmup triggered by admin mutation")
+				if err := w.cache.Warmup(ctx); err != nil {
+					w.logger.Error("cache warmup failed", zap.Error(err))
+				}
+				// Delete the flag
 				w.valkey.Del(ctx, "warmup:scheduled")
 			}
 		case <-ctx.Done():

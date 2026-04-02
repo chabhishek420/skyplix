@@ -23,60 +23,50 @@ using admin-created campaigns.
 ## Tasks
 
 <task type="auto">
-  <name>Implement cache warmup scheduler</name>
+  <name>Upgrade existing CacheWarmupWorker to call real Warmup()</name>
   <files>
-    internal/cache/scheduler.go (NEW)
-    internal/server/server.go (MODIFY — start scheduler goroutine)
+    internal/worker/cache_warmup.go (MODIFY — AUDIT FIX #2: upgrade, NOT create new scheduler)
   </files>
   <action>
-    1. Create `internal/cache/scheduler.go`:
-       ```go
-       // ScheduleWarmup sets a flag in Valkey indicating warmup is needed.
-       // Called by admin handlers after any entity mutation.
-       func (c *Cache) ScheduleWarmup() {
-           c.vk.Set(context.Background(), "warmup:scheduled", "1", 30*time.Second)
-       }
+    AUDIT FIX #2: A `CacheWarmupWorker` already exists at `internal/worker/cache_warmup.go`.
+    It already polls `warmup:scheduled` every 30 seconds and deletes the flag.
+    It is a Phase 1 stub — it logs but does NOT call `cache.Warmup()`.
 
-       // RunWarmupScheduler checks the warmup flag every 5 seconds.
-       // When set, runs full warmup and clears the flag.
-       // Debounces rapid mutations (multiple saves within 5s = one warmup).
-       func (c *Cache) RunWarmupScheduler(ctx context.Context) {
-           ticker := time.NewTicker(5 * time.Second)
-           defer ticker.Stop()
-           for {
-               select {
-               case <-ctx.Done():
-                   return
-               case <-ticker.C:
-                   val, err := c.vk.Get(ctx, "warmup:scheduled").Result()
-                   if err != nil || val != "1" {
-                       continue
-                   }
-                   c.vk.Del(ctx, "warmup:scheduled")
-                   if err := c.Warmup(ctx); err != nil {
-                       c.logger.Error("scheduled warmup failed", zap.Error(err))
-                   } else {
-                       c.logger.Info("scheduled cache warmup complete")
-                   }
-               }
-           }
-       }
+    DO NOT create `internal/cache/scheduler.go` — that would create two competing
+    goroutines polling the same Valkey key, causing flag starvation.
+
+    Instead, upgrade the existing worker:
+
+    1. Modify `internal/worker/cache_warmup.go`:
+       - Add `cache *cache.Cache` field to `CacheWarmupWorker` struct
+       - Update constructor: `NewCacheWarmupWorker(valkey, cache, logger)`
+       - Change ticker interval from `30 * time.Second` to `5 * time.Second`
+         (matches Keitaro's ~5s warmup debounce)
+       - Replace the stub log line with actual warmup call:
+         ```go
+         if err := w.cache.Warmup(ctx); err != nil {
+             w.logger.Error("cache warmup failed", zap.Error(err))
+         } else {
+             w.logger.Info("scheduled cache warmup complete")
+         }
+         ```
+
+    2. Update `internal/server/server.go` worker initialization
+       (already updated in Plan 3.1) to pass `s.cache` to the constructor:
+       ```go
+       worker.NewCacheWarmupWorker(s.valkey, s.cache, logger)
        ```
 
-    2. Start scheduler in `server.go` Run():
-       - Add goroutine: `go s.cache.RunWarmupScheduler(ctx)`
-       - Must be started BEFORE HTTP server begins accepting requests
-       - Must respect context cancellation for graceful shutdown
-
-    IMPORTANT: The scheduler debounces naturally — multiple ScheduleWarmup() calls
-    within 5s result in a single actual warmup. This is intentional and matches Keitaro.
+    IMPORTANT: The ScheduleWarmup() method on Cache (created in Plan 3.1)
+    sets the same `warmup:scheduled` key that this worker polls. No new
+    goroutines or schedulers needed — the existing worker pattern is correct.
   </action>
   <verify>go build ./... && echo "BUILD OK"</verify>
   <done>
-    - ScheduleWarmup() method exists on Cache
-    - RunWarmupScheduler goroutine runs in background
-    - 5-second polling interval with natural debounce
-    - Graceful shutdown via context cancellation
+    - Existing CacheWarmupWorker upgraded from stub to real warmup
+    - 5-second polling interval (was 30s) with natural debounce
+    - No duplicate scheduler — single goroutine polls single flag
+    - Graceful shutdown via context cancellation (already implemented)
   </done>
 </task>
 

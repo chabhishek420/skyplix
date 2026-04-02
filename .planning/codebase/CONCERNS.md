@@ -1,27 +1,39 @@
 ## Current Position
-- **Phase**: 3 — Admin API
-- **Task**: Prepared to scaffold base API structure (3.0) and Campaign CRUD (3.1).
-- **Status**: Paused at 2026-04-02 17:55 IST after Phase 2 verified (100% green).
+- **Phase**: 3 (Admin API)
+- **Task**: 3.4 — Traffic Sources, Domains, Users, Settings CRUD
+- **Status**: Paused at 2026-04-02 21:08
 
 ## Last Session Summary
-- Successfully hardened and verified the routing engine (Phase 2).
-- Achieved 100% pass rate on integration tests: Bot Detection, Geo, Weighted Rotation, and L2 Landing-to-Offer redirects.
-- Transitioned GSD records to Phase 3.
+Focused on implementing the Admin API CRUD surface. Successfully added migration `005` (Stream Limits & API Keys) and scaffolded handlers/repositories for Traffic Sources and Domains. Identified a drift where current implementation lacks specific "AUDIT FIX" requirements from `4-PLAN.md` (cloning, soft-deletion, restoration).
 
 ## In-Progress Work
-- Scaffolding of RESTful Administrative API (Phase 3).
-- Files modified: server.go, routes.go, l2_find_campaign.go, 12_choose_offer.go (hardened).
-- Tests status: All integration tests PASS.
+- Migration `005_add_stream_limits_and_api_keys.up.sql` is applied.
+- `internal/admin/handler/sources.go` — 5/6 endpoints implemented (missing `/clone`).
+- `internal/admin/repository/domains.go` — Basic CRUD done, missing soft-delete/state-filtering logic.
+- Files modified: `internal/admin/handler/sources.go`, `internal/admin/handler/streams.go`, `internal/admin/repository/domains.go`, `db/postgres/migrations/005_...`.
+- Tests status: Not yet run for new CRUD surface.
+
+## Blockers
+- **Plan Drift**: The implementation has slightly diverted from the "AUDIT FIX #4" requirements in `4-PLAN.md`. Need to align on whether to implement the full 15 additional endpoints now.
 
 ## Context Dump
-
 ### Decisions Made
-- **2-Level Redirect**: Finalized the use of LpToken persistence in Valkey for linking landing page clicks to offer clicks.
-- **Memory Safety**: Adopted heap-escaping copies for all selected entities in the pipeline to prevent nil-pointer regression.
-- **Brute-Force L2 Extraction**: Implemented manual path extraction as a definitive fallback for `chi` URL parameter fragmentation.
+- **Migration 005**: Added `stream_limit` to `campaigns` and `api_key` to `users` to support upcoming admin features.
+- **ScheduleWarmup**: All mutations correctly trigger cache warmup via `h.cache.ScheduleWarmup()`.
 
-### Next Steps
-1. Execute Task 3.0: Setup administrative route handlers in `server/admin.go`.
-2. Execute Task 3.1: RESTful CRUD for Campaigns.
-3. Integrate with cache warmup trigger on entity save.
-3. Then → `/plan 3` for Admin API.
+### Approaches Tried
+- **Basic CRUD**: Followed standard repository/handler pattern; now needs extension for domain state management.
+
+### Current Hypothesis
+The core CRUD is functional, but scaling it to match the Keitaro reference (cloning, archivals) is the primary remaining gap for this task.
+
+### Files of Interest
+- `4-PLAN.md`: The "Source of Truth" for missing endpoints.
+- `internal/admin/handler/sources.go`: Needs `/clone` endpoint.
+- `internal/admin/repository/domains.go`: Needs `state` field support in SQL queries.
+
+## Next Steps
+1. **Align with Plan**: Implement missing endpoints (`/clone` for sources; `/deleted`, `/restore`, `/clone`, `/check` for domains).
+2. **Soft-Delete Logic**: Update `DomainRepository` to set `state = 'archived'` instead of hard DELETE.
+3. **Migration 006**: Create settings table and implement bulk-upsert handler.
+4. **Users CRUD**: Complete secure password handling and access-data updates.

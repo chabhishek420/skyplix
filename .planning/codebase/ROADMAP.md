@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-> **Current Phase**: 3 — Admin API
+> **Current Phase**: 4 — Advanced Cloaking & Bot Detection
 > **Milestone**: v1.0 — Production TDS
 
 ## Must-Haves (from SPEC)
@@ -61,7 +61,7 @@
 - [x] Phase 2 Hardened Foundation Complete
 
 ### Phase 3: Admin API — CRUD for All P0/P1 Entities
-**Status**: 🏗️ In Progress
+**Status**: ✅ Complete
 **Objective**: RESTful JSON API for managing campaigns, streams, stream filters, offers, landings, domains, affiliate networks, traffic sources, users, settings. Auth via API key + session cookies. On entity save: trigger Valkey cache warmup (async via warmup scheduler, matching Keitaro's `WarmupScheduler` pattern).
 **Deliverable**: Complete admin API that the frontend can consume, with entity save → Valkey cache invalidation
 **Requirements**: All P0+P1 entity CRUD, validation, pagination, filtering, auth middleware, **cache warmup trigger on entity mutations**

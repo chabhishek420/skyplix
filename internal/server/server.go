@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/action"
+	"github.com/skyplix/zai-tds/internal/admin/handler"
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/cache"
 	"github.com/skyplix/zai-tds/internal/config"
@@ -39,8 +40,9 @@ type Server struct {
 	valkey   *redis.Client
 	geo      *geo.Resolver
 	device   *device.Detector
-	chWriter *queue.Writer
-	workers  *worker.Manager
+	chWriter     *queue.Writer
+	workers      *worker.Manager
+	adminHandler *handler.Handler
 
 	cache        *cache.Cache
 	filterEngine *filter.Engine
@@ -99,6 +101,15 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.hitlimitSvc = hitlimit.New(s.valkey, logger)
 	s.bindingSvc = binding.New(s.valkey, logger)
 	s.lpTokenSvc = lptoken.New(s.valkey, logger)
+
+	// Admin Handler
+	s.adminHandler = handler.NewHandler(s.db, s.cache, logger)
+
+	// Workers (AUDIT FIX #5)
+	s.workers = worker.NewManager(logger,
+		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
+		worker.NewSessionJanitorWorker(logger),
+	)
 
 	// Warmup cache
 	if err := s.cache.Warmup(ctx); err != nil {
@@ -176,6 +187,11 @@ func (s *Server) Run(ctx context.Context) error {
 		}()
 	}
 
+	// Start background workers (AUDIT FIX #5)
+	if s.workers != nil {
+		s.workers.StartAll(ctx)
+	}
+
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -201,6 +217,9 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	// 2. Shut down workers (flushes ClickHouse batches)
+	if s.workers != nil {
+		s.workers.Wait()
+	}
 	wg.Wait()
 
 	// 3. Close connections

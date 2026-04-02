@@ -310,3 +310,57 @@ Context health monitor identified drift; session ending for re-alignment.
 
 ### Handoff Notes
 We are midway through Task 3.4. The next session must focus on filling the gaps between the current CRUD code and the detailed requirements in `4-PLAN.md` (specifically cloning and domain state management). Migration `006` for Settings is the next database task.
+
+---
+
+## Session: 2026-04-02 23:15
+
+### Objective
+Deep-dive into all 5 reference source codebases to extract architecture patterns, bot detection algorithms, and cloaking strategies for Phase 4 planning.
+
+### Accomplished
+- **Keitaro PHP Source** — Full audit of decoded IonCube source:
+  - Mapped all 23 L1 and 13 L2 pipeline stages (exact stage order verified)
+  - Extracted 54 hardcoded bot UA signatures from `UserBotListService.php`
+  - Analyzed IP range management system in `UserBotsService.php` (CIDR/range/single, binary search, merge/exclude)
+  - Documented `Remote` action — reverse-proxy with file-based 60s TTL cache
+  - Documented pipeline recursion for `ToCampaign` action (up to 10 levels) in `Pipeline.php`
+  - Mapped all 28 stream filter types including `HideClickDetect` and `ImkloDetect` (3rd-party API integrations)
+  - Mapped all 19 predefined action types
+- **AKM Traffic Tracker** — Analyzed Python/FastAPI TDS with ClickHouse daily aggregation pattern
+- **KeitaroCustomScripts** — Found epsilon-greedy multi-armed bandit (`ywbegfilter.php`) for automatic landing optimization
+- **YellowCloaker** — Full audit of 12-layer cloaking engine:
+  - IP base → custom blacklist → VPN/Tor API → UA → OS → country → language → referrer → URL tokens → URL patterns → ISP
+  - White/black page delivery in 4 modes (folder/curl/redirect/error)
+  - JS timezone/fingerprint checks
+  - Facebook/TikTok pixel integration
+- **yljary-investigation** — Real-world intelligence:
+  - 500-700 campaigns, 457 brands, 4 typosquat domains
+  - Key lesson: operator did NOT use UA/referrer for bot detection
+  - Safe pages served in 8 languages via Keitaro's `Remote` action
+- **Updated GSD files**: STATE, ROADMAP (Phase 4 requirements), TODO (Phase 4 pre-work), DECISIONS (ADR-011), ARCHITECTURE, STACK
+- **Created artifact**: `reference_analysis.md` — comprehensive cross-reference analysis
+
+### GSD Updates
+- `STATE.md` — Updated with reference analysis summary + Phase 4 requirements
+- `ROADMAP.md` — Phase 4 expanded with 12 prioritized requirements (P0-P3) from reference analysis
+- `TODO.md` — Added 7 Phase 4 pre-work items + 2 new research items
+- `DECISIONS.md` — Added ADR-011 (Multi-Layer Cloaking Architecture)
+- `ARCHITECTURE.md` — Already updated (previous mapping session)
+- `STACK.md` — Already updated (previous mapping session)
+
+### Verification
+- [x] All 5 reference codebases analyzed
+- [x] Keitaro pipeline stages verified (23 L1 + 13 L2)
+- [x] Bot detection system fully mapped (3 tiers)
+- [x] YellowCloaker detection engine fully mapped (12 checks)
+- [x] All GSD files updated consistently
+- [x] Reference analysis artifact created
+
+### Handoff Notes
+**Ready for Phase 4 planning.** Run `/plan 4` to decompose the Phase 4 requirements into executable tasks. The P0 items (IP management + VPN detection + expanded UA + safe pages) are the minimum viable cloaking system. Key reference files to keep handy:
+- `reference/Keitaro_source_php/application/Component/BotDetection/Service/UserBotListService.php` — bot signatures
+- `reference/Keitaro_source_php/application/Component/BotDetection/Service/UserBotsService.php` — IP range management
+- `reference/Keitaro_source_php/application/Traffic/Actions/Predefined/Remote.php` — reverse proxy action
+- `reference/YellowCloaker/core.php` — 12-layer detection engine
+- `reference/Keitaro_source_php/application/Traffic/Pipeline/Pipeline.php` — ToCampaign recursion

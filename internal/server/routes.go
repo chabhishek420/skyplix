@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 
+	"github.com/skyplix/zai-tds/internal/admin"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
@@ -20,8 +21,100 @@ func (s *Server) routes() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(s.requestLogger())
 
-	// Admin / health
+	// Public Administrative routes
 	r.Get("/api/v1/health", s.handleHealth)
+
+	// Protected Admin API routes
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(admin.APIKeyAuth(s.db))
+
+		r.Route("/campaigns", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListCampaigns)
+			r.Post("/", s.adminHandler.HandleCreateCampaign)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetCampaign)
+				r.Put("/", s.adminHandler.HandleUpdateCampaign)
+				r.Delete("/", s.adminHandler.HandleDeleteCampaign)
+				r.Get("/streams", s.adminHandler.HandleListStreams)
+			})
+		})
+
+		r.Route("/streams", func(r chi.Router) {
+			r.Post("/", s.adminHandler.HandleCreateStream)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetStream)
+				r.Put("/", s.adminHandler.HandleUpdateStream)
+				r.Delete("/", s.adminHandler.HandleDeleteStream)
+				r.Get("/offers", s.adminHandler.HandleGetStreamOffers)
+				r.Post("/offers", s.adminHandler.HandleSyncStreamOffers)
+				r.Get("/landings", s.adminHandler.HandleGetStreamLandings)
+				r.Post("/landings", s.adminHandler.HandleSyncStreamLandings)
+			})
+		})
+
+		r.Route("/offers", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListOffers)
+			r.Post("/", s.adminHandler.HandleCreateOffer)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetOffer)
+				r.Put("/", s.adminHandler.HandleUpdateOffer)
+				r.Delete("/", s.adminHandler.HandleDeleteOffer)
+			})
+		})
+
+		r.Route("/landings", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListLandings)
+			r.Post("/", s.adminHandler.HandleCreateLanding)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetLanding)
+				r.Put("/", s.adminHandler.HandleUpdateLanding)
+				r.Delete("/", s.adminHandler.HandleDeleteLanding)
+			})
+		})
+
+		r.Route("/affiliate_networks", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListNetworks)
+			r.Post("/", s.adminHandler.HandleCreateNetwork)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetNetwork)
+				r.Put("/", s.adminHandler.HandleUpdateNetwork)
+				r.Delete("/", s.adminHandler.HandleDeleteNetwork)
+			})
+		})
+
+		r.Route("/traffic_sources", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListSources)
+			r.Post("/", s.adminHandler.HandleCreateSource)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetSource)
+				r.Put("/", s.adminHandler.HandleUpdateSource)
+				r.Delete("/", s.adminHandler.HandleDeleteSource)
+			})
+		})
+
+		r.Route("/domains", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListDomains)
+			r.Post("/", s.adminHandler.HandleCreateDomain)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetDomain)
+				r.Put("/", s.adminHandler.HandleUpdateDomain)
+				r.Delete("/", s.adminHandler.HandleDeleteDomain)
+			})
+		})
+
+		r.Route("/users", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListUsers)
+			r.Post("/", s.adminHandler.HandleCreateUser)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetUser)
+				r.Put("/", s.adminHandler.HandleUpdateUser)
+				r.Delete("/", s.adminHandler.HandleDeleteUser)
+			})
+		})
+
+		r.Get("/settings", s.adminHandler.HandleGetSettings)
+		r.Put("/settings", s.adminHandler.HandleUpdateSettings)
+	})
 
 	// Click traffic routes (hot path)
 	r.Get("/lp/{token}/click", s.handleClickL2) // Level 2 (Landing → Offer)

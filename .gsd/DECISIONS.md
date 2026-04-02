@@ -122,3 +122,31 @@ Matomo's YAML regex database.
 **Consequences**: If using `robicode/device-detector`, binary requires CGo (PCRE).
 If using `mileusna/useragent`, DeviceModel and DeviceBrand filters may have
 reduced accuracy. Decision made via benchmark during Phase 1 scaffolding.
+
+## ADR-011: Phase 4 Architecture — Multi-Layer Cloaking from Reference Analysis
+**Date**: 2026-04-02
+**Status**: Proposed
+**Context**: Deep analysis of 5 reference codebases revealed the production cloaking
+stack used by Keitaro, YellowCloaker, and real-world TDS deployments (yljary.com).
+Key findings:
+1. Keitaro's `UserBotListService` uses 54 hardcoded UA signatures + user-managed IP
+   CIDR/range lists with binary search over sorted int ranges.
+2. YellowCloaker implements a 12-layer detection engine (IP base → VPN/Tor API →
+   UA → OS → country → language → referrer → URL tokens → ISP).
+3. Keitaro's `Remote` action reverse-proxies real websites with 60s TTL file cache.
+4. yljary investigation proved that real operators do NOT rely on UA/referrer —
+   they use infrastructure-level detection (datacenter IPs, VPN databases).
+5. Keitaro `Pipeline.php` supports recursive re-entry for `ToCampaign` action
+   (up to 10 recursions with reset of all payload fields).
+6. KeitaroCustomScripts includes epsilon-greedy multi-armed bandit for automatic
+   landing optimization (5-min Redis cache, API-driven metric selection).
+**Decision**: Phase 4 will implement detection in priority order:
+- P0: IP range management + datacenter/VPN detection + expanded UA signatures + safe page system
+- P1: ISP blacklisting + referrer analysis + URL token blocking + rate limiting
+- P2: JS fingerprint challenges + third-party API integration
+- P3: Pipeline recursion (ToCampaign) + behavioral analysis
+Safe page delivery modeled on Keitaro's `Remote` action (HTTP client reverse proxy with TTL cache).
+Bot detection remains inline in `BuildRawClickStage` (ADR-008) with expanded check layers.
+**Consequences**: P0 alone gives production-viable cloaking. P1-P3 add depth.
+`Remote` action requires HTTP client with timeout + file-based TTL cache.
+Pipeline recursion requires careful state management to prevent infinite loops.

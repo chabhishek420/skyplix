@@ -29,23 +29,32 @@ Settings (system-wide config key-value store).
     internal/server/routes.go (MODIFY)
   </files>
   <action>
-    1. Traffic Sources CRUD (5 endpoints):
+    1. Register repositories:
+       - Update `internal/admin/handler/handler.go` struct to include `trafficSources`, `domains`
+       - Update `NewHandler` to initialize them.
+
+    2. Traffic Sources CRUD (6 endpoints — AUDIT FIX #4, was 5, missing clone):
        - GET /traffic_sources — list
        - GET /traffic_sources/:id — show
        - POST /traffic_sources — create (name, postback_url, params JSONB)
        - PUT /traffic_sources/:id — update
        - DELETE /traffic_sources/:id — archive
+       - POST /traffic_sources/:id/clone — clone
 
        The `params` field is JSONB storing parameter name→token mappings.
        Example: `{"cost": "{cost}", "keyword": "{keyword}"}`
        Validation: name required
 
-    2. Domains CRUD (5 endpoints):
+    2. Domains CRUD (9 endpoints — AUDIT FIX #4, was 5, missing 4 routes):
        - GET /domains — list
        - GET /domains/:id — show
        - POST /domains — create (domain, campaign_id)
        - PUT /domains/:id — update
        - DELETE /domains/:id — archive (set state = 'archived')
+       - GET /domains/deleted — list archived domains
+       - POST /domains/:id/restore — restore from archive
+       - POST /domains/:id/clone — clone domain
+       - POST /domains/:id/check — trigger DNS validation (stub: sets status, not real DNS check)
 
        Validation: domain required, unique, campaign_id must exist
 
@@ -53,12 +62,14 @@ Settings (system-wide config key-value store).
 
     IMPORTANT: Domain cache invalidation is critical — domain→campaign mapping
     is used on the hot path by DomainRedirectStage. Must warmup after domain mutations.
+    IMPORTANT: `/deleted` route must come BEFORE `/{id}` in Chi to avoid wildcard collision.
   </action>
   <verify>go build ./... && echo "BUILD OK"</verify>
   <done>
-    - 10 endpoints for traffic sources + domains
+    - 15 endpoints for traffic sources (6) + domains (9)
     - JSONB params field properly handled
     - Domain changes trigger cache warmup
+    - Clone endpoints copy all fields except id/timestamps, append " (copy)" to name
   </done>
 </task>
 
@@ -74,7 +85,11 @@ Settings (system-wide config key-value store).
     internal/server/routes.go (MODIFY)
   </files>
   <action>
-    1. Create settings migration:
+    1. Register repositories:
+       - Update `internal/admin/handler/handler.go` struct to include `users`, `settings`
+       - Update `NewHandler` to initialize them.
+
+    2. Create settings migration:
        ```sql
        CREATE TABLE settings (
            key   VARCHAR(255) PRIMARY KEY,
@@ -89,13 +104,14 @@ Settings (system-wide config key-value store).
            ('security.max_auth_tries', '5');
        ```
 
-    2. Users CRUD (5 endpoints):
+    2. Users CRUD (6 endpoints — AUDIT FIX #4, was 5, missing access-data):
        - GET /users — list (never return password_hash or api_key)
        - GET /users/:id — show
        - POST /users — create (login, password, role)
          Password hashed with pgcrypto's crypt() + gen_salt('bf')
        - PUT /users/:id — update (login, role, password optional)
        - DELETE /users/:id — deactivate (state = 'disabled')
+       - PUT /users/:id/access — update access data (password + api_key regeneration)
 
        SECURITY: Never expose password_hash in JSON responses.
        SECURITY: Password updates use pgcrypto bcrypt.
@@ -123,8 +139,8 @@ Settings (system-wide config key-value store).
 
 ## Success Criteria
 - [ ] `go build ./...` succeeds
-- [ ] Traffic Sources: 5 endpoints with JSONB params
-- [ ] Domains: 5 endpoints with campaign linking
-- [ ] Users: 5 endpoints with secure password handling
+- [ ] Traffic Sources: 6 endpoints with JSONB params (including clone)
+- [ ] Domains: 9 endpoints with campaign linking (including deleted/restore/clone/check)
+- [ ] Users: 6 endpoints with secure password handling (including access-data)
 - [ ] Settings: 2 endpoints (GET all, PUT bulk upsert)
 - [ ] Migration 006 creates settings table with default values

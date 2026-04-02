@@ -366,6 +366,12 @@ func (c *Cache) GetCampaign(ctx context.Context, id uuid.UUID) (*model.Campaign,
 	return c.GetCampaignByID(ctx, id)
 }
 
+// ScheduleWarmup sets a flag in Valkey indicating warmup is needed.
+// Called by admin handlers after any entity mutation.
+func (c *Cache) ScheduleWarmup() {
+	c.vk.Set(context.Background(), "warmup:scheduled", "1", 30*time.Second)
+}
+
 // GetStream retrieves a single stream by its UUID.
 func (c *Cache) GetStream(ctx context.Context, id uuid.UUID) (*model.Stream, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("stream:%s", id)).Result()

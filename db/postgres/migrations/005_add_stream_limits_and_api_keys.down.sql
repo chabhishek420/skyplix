@@ -1,0 +1,3 @@
+ALTER TABLE users DROP COLUMN IF EXISTS api_key;
+ALTER TABLE streams DROP COLUMN IF EXISTS daily_limit;
+ALTER TABLE streams DROP COLUMN IF EXISTS total_limit;

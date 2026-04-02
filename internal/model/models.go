@@ -184,3 +184,20 @@ type TrafficSource struct {
 	Params      map[string]string
 	State       string
 }
+
+// Domain represents a campaign-to-domain binding.
+type Domain struct {
+	ID         uuid.UUID
+	Domain     string
+	CampaignID *uuid.UUID
+	State      string
+}
+
+// User represents an administrative user.
+type User struct {
+	ID       uuid.UUID
+	Login    string
+	Role     string
+	State    string
+	ApiKey   string // Added in migration 005
+}

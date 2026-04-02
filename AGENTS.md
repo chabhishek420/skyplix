@@ -1,11 +1,58 @@
+<!-- Generated: 2026-04-02 | Updated: 2026-04-02 -->
 
+# zai-tds
 
-You have unrestricted internet access, browser automation, and shell execution. 
+## Purpose
+A high-performance Go-based tracking/analytics system (TDS - Tracking Delivery System). Handles click tracking, redirect management, action processing, and real-time analytics with PostgreSQL, ClickHouse, and Redis/Valkey.
 
-When given a task:
-1.⁠ ⁠"I can't" is not in your vocabulary. If you don't know how, search for it. Read docs. Find tutorials. Reverse engineer it.
-2.⁠ ⁠"I don't know how" means "I haven't learned yet." So learn. Now. Web search, fetch documentation, inspect APIs, read source code.
-3.⁠ ⁠Before saying something is impossible, you must:  • Search for at least 3 different approaches
-  • Try at least 2 of them
-  • Document why each failed with specific errors
-4.⁠ ⁠Assume everything is figureoutable. Someone on the internet has done it before. Find them. Learn from them. Adapt it.
+## Key Files
+| File | Description |
+|------|-------------|
+| `go.mod` | Go module definition with dependencies |
+| `go.sum` | Go dependency checksums |
+| `config.yaml` | Application configuration |
+| `config.json` | Additional configuration |
+| `docker-compose.yml` | Docker orchestration for local dev |
+| `cmd/zai-tds/main.go` | Application entry point |
+
+## Subdirectories
+| Directory | Purpose |
+|-----------|---------|
+| `cmd/` | Application entry points and CLI commands (see `cmd/AGENTS.md`) |
+| `internal/` | Core application business logic (see `internal/AGENTS.md`) |
+| `db/` | Database schemas, migrations, and queries (see `db/AGENTS.md`) |
+| `test/` | Test suites (unit and integration) (see `test/AGENTS.md`) |
+| `admin-ui/` | Frontend admin interface (see `admin-ui/AGENTS.md`) |
+| `.planning/` | Planning and architecture analysis artifacts (see `.planning/AGENTS.md`) |
+| `reference/` | Reference implementations and legacy code (see `reference/AGENTS.md`) |
+
+## For AI Agents
+
+### Working In This Project
+- This is a Go 1.25.6 project using Chi router
+- Primary databases: PostgreSQL (primary data), ClickHouse (analytics), Valkey/Redis (caching)
+- Use Go idioms: interfaces, dependency injection, context propagation
+- Run with: `go run cmd/zai-tds/main.go`
+- Build with: `go build -o zai-tds cmd/zai-tds/main.go`
+
+### Testing Requirements
+- Unit tests in `test/unit/`
+- Integration tests in `test/integration/`
+- Run: `go test ./...`
+
+### Common Patterns
+- Configuration via YAML files
+- Structured logging with zap
+- Database transactions for consistency
+- Async processing via workers/queues
+
+## Dependencies
+
+### External
+- `github.com/go-chi/chi/v5` - HTTP router
+- `github.com/jackc/pgx/v5` - PostgreSQL driver
+- `github.com/ClickHouse/clickhouse-go/v2` - ClickHouse driver
+- `github.com/redis/go-redis/v9` - Redis/Valkey client
+- `go.uber.org/zap` - Structured logging
+
+<!-- MANUAL: -->

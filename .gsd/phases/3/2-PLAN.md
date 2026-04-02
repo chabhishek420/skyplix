@@ -60,7 +60,11 @@ restore, enable/disable, and cache warmup trigger on every mutation.
        ```
        UpdateCampaignInput uses pointer fields for PATCH semantics (nil = don't update).
 
-    2. Create `internal/admin/handler/campaigns.go`:
+    2. Register repository:
+       - Update `internal/admin/handler/handler.go` struct to include `campaigns *repository.CampaignRepo`
+       - Update `NewHandler` to initialize it: `h.campaigns = repository.NewCampaignRepo(db)`
+
+    3. Create `internal/admin/handler/campaigns.go`:
        - `handleListCampaigns` — GET /campaigns → list with pagination
        - `handleGetCampaign` — GET /campaigns/{id}
        - `handleCreateCampaign` — POST /campaigns → validate + create + ScheduleWarmup
@@ -143,9 +147,14 @@ restore, enable/disable, and cache warmup trigger on every mutation.
        }
        ```
 
-    2. Create `internal/admin/handler/streams.go`:
+    2. Register repository:
+       - Update `internal/admin/handler/handler.go` struct to include `streams *repository.StreamRepo`
+       - Update `NewHandler` to initialize it: `h.streams = repository.NewStreamRepo(db)`
+
+    3. Create `internal/admin/handler/streams.go`:
        - `handleListStreamsByCampaign` — GET /campaigns/{campaign_id}/streams
        - `handleGetStream` — GET /streams/{id}
+       - `handleSearchStreams` — GET /streams/search
        - `handleCreateStream` — POST /streams → validate + create + ScheduleWarmup
        - `handleUpdateStream` — PUT /streams/{id} → update + ScheduleWarmup
        - `handleArchiveStream` — DELETE /streams/{id} → archive + ScheduleWarmup
@@ -153,6 +162,10 @@ restore, enable/disable, and cache warmup trigger on every mutation.
        - `handleEnableStream` — POST /streams/{id}/enable
        - `handleDisableStream` — POST /streams/{id}/disable
        - `handleListDeletedStreams` — GET /streams/deleted
+       - `handleGetCurrentStreamFilters` — GET /stream_filters
+       - `handleGetStreamTypes` — GET /stream_types
+       - `handleGetStreamActions` — GET /stream_actions
+       - `handleGetStreamSchemas` — GET /stream_schemas
 
        Validation rules:
        - `campaign_id`: required, must exist
@@ -185,7 +198,7 @@ restore, enable/disable, and cache warmup trigger on every mutation.
   </action>
   <verify>go build ./... && echo "BUILD OK"</verify>
   <done>
-    - 10 stream endpoints compile and are wired
+    - 14 stream endpoints compile and are wired (including metadata + search)
     - Streams linked to campaigns via campaign_id
     - JSONB filters/action_payload properly serialized/deserialized
     - Cache warmup triggered on mutations
@@ -195,5 +208,5 @@ restore, enable/disable, and cache warmup trigger on every mutation.
 ## Success Criteria
 - [ ] `go build ./...` succeeds with all campaign + stream routes wired
 - [ ] Campaigns: 9 endpoints (list, show, create, update, archive, restore, enable, disable, list-deleted)
-- [ ] Streams: 10 endpoints (list-by-campaign, show, create, update, archive, restore, enable, disable, list-deleted, search)
+- [ ] Streams: 14 endpoints (list-by-campaign, search, show, create, update, archive, restore, enable, disable, list-deleted, plus 4 metadata endpoints)
 - [ ] All mutations trigger cache warmup

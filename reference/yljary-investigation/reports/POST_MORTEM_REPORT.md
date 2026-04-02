@@ -11,20 +11,7 @@
 
 ## EXECUTIVE SUMMARY
 
-A sophisticated traffic cloaking operation utilizing **Keitaro TDS** (Traffic Distribution System) is actively filtering traffic through a multi-hop redirect chain to monetize Hostinger affiliate program. The operation has been running since **June 2023** and is **currently active** with certificate rotation as recent as March 11, 2026.
-
-### Key Findings:
-| Attribute | Value |
-|-----------|-------|
-| **Operation Duration** | ~33 months (June 2023 - Present) |
-| **Primary Domain** | yljary.com (NameCheap, Iceland privacy) |
-| **Affiliate Network** | Hostinger / Impact (HasOffers platform) |
-| **Affiliate ID** | **1636** |
-| **Offer ID** | 753 |
-| **Tracker Platform** | Keitaro TDS (self-hosted PHP) |
-| **Estimated Campaign Scale** | 10,000+ campaigns |
-| **Publisher Scale** | 100,000+ tracked |
-| **Traffic Sources** | Facebook Ads, Microsoft Ads, Spotify Ads |
+A sophisticated traffic cloaking system utilizing **Keitaro TDS** (Traffic Distribution System) is actively filtering traffic through a multi-hop redirect chain to monetize affiliate programs. 
 
 ---
 

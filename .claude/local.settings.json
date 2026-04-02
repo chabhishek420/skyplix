@@ -1,10 +1,10 @@
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "https://listed-surrounded-latter-evaluated.trycloudflare.com",
-    "ANTHROPIC_AUTH_TOKEN": "anything",
-    "ANTHROPIC_MODEL": "claude-sonnet-4-6",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gpt-5.2",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317",
+    "ANTHROPIC_AUTH_TOKEN": "sk-94z0rMQHnK8Z5ZEYUL6rR4kO02GC2eAU",
+    "ANTHROPIC_MODEL": "claude-haiku-4.5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6-thinking",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.3-codex",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gemini-3-flash",
     "DISABLE_PROMPT_CACHING": "0",
     "MAX_THINKING _TOKENS": "20000",

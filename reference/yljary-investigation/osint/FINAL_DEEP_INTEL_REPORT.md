@@ -12,8 +12,7 @@
 
 # EXECUTIVE SUMMARY
 
-A sophisticated, multi-layered affiliate fraud operation has been running for **33+ months** utilizing **Keitaro TDS** (Traffic Distribution System) to cloak traffic and monetize Hostinger's affiliate program. This operation is part of a **massive ecosystem** of over **15,500 scam and malware domains** identified by Infoblox and Confiant research.
-
+A sophisticated, multi-layered affiliate system has been running for **33+ months** utilizing **Keitaro TDS** (Traffic Distribution System) to cloak traffic and monetize affiliate programs.
 ## Critical Findings Summary
 
 | Category | Finding | Severity |
