@@ -1,4 +1,4 @@
-package queue
+package queue_test
 
 import (
 	"net"
@@ -9,16 +9,16 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/model"
+	"github.com/skyplix/zai-tds/internal/queue"
 )
 
 func TestParseUUIDVal_ValidUUID(t *testing.T) {
-	logger := zap.NewNop()
-	w := &Writer{logger: logger}
+	w := &queue.Writer{Logger: zap.NewNop()}
 
 	validUUID := "550e8400-e29b-41d4-a716-446655440000"
 	fallback := uuid.Nil
 
-	result := w.parseUUIDVal(validUUID, fallback)
+	result := w.ParseUUIDVal(validUUID, fallback)
 
 	if result.String() != validUUID {
 		t.Errorf("expected %s, got %s", validUUID, result.String())
@@ -27,11 +27,11 @@ func TestParseUUIDVal_ValidUUID(t *testing.T) {
 
 func TestParseUUIDVal_EmptyString(t *testing.T) {
 	logger := zap.NewNop()
-	w := &Writer{logger: logger}
+	w := &queue.Writer{Logger: logger}
 
 	fallback := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 
-	result := w.parseUUIDVal("", fallback)
+	result := w.ParseUUIDVal("", fallback)
 
 	if result != fallback {
 		t.Errorf("expected fallback %s, got %s", fallback, result)
@@ -40,12 +40,12 @@ func TestParseUUIDVal_EmptyString(t *testing.T) {
 
 func TestParseUUIDVal_InvalidUUID(t *testing.T) {
 	logger := zap.NewNop()
-	w := &Writer{logger: logger}
+	w := &queue.Writer{Logger: logger}
 
 	invalidUUID := "not-a-valid-uuid"
 	fallback := uuid.Nil
 
-	result := w.parseUUIDVal(invalidUUID, fallback)
+	result := w.ParseUUIDVal(invalidUUID, fallback)
 
 	if result != fallback {
 		t.Errorf("expected fallback %s, got %s", fallback, result)
@@ -53,7 +53,7 @@ func TestParseUUIDVal_InvalidUUID(t *testing.T) {
 }
 
 func TestParseIPv6_ValidIPv4(t *testing.T) {
-	result := parseIPv6("192.168.1.1")
+	result := queue.ParseIPv6("192.168.1.1")
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -64,7 +64,7 @@ func TestParseIPv6_ValidIPv4(t *testing.T) {
 }
 
 func TestParseIPv6_ValidIPv6(t *testing.T) {
-	result := parseIPv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+	result := queue.ParseIPv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -75,7 +75,7 @@ func TestParseIPv6_ValidIPv6(t *testing.T) {
 }
 
 func TestParseIPv6_EmptyString(t *testing.T) {
-	result := parseIPv6("")
+	result := queue.ParseIPv6("")
 
 	if !result.Equal(net.IPv6zero) {
 		t.Errorf("expected IPv6zero, got %s", result)
@@ -83,7 +83,7 @@ func TestParseIPv6_EmptyString(t *testing.T) {
 }
 
 func TestParseIPv6_InvalidIP(t *testing.T) {
-	result := parseIPv6("not-an-ip-address")
+	result := queue.ParseIPv6("not-an-ip-address")
 
 	if !result.Equal(net.IPv6zero) {
 		t.Errorf("expected IPv6zero for invalid IP, got %s", result)
@@ -91,7 +91,7 @@ func TestParseIPv6_InvalidIP(t *testing.T) {
 }
 
 func TestFixedString2_TwoChars(t *testing.T) {
-	result := fixedString2("US")
+	result := queue.FixedString2("US")
 
 	if result != "US" {
 		t.Errorf("expected 'US', got %q", result)
@@ -102,7 +102,7 @@ func TestFixedString2_TwoChars(t *testing.T) {
 }
 
 func TestFixedString2_Empty(t *testing.T) {
-	result := fixedString2("")
+	result := queue.FixedString2("")
 
 	if result != "  " {
 		t.Errorf("expected '  ', got %q", result)
@@ -113,7 +113,7 @@ func TestFixedString2_Empty(t *testing.T) {
 }
 
 func TestFixedString2_TooLong(t *testing.T) {
-	result := fixedString2("USA")
+	result := queue.FixedString2("USA")
 
 	if result != "US" {
 		t.Errorf("expected 'US', got %q", result)
@@ -156,7 +156,7 @@ func TestFromRawClick_Conversion(t *testing.T) {
 		ClickToken:     "abc123def456",
 	}
 
-	record := FromRawClick(rc)
+	record := queue.FromRawClick(rc)
 
 	if record.CampaignID != testUUID.String() {
 		t.Errorf("CampaignID: expected %s, got %s", testUUID.String(), record.CampaignID)

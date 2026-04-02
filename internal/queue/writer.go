@@ -112,11 +112,11 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 type Writer struct {
 	conn      driver.Conn
 	clickChan chan ClickRecord
-	logger    *zap.Logger
+	Logger    *zap.Logger
 }
 
 // NewWriter creates and connects a Writer to ClickHouse.
-func NewWriter(addr, database string, logger *zap.Logger) (*Writer, error) {
+func NewWriter(addr, database string, Logger *zap.Logger) (*Writer, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{addr},
 		Auth: clickhouse.Auth{
@@ -140,7 +140,7 @@ func NewWriter(addr, database string, logger *zap.Logger) (*Writer, error) {
 	return &Writer{
 		conn:      conn,
 		clickChan: make(chan ClickRecord, 10_000),
-		logger:    logger,
+		Logger:    Logger,
 	}, nil
 }
 
@@ -179,7 +179,7 @@ func (w *Writer) Run(ctx context.Context) error {
 			if len(batch) > 0 {
 				w.flush(batch)
 			}
-			w.logger.Info("click writer shut down", zap.Int("flushed", len(batch)))
+			w.Logger.Info("click writer shut down", zap.Int("flushed", len(batch)))
 			return nil
 		}
 	}
@@ -206,23 +206,23 @@ func (w *Writer) flush(records []ClickRecord) {
 		 sub_id_1, sub_id_2, sub_id_3, sub_id_4, sub_id_5,
 		 cost, payout, action_type, click_token)`)
 	if err != nil {
-		w.logger.Error("clickhouse prepare batch failed", zap.Error(err))
+		w.Logger.Error("clickhouse prepare batch failed", zap.Error(err))
 		return
 	}
 
 	for _, r := range records {
 		// UUID columns: validate before appending to ensure the batch doesn't fail due to type mismatch.
 		zero := uuid.Nil
-		campaignID := w.parseUUIDVal(r.CampaignID, zero)
-		streamID := w.parseUUIDVal(r.StreamID, zero)
-		offerID := w.parseUUIDVal(r.OfferID, zero)
-		landingID := w.parseUUIDVal(r.LandingID, zero)
+		campaignID := w.ParseUUIDVal(r.CampaignID, zero)
+		streamID := w.ParseUUIDVal(r.StreamID, zero)
+		offerID := w.ParseUUIDVal(r.OfferID, zero)
+		landingID := w.ParseUUIDVal(r.LandingID, zero)
 
 		// IPv6 column: always 16-byte form
-		ip := parseIPv6(r.IP)
+		ip := ParseIPv6(r.IP)
 
 		// FixedString(2): must be exactly 2 bytes
-		cc := fixedString2(r.CountryCode)
+		cc := FixedString2(r.CountryCode)
 
 		if err := b.Append(
 			r.CreatedAt,
@@ -257,37 +257,37 @@ func (w *Writer) flush(records []ClickRecord) {
 			r.ActionType,
 			r.ClickToken,
 		); err != nil {
-			w.logger.Error("batch append failed", zap.Error(err), zap.String("token", r.ClickToken))
+			w.Logger.Error("batch append failed", zap.Error(err), zap.String("token", r.ClickToken))
 		}
 	}
 
 	if err := b.Send(); err != nil {
-		w.logger.Error("clickhouse send batch failed",
+		w.Logger.Error("clickhouse send batch failed",
 			zap.Error(err),
 			zap.Int("records", len(records)),
 		)
 		return
 	}
 
-	w.logger.Info("clicks flushed to ClickHouse", zap.Int("count", len(records)))
+	w.Logger.Info("clicks flushed to ClickHouse", zap.Int("count", len(records)))
 }
 
-// parseUUIDVal parses a UUID string to uuid.UUID. Returns fallback on parse error.
-func (w *Writer) parseUUIDVal(s string, fallback uuid.UUID) uuid.UUID {
+// ParseUUIDVal parses a UUID string to uuid.UUID. Returns fallback on parse error.
+func (w *Writer) ParseUUIDVal(s string, fallback uuid.UUID) uuid.UUID {
 	if s == "" {
 		return fallback
 	}
 	id, err := uuid.Parse(s)
 	if err != nil {
-		w.logger.Warn("invalid UUID detected — falling back", zap.String("uuid", s))
+		w.Logger.Warn("invalid UUID detected — falling back", zap.String("uuid", s))
 		return fallback
 	}
 	return id
 }
 
-// parseIPv6 converts an IP string to a 16-byte IPv6 net.IP.
+// ParseIPv6 converts an IP string to a 16-byte IPv6 net.IP.
 // Returns the IPv6 zero address if parsing fails.
-func parseIPv6(s string) net.IP {
+func ParseIPv6(s string) net.IP {
 	if s == "" {
 		return net.IPv6zero
 	}
@@ -302,9 +302,9 @@ func parseIPv6(s string) net.IP {
 	return net.IPv6zero
 }
 
-// fixedString2 returns a string of exactly 2 bytes for ClickHouse FixedString(2).
+// FixedString2 returns a string of exactly 2 bytes for ClickHouse FixedString(2).
 // Empty or unknown → two spaces ("  "). Truncates if longer.
-func fixedString2(s string) string {
+func FixedString2(s string) string {
 	switch len(s) {
 	case 2:
 		return s
