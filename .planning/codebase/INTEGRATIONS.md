@@ -1,97 +1,51 @@
-# External Integrations
+# INTEGRATIONS
 
-**Analysis Date:** 2026-04-02
+## PostgreSQL (Operational Data)
+- Connection created in `internal/server/server.go` via `pgxpool.New(ctx, cfg.Postgres.DSN)`.
+- DSN configured through `config.yaml` (`postgres.dsn`) or `DATABASE_URL` env override in `internal/config/config.go`.
+- Schema managed by SQL migrations under `db/postgres/migrations/*.sql`.
+- Admin CRUD repositories hit Postgres directly (example: `internal/admin/repository/campaigns.go`).
 
-## Data Storage
+## ClickHouse (Analytics Sink)
+- Click writer initialized in `internal/server/server.go` using `queue.NewWriter(...)`.
+- Batch writes implemented in `internal/queue/writer.go` (channels + periodic flush).
+- Clicks table definition in `db/clickhouse/migrations/001_create_clicks.sql`.
+- Conversions table definition in `db/clickhouse/migrations/002_create_conversions.sql`.
+- Integration tests assert persisted click rows (`test/integration/click_test.go`).
 
-**Primary Database (PostgreSQL):**
-- Driver: `jackc/pgx/v5` (`github.com/jackc/pgx/v5/pgxpool`)
-- Connection: DSN via `DATABASE_URL` env var or `postgres.dsn` in config.yaml
-- Purpose: Campaigns, streams, offers, landings (entity storage)
-- Schema: Direct SQL queries in pipeline stages
+## Valkey / Redis (Hot Path State)
+- Client created in `internal/server/server.go` with `redis.NewClient`.
+- Used by cache layer: `internal/cache/cache.go`.
+- Used by session and uniqueness keys: `internal/session/session.go`.
+- Used by rate limiting counters: `internal/ratelimit/ratelimit.go`.
+- Used by hit-limit counters: `internal/hitlimit/hitlimit.go`.
+- Used by bot IP and UA storage: `internal/botdb/valkey.go`, `internal/botdb/uastore.go`.
+- Used by attribution token cache: `internal/attribution/service.go`.
 
-**Analytics Database (ClickHouse):**
-- Driver: `ClickHouse/clickhouse-go/v2` v2.44.0
-- Connection: `CLICKHOUSE_URL` env var or `clickhouse.addr` in config.yaml
-- Purpose: Click event storage for analytics/reporting
-- Write Pattern: Async batch writer with 500ms/5000 record flush
-- Table: `clicks` with ~32 columns (click metadata, geo, device, costs)
+## GeoIP Databases
+- Resolver loads MaxMind DB files in `internal/geo/geo.go`.
+- Configured paths from `config.yaml`:
+- `data/geoip/GeoLite2-Country.mmdb`
+- `data/geoip/GeoLite2-City.mmdb`
+- `data/geoip/GeoLite2-ASN.mmdb`
+- Output consumed in click build/update stages (e.g., `internal/pipeline/stage/3_build_raw_click.go`, `internal/pipeline/stage/6_update_raw_click.go`).
 
-**Cache/Session Store (Valkey):**
-- Driver: `redis/go-redis/v9` v9.18.0
-- Connection: `VALKEY_URL` env var or `valkey.addr` in config.yaml
-- Purpose: Hit limit counters, uniqueness sessions, cache warmup flags
-- Key Patterns:
-  - `hitlimit:*` - Daily click caps (deleted at midnight UTC)
-  - `warmup:scheduled` - Cache warmup trigger flag
-  - Session keys with TTL (Phase 2)
+## HTTP API Integration Surface
+- Public health endpoint: `/api/v1/health` in `internal/server/routes.go`.
+- Authenticated admin API under `/api/v1/*` with `X-Api-Key` middleware (`internal/admin/middleware.go`).
+- Click tracking endpoints:
+- `GET /{alias}` (L1 pipeline)
+- `GET /lp/{token}/click` (L2 pipeline)
+- `GET /` (domain gateway path)
 
-## IP Intelligence
+## Background Integration Points
+- Cache warmup worker checks Valkey key `warmup:scheduled` and reloads from Postgres (`internal/worker/cache_warmup.go`).
+- Hit-limit reset worker scans/deletes `hitlimit:*` keys (`internal/worker/hitlimit_reset.go`).
 
-**GeoIP (MaxMind GeoIP2):**
-- Library: `oschwald/geoip2-golang` v1.13.0
-- Databases: Country (.mmdb), City (.mmdb), ASN (.mmdb)
-- Config paths: `geoip.country_db`, `geoip.city_db`, `geoip.asn_db` in config.yaml
-- Data Returned: Country code, city name, ISP
-- Graceful: Empty paths log warnings, do not fail startup
+## Test/Tooling Integration Requirements
+- Integration tests require running Postgres + Valkey + ClickHouse (`test/integration/*.go`).
+- Benchmark test also depends on live infra and seeded campaign alias (`test/benchmark/latency_test.go`).
 
-**User-Agent Parsing:**
-- Library: `mileusna/useragent` v1.3.5
-- Data Returned: Device type (desktop/mobile/tablet/bot), browser, browser version, OS, OS version
-- Bot Detection: `Bot` flag from useragent library
-
-## Authentication
-
-**None detected** - This is a traffic distribution system (TDS), not a user-facing application with auth.
-
-## Logging & Observability
-
-**Logging Framework:**
-- Library: `go.uber.org/zap` v1.27.1
-- Levels: Debug (development), Production (JSON structured)
-- Request logging: Chi middleware with method, path, status, bytes, IP
-
-**Health Check Endpoint:**
-- `GET /api/v1/health` - Returns `{"status": "ok", "version": "X.X.X"}`
-
-## Background Workers
-
-**Worker Manager:** Runs multiple goroutines managed by `worker.Manager`
-
-| Worker | Purpose | Schedule |
-|--------|---------|----------|
-| `hitlimit-reset` | Reset daily click caps | Midnight UTC daily |
-| `cache-warmup` | Detect cache warmup requests | Every 30 seconds |
-| `session-janitor` | Expire old sessions | Every 1 hour |
-| `click-writer` | Flush clicks to ClickHouse | Every 500ms or 5000 records |
-
-## HTTP Server
-
-**Framework:** Chi v5 (`github.com/go-chi/chi/v5`)
-
-**Endpoints:**
-| Route | Handler | Purpose |
-|-------|---------|---------|
-| `GET /api/v1/health` | `handleHealth` | Health check |
-| `GET /{alias}` | `handleClick` | Click traffic processing |
-| `GET /` | `handleClick` | Bare domain (gateway context) |
-
-**Timeouts:**
-- Read: 10s, Write: 15s, Idle: 60s
-
-## Environment Configuration
-
-**Required env vars (production):**
-- `DATABASE_URL` - PostgreSQL connection string
-- `VALKEY_URL` - Valkey connection address
-- `CLICKHOUSE_URL` - ClickHouse connection address
-- `SYSTEM_SALT` - Cryptographic salt (min 32 chars in production)
-
-**Optional env vars:**
-- `CONFIG_PATH` - Custom config.yaml location
-- `DEBUG` - Enable debug mode ("true" or "1")
-- `LOG_LEVEL` - Override log level
-
----
-
-*Integration audit: 2026-04-02*
+## Security/Auth Integration Notes
+- API key auth validates directly against `users.api_key` in Postgres (`internal/admin/middleware.go`).
+- Default admin seed user with known password appears in migration `db/postgres/migrations/004_create_domains_users.up.sql` (explicitly marked to change in production).
