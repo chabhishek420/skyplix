@@ -8,11 +8,13 @@
 - **Milestone**: v1.0 — Production TDS
 
 ## Context from Last Session
-- Completed Phase 5.1 Task 3: Upgraded `QueueWriter` to a generic multi-table batcher.
-- The system can now handle `clicks` and `conversions` concurrently in ClickHouse.
-- Cloaking system (Phase 4) is 100% verified (8/8 cases pass).
-- Latency baseline: 2.06ms p99 recorded.
-- **WIP**: `internal/analytics` scaffolded with `Service`, `QueryBuilder`, and `Models`.
+Codebase mapping complete (2026-04-03).
+- **25** pipeline stages identified and documented (upgraded from 23).
+- **27+** filter types and **19** action types verified.
+- **5** ClickHouse migrations confirmed (including Materialized Views for stats).
+- **Technical Debt resolved**: `strings.Title` migrated, Bcrypt hashing implemented, and Pagination added to admin handlers.
+- **Outdated Packages**: Identified 3 low-risk updates (OTEL, Protobuf, Net).
+- Documentation synced in `.gsd/ARCHITECTURE.md` and `.gsd/STACK.md`.
 
 ## Blockers
 - None.
