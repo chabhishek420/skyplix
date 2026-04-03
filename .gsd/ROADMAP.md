@@ -107,12 +107,29 @@
 ### Phase 6: Admin Dashboard UI
 **Status**: ⬜ Not Started
 **Objective**: React SPA admin dashboard with campaign management, click log viewer, conversion reports, real-time stats. Served as static files from the Go binary via `//go:embed`.
-**Deliverable**: Production admin interface matching Keitaro's UX
+**Deliverable**: Production admin interface matching Keitaro's UX — closes ⚠️ "Real-time analytics dashboard" and ⚠️ "Single binary deployment" must-haves.
 **Requirements**: Vite + React 19 + shadcn/ui, embedded in Go binary, responsive dark theme
 
 ### Phase 7: Production Hardening
 **Status**: ⬜ Not Started
 **Objective**: Production readiness — graceful shutdown, health checks, metrics (Prometheus), structured logging, config validation, Docker image, systemd unit, backup/restore, performance benchmarks, Keitaro→SkyPlix data migration script.
 **Deliverable**: Battle-tested binary ready for live affiliate traffic
-**Requirements**: Benchmarks proving <5ms p99, load testing, monitoring, deployment docs, data migration from Keitaro MySQL
+**Requirements**:
+- Benchmarks proving <5ms p99 under sustained load
+- Load testing (k6 or wrk)
+- Monitoring and alerting stack (Prometheus + Grafana)
+- Deployment docs and Docker image
+- Data migration script from Keitaro MySQL → ZAI PostgreSQL
+- **Milestone Audit Debt (from v1.0 audit)**:
+  - ClickHouse partitioning & indexing strategy for attribution performance
+  - Stage 22 enforcement logic (currently log-only)
+  - CLAUDE.md sync hygiene automation
+
+### Milestone Must-Haves Progress (v1.0)
+- [x] Click pipeline processing <5ms p99 — **2.06ms measured**
+- [x] Campaign/Stream/Offer CRUD — **Admin API verified, 3/3 PASS**
+- [x] Bot detection + cloaking — **8/8 cloaking tests PASS**
+- [x] Postback conversion tracking — **Attribution + CH writer verified**
+- [ ] Real-time analytics dashboard — **Backend done; Phase 6 (UI) pending**
+- [ ] Single binary deployment — **Phase 6 (embed) + Phase 7 (hardening) pending**
 
