@@ -2,11 +2,12 @@
 
 ## Current Position
 - **Phase**: 5 — Conversion Tracking & Analytics
-- **Task**: Not started
-- **Status**: Ready to plan
+- **Task**: 5.1 — Model & Storage Foundation
+- **Status**: Ready to execute
 
 ## Last Session Summary
-Phase 4 re-verified and fully complete. Gaps in Safe Page modes (Remote and Curl) closed with fixes and new integration test coverage. 8/8 cloaking test cases ARE GREEN.
+Phase 4 re-verified and fully complete. 8/8 cloaking test cases ARE GREEN.
+Phase 5 planning complete — 3 plans created (5.1, 5.2, 5.3) covering foundation, postback API, and reporting stats.
 
 ## Completed Plans
 | Phase | Plan | Name | Commit | Status |
@@ -22,9 +23,6 @@ Phase 4 re-verified and fully complete. Gaps in Safe Page modes (Remote and Curl
 None.
 
 ## Next Steps
-1. `/plan 5` — plan Phase 5 (Conversion Tracking & Analytics)
-   - Postback (S2S) endpoint
-   - ClickHouse materialized views (daily/hourly)
-   - Stats aggregation API
-   - Report builder (campaign/geo/device/source/time drilldowns)
-   - Click → conversion attribution via click_token
+1. `/execute 5.1` — Implement Conversion Foundation & Attribution Caching.
+2. `/execute 5.2` — Implement Postback API & Attribution Engine.
+3. `/execute 5.3` — Implement Analytics Reporting Service & Stats API.

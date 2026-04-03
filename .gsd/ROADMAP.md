@@ -88,6 +88,17 @@
 - **P3 — Pipeline Recursion**: **Convert** existing `ToCampaignAction` from simple 302 redirect → recursive pipeline re-entry with state reset (up to 10 levels, Keitaro `Pipeline.php` L60-73)
 - **P3 — Behavioral Analysis**: Request timing, header consistency checks (lesson from yljary investigation — operators don't rely on UA/referrer alone)
 
+### Phase 4.9: Infrastructure Hardening & Debt Closure
+**Status**: ⬜ Not Started
+**Objective**: Closure of cross-cutting technical debt and pipeline stubs identified during the Phase 4 audit. Ensures the engine is robust and compliant with modern Go patterns before entering the Analytics phase.
+**Deliverable**: Deprecation-free codebase with full recursive pipeline support.
+**Requirements**:
+- **Technical Debt**: Replace deprecated `strings.Title` with `golang.org/x/text/cases.Title` across the entire project.
+- **Pipeline Expansion**: Implement internal re-dispatch for `ToCampaignAction` (recursive pipeline entry, max 10 hops) and wire Stages 21-22.
+- **Admin API Hardening**: Implement Campaign/Stream cloning and settings bulk-upsert endpoints.
+- **Audit Cleanup**: Resolve 5+ stale items in `TODO.md` that were already implemented but not checked off.
+
+
 ### Phase 5: Conversion Tracking & Analytics
 **Status**: ⬜ Not Started
 **Objective**: Postback (S2S) conversion tracking, real-time stats aggregation (daily/hourly materialized views in ClickHouse), reporting API with drilldowns by campaign/geo/device/source/time.
