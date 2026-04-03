@@ -67,7 +67,7 @@
 **Requirements**: All P0+P1 entity CRUD, validation, pagination, filtering, auth middleware, **cache warmup trigger on entity mutations**
 
 ### Phase 4: Advanced Cloaking & Bot Detection
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Objective**: Upgrade bot detection beyond Phase 1's basic IP+UA checks. Implement production-grade cloaking with multi-layer detection (modeled after YellowCloaker's 12-check engine + Keitaro's bot system) and safe page delivery (modeled after Keitaro's `Remote` action). This builds on the basic bot detection already running in BuildRawClickStage.
 **Deliverable**: Production cloaking — compliance bots/scanners see safe pages, real users see offers
 **Requirements**:
