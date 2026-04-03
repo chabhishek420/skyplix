@@ -2,6 +2,7 @@ package action
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -84,6 +85,6 @@ func (a *CurlAction) Execute(w http.ResponseWriter, r *http.Request, ctx *Action
 		w.Header()[k] = v
 	}
 	w.WriteHeader(resp.StatusCode)
-	fmt.Fprint(w, resp.Body)
+	_, _ = io.Copy(w, resp.Body)
 	return nil
 }

@@ -41,3 +41,36 @@ VALUES (
     '[{"type": "IsBot", "payload": {"is_bot": true}}]', 
     'active'
 );
+
+-- Campaign: cloaked-proxy-test
+DELETE FROM campaigns WHERE alias = 'cloaked-proxy-test';
+INSERT INTO campaigns (id, alias, name, type, state)
+VALUES ('99999999-9999-4999-a999-999999999999', 'cloaked-proxy-test', 'Proxy/Curl Verification', 'POSITION', 'active');
+
+-- Stream 1: Remote Proxy (Bot)
+INSERT INTO streams (id, campaign_id, name, type, position, action_type, action_payload, filters, state)
+VALUES (
+    '10101010-1010-4010-a010-101010101010', 
+    '99999999-9999-4999-a999-999999999999', 
+    'Remote Safe Page', 
+    'REGULAR', 
+    1, 
+    'Remote', 
+    '{"url": "http://localhost:8080/api/v1/health"}', 
+    '[{"type": "IsBot", "payload": {"is_bot": true}}]', 
+    'active'
+);
+
+-- Stream 2: Curl (Default)
+INSERT INTO streams (id, campaign_id, name, type, position, action_type, action_payload, filters, state)
+VALUES (
+    '11111111-1111-4111-a111-111111110000', 
+    '99999999-9999-4999-a999-999999999999', 
+    'Curl Safe Page', 
+    'DEFAULT', 
+    2, 
+    'Curl', 
+    '{"url": "http://localhost:8080/api/v1/health"}', 
+    '[]', 
+    'active'
+);

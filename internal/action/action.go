@@ -48,7 +48,7 @@ func NewEngine() *Engine {
 		&FrameAction{}, &IframeAction{}, &ShowHtmlAction{}, &ShowTextAction{}, 
 		&LocalFileAction{}, &Status404Action{}, &DoNothingAction{}, &CurlAction{},
 		// proxy.go
-		&RemoteProxyAction{},
+		NewRemoteProxyAction(0),
 		// special.go
 		&SubIdAction{}, &ToCampaignAction{},
 	)

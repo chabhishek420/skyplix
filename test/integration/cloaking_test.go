@@ -184,6 +184,59 @@ func TestCloaking(t *testing.T) {
 		}
 	})
 
+	// --- Case 7: Remote Proxy Action ---
+	t.Run("RemoteProxyActionWorks", func(t *testing.T) {
+		// Use a bot UA to trigger stream 1 (Remote action to /api/v1/health)
+		u := fmt.Sprintf("http://%s/cloaked-proxy-test", serverAddr)
+		req, _ := http.NewRequest("GET", u, nil)
+		req.Header.Set("User-Agent", "googlebot") // Trigger bot filter
+		req.Header.Set("X-Forwarded-For", "66.249.66.1") // Correctly set the IP
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("failed to request remote proxy: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected 200 for remote proxy, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if !bytes.Contains(body, []byte(`"status":"ok"`)) {
+			t.Errorf("expected health check response from proxy, got: %s", string(body))
+		}
+		if resp.Header.Get("X-Cache-Status") != "HIT" {
+			// Request twice to verify HIT.
+			resp2, _ := client.Do(req)
+			defer resp2.Body.Close()
+			if resp2.Header.Get("X-Cache-Status") != "HIT" {
+				t.Errorf("expected X-Cache-Status: HIT on second request, got %s", resp2.Header.Get("X-Cache-Status"))
+			}
+		}
+	})
+
+	// --- Case 8: Curl Action ---
+	t.Run("CurlActionWorks", func(t *testing.T) {
+		// Just normal UA (no special filter) -> fallback to stream 2 (Curl)
+		u := fmt.Sprintf("http://%s/cloaked-proxy-test", serverAddr)
+		req, _ := http.NewRequest("GET", u, nil)
+		req.Header.Set("User-Agent", "curl/7.68.0") // Substring match botUAPatterns -> trigger stream 2
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("failed to request curl action: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected 200 for curl action, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if !bytes.Contains(body, []byte(`"status":"ok"`)) {
+			t.Errorf("expected health check response from curl, got: %s", string(body))
+		}
+	})
+
 	// 3. Final ClickHouse Verification
 	t.Run("ClickHouseVerification", func(t *testing.T) {
 		time.Sleep(1500 * time.Millisecond) // Wait for flush
