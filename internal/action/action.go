@@ -7,11 +7,18 @@ package action
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/skyplix/zai-tds/internal/model"
 )
+
+// ErrRedispatch signals to the pipeline that an internal campaign transition is required.
+var ErrRedispatch = errors.New("internal redispatch")
 
 // Action is the interface implemented by all TDS routing action types.
 type Action interface {
@@ -58,13 +65,13 @@ func NewEngine() *Engine {
 
 func (e *Engine) register(actions ...Action) {
 	for _, a := range actions {
-		e.actions[strings.Title(strings.ToLower(a.Type()))] = a
+		e.actions[cases.Title(language.Und).String(strings.ToLower(a.Type()))] = a
 	}
 }
 
 // Get looks up an action by type.
 func (e *Engine) Get(actionType string) (Action, bool) {
-	a, ok := e.actions[strings.Title(strings.ToLower(actionType))]
+	a, ok := e.actions[cases.Title(language.Und).String(strings.ToLower(actionType))]
 	return a, ok
 }
 

@@ -7,12 +7,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/action"
 	"github.com/skyplix/zai-tds/internal/admin/handler"
+	"github.com/skyplix/zai-tds/internal/admin/repository"
+	"github.com/skyplix/zai-tds/internal/attribution"
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/botdb"
 	"github.com/skyplix/zai-tds/internal/cache"
@@ -34,29 +38,32 @@ import (
 
 // Server is the main application server.
 type Server struct {
-	cfg      *config.Config
-	logger   *zap.Logger
-	version  string
-	http     *http.Server
-	db       *pgxpool.Pool
-	valkey   *redis.Client
-	geo      *geo.Resolver
-	device   *device.Detector
-	chWriter     *queue.Writer
-	workers      *worker.Manager
-	adminHandler *handler.Handler
-	botDB        *botdb.ValkeyStore
-	uaStore      *botdb.UAStore
-	ratelimiter  *ratelimit.Service
+	cfg             *config.Config
+	logger          *zap.Logger
+	version         string
+	http            *http.Server
+	db              *pgxpool.Pool
+	valkey          *redis.Client
+	geo             *geo.Resolver
+	device          *device.Detector
+	chWriter        *queue.Writer
+	chReader        driver.Conn
+	workers         *worker.Manager
+	adminHandler    *handler.Handler
+	postbackHandler *handler.PostbackHandler
+	botDB           *botdb.ValkeyStore
+	uaStore         *botdb.UAStore
+	ratelimiter     *ratelimit.Service
 
-	cache        *cache.Cache
-	filterEngine *filter.Engine
-	sessionSvc   *session.Service
-	rotator      *rotator.Rotator
-	actionEngine *action.Engine
-	hitlimitSvc  *hitlimit.Service
-	bindingSvc   *binding.Service
-	lpTokenSvc   *lptoken.Service
+	cache          *cache.Cache
+	filterEngine   *filter.Engine
+	sessionSvc     *session.Service
+	rotator        *rotator.Rotator
+	actionEngine   *action.Engine
+	hitlimitSvc    *hitlimit.Service
+	bindingSvc     *binding.Service
+	lpTokenSvc     *lptoken.Service
+	attributionSvc *attribution.Service
 
 	pipelineL1 *pipeline.Pipeline
 	pipelineL2 *pipeline.Pipeline
@@ -97,6 +104,29 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	chWriter, _ := queue.NewWriter(cfg.ClickHouse.Addr, cfg.ClickHouse.Database, logger)
 	s.chWriter = chWriter
 
+	// ClickHouse read client (used for postback attribution fallback)
+	if cfg.ClickHouse.Addr != "" {
+		chConn, err := clickhouse.Open(&clickhouse.Options{
+			Addr: []string{cfg.ClickHouse.Addr},
+			Auth: clickhouse.Auth{
+				Database: cfg.ClickHouse.Database,
+				Username: cfg.ClickHouse.Username,
+				Password: cfg.ClickHouse.Password,
+			},
+			DialTimeout:     5 * time.Second,
+			MaxOpenConns:    3,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: time.Hour,
+		})
+		if err != nil {
+			logger.Warn("clickhouse reader init failed", zap.Error(err))
+		} else if err := chConn.Ping(ctx); err != nil {
+			logger.Warn("clickhouse reader ping failed", zap.Error(err))
+		} else {
+			s.chReader = chConn
+		}
+	}
+
 	// Phase 2 services
 	s.cache = cache.New(s.valkey, s.db, logger)
 	s.filterEngine = filter.NewEngine()
@@ -106,6 +136,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.hitlimitSvc = hitlimit.New(s.valkey, logger)
 	s.bindingSvc = binding.New(s.valkey, logger)
 	s.lpTokenSvc = lptoken.New(s.valkey, logger)
+	s.attributionSvc = attribution.New(s.valkey, logger)
 
 	// Bot IP Database (Plan 4.1/4.2)
 	botDB, err := botdb.NewValkeyStore(s.valkey)
@@ -125,6 +156,20 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	// Admin Handler
 	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
 
+	var convChan chan<- queue.ConversionRecord
+	if s.chWriter != nil {
+		convChan = s.chWriter.ConvChan()
+	}
+
+	// Postback Handler (Phase 5.2)
+	s.postbackHandler = handler.NewPostbackHandler(
+		logger,
+		repository.NewSettingsRepository(s.db),
+		s.attributionSvc,
+		s.chReader,
+		convChan,
+	)
+
 	// Workers (AUDIT FIX #5)
 	s.workers = worker.NewManager(logger,
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
@@ -138,7 +183,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 
 	var clickChan chan<- queue.ClickRecord
 	if s.chWriter != nil {
-		clickChan = s.chWriter.Chan()
+		clickChan = s.chWriter.ClickChan()
 	}
 
 	// Build singleton pipelines
@@ -157,6 +202,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
 		&stage.CheckParamAliasesStage{Cache: s.cache, Logger: logger},
+		&stage.UpdateGlobalUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.UpdateCampaignUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.ChooseStreamStage{Cache: s.cache, Filter: s.filterEngine, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.UpdateStreamUniquenessStage{Session: s.sessionSvc, Logger: logger},
@@ -171,9 +217,9 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.SaveUniquenessSessionStage{Session: s.sessionSvc},
 		&stage.SetCookieStage{},
 		&stage.ExecuteActionStage{ActionEngine: s.actionEngine, Logger: logger},
-		stage.NewNoOp(21, "PrepareRawClickToStore", logger),
-		stage.NewNoOp(22, "CheckSendingToAnotherCampaign", logger),
-		&stage.StoreRawClicksStage{ClickChan: clickChan},
+		&stage.PrepareRawClickToStoreStage{},
+		&stage.CheckSendingToAnotherCampaignStage{},
+		&stage.StoreRawClicksStage{ClickChan: clickChan, Attribution: s.attributionSvc},
 	)
 
 	s.pipelineL2 = pipeline.New(
@@ -193,7 +239,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.GenerateTokenStage{},
 		&stage.SetCookieStage{},
 		&stage.ExecuteActionStage{ActionEngine: s.actionEngine, Logger: logger},
-		&stage.StoreRawClicksStage{ClickChan: clickChan},
+		&stage.StoreRawClicksStage{ClickChan: clickChan, Attribution: s.attributionSvc},
 	)
 
 	// Build HTTP server
@@ -209,10 +255,15 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	return s, nil
 }
 
+// Handler returns the HTTP handler (multiplexer) for this server.
+func (s *Server) Handler() http.Handler {
+	return s.http.Handler
+}
+
 // Run starts the HTTP server. Blocks until ctx is cancelled.
 func (s *Server) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
-	
+
 	if s.chWriter != nil {
 		wg.Add(1)
 		go func() {

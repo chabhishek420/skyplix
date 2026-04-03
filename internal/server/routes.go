@@ -24,6 +24,10 @@ func (s *Server) routes() http.Handler {
 	// Public Administrative routes
 	r.Get("/api/v1/health", s.handleHealth)
 
+	// Public postback endpoint (Phase 5.2)
+	r.Get("/postback/{key}", s.postbackHandler.HandlePostback)
+	r.Post("/postback/{key}", s.postbackHandler.HandlePostback)
+
 	// Protected Admin API routes
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(admin.APIKeyAuth(s.db))
@@ -35,6 +39,7 @@ func (s *Server) routes() http.Handler {
 				r.Get("/", s.adminHandler.HandleGetCampaign)
 				r.Put("/", s.adminHandler.HandleUpdateCampaign)
 				r.Delete("/", s.adminHandler.HandleDeleteCampaign)
+				r.Post("/clone", s.adminHandler.HandleCloneCampaign)
 				r.Get("/streams", s.adminHandler.HandleListStreams)
 			})
 		})
@@ -45,6 +50,7 @@ func (s *Server) routes() http.Handler {
 				r.Get("/", s.adminHandler.HandleGetStream)
 				r.Put("/", s.adminHandler.HandleUpdateStream)
 				r.Delete("/", s.adminHandler.HandleDeleteStream)
+				r.Post("/clone", s.adminHandler.HandleCloneStream)
 				r.Get("/offers", s.adminHandler.HandleGetStreamOffers)
 				r.Post("/offers", s.adminHandler.HandleSyncStreamOffers)
 				r.Get("/landings", s.adminHandler.HandleGetStreamLandings)
@@ -134,8 +140,8 @@ func (s *Server) routes() http.Handler {
 
 	// Click traffic routes (hot path)
 	r.Get("/lp/{token}/click", s.handleClickL2) // Level 2 (Landing → Offer)
-	r.Get("/{alias}", s.handleClick)             // Level 1 (Campaign → Stream → Redirect)
-	r.Get("/", s.handleClick)                    // Gateway context (bare domain)
+	r.Get("/{alias}", s.handleClick)            // Level 1 (Campaign → Stream → Redirect)
+	r.Get("/", s.handleClick)                   // Gateway context (bare domain)
 
 	return r
 }
@@ -155,7 +161,6 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 	l := s.logger
 
 	// Using pre-compiled singleton pipeline for Level 1 clicks
-
 
 	payload := &pipeline.Payload{
 		Ctx:     r.Context(),

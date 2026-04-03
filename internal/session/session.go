@@ -24,6 +24,18 @@ func New(vk *redis.Client, logger *zap.Logger) *Service {
 	}
 }
 
+// CheckGlobalUniqueness returns true if this visitor has NEVER visited this TDS before (within 24h).
+// Key: sess:{visitor_code}:global — TTL 24h
+func (s *Service) CheckGlobalUniqueness(ctx context.Context, visitorCode string) (bool, error) {
+	key := fmt.Sprintf("sess:%s:global", visitorCode)
+	// SETNX returns true if the key was set, false if it already exists
+	isNew, err := s.vk.SetNX(ctx, key, "1", 24*time.Hour).Result()
+	if err != nil {
+		return false, fmt.Errorf("check global uniqueness: %w", err)
+	}
+	return isNew, nil
+}
+
 // CheckCampaignUniqueness returns true if this visitor has NOT visited this campaign before.
 // Sets the uniqueness flag in Valkey if unique.
 // Key: sess:{visitor_code}:campaign:{campaign_id} — TTL 24h

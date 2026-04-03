@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
@@ -215,4 +216,61 @@ func (h *Handler) HandleSyncStreamLandings(w http.ResponseWriter, r *http.Reques
 
 	h.cache.ScheduleWarmup()
 	h.respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// HandleCloneStream duplicates a stream and its associated offers/landings.
+func (h *Handler) HandleCloneStream(w http.ResponseWriter, r *http.Request) {
+	id, err := h.parseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid stream id")
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		h.logger.Error("begin tx failed", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to start transaction")
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Get Source Stream
+	source, err := h.streams.GetByID(ctx, id)
+	if err != nil {
+		h.respondError(w, http.StatusNotFound, "source stream not found")
+		return
+	}
+
+	// Create temporary repository bound to the transaction
+	txStreams := repository.NewStreamRepository(tx)
+
+	// 2. Insert New Stream
+	newStream := *source
+	newStream.ID = uuid.New()
+	newStream.Name = source.Name + " (Copy)"
+	// Shift position to be right after the source
+	newStream.Position = source.Position + 1
+
+	if err := txStreams.Create(ctx, &newStream); err != nil {
+		h.logger.Error("clone stream insert failed", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to insert cloned stream")
+		return
+	}
+
+	// 3. Clone Offers/Landings associations
+	offers, _ := h.streams.GetOffers(ctx, id)
+	txStreams.SyncOffers(ctx, newStream.ID, offers)
+
+	landings, _ := h.streams.GetLandings(ctx, id)
+	txStreams.SyncLandings(ctx, newStream.ID, landings)
+
+	if err := tx.Commit(ctx); err != nil {
+		h.logger.Error("clone stream commit failed", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to commit clone")
+		return
+	}
+
+	h.cache.ScheduleWarmup()
+	h.respondJSON(w, http.StatusCreated, newStream)
 }

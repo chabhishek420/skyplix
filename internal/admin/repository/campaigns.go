@@ -5,18 +5,17 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
 // CampaignRepository handles SQL operations for the campaigns table.
 type CampaignRepository struct {
-	db *pgxpool.Pool
+	db DB
 }
 
 // NewCampaignRepository creates a new repository.
-func NewCampaignRepository(db *pgxpool.Pool) *CampaignRepository {
+func NewCampaignRepository(db DB) *CampaignRepository {
 	return &CampaignRepository{db: db}
 }
 

@@ -50,6 +50,24 @@ type ClickRecord struct {
 	ClickToken       string
 }
 
+// ConversionRecord is the serialized form of a Conversion, ready for ClickHouse batch INSERT.
+type ConversionRecord struct {
+	ID                 string
+	CreatedAt          time.Time
+	ClickToken         string
+	CampaignID         string
+	StreamID           string
+	OfferID            string
+	LandingID          string
+	AffiliateNetworkID string
+	SourceID           string
+	CountryCode        string
+	Status             string
+	Payout             float64
+	Revenue            float64
+	ExternalID         string
+}
+
 // FromRawClick converts a RawClick to a ClickRecord for ClickHouse insertion.
 func FromRawClick(rc *model.RawClick) ClickRecord {
 	r := ClickRecord{
@@ -106,12 +124,33 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 	return r
 }
 
+// FromConversion converts a Conversion to a ConversionRecord for ClickHouse insertion.
+func FromConversion(c *model.Conversion) ConversionRecord {
+	return ConversionRecord{
+		ID:                 c.ID.String(),
+		CreatedAt:          c.CreatedAt,
+		ClickToken:         c.ClickToken,
+		CampaignID:         c.CampaignID.String(),
+		StreamID:           c.StreamID.String(),
+		OfferID:            c.OfferID.String(),
+		LandingID:          c.LandingID.String(),
+		AffiliateNetworkID: c.AffiliateNetworkID.String(),
+		SourceID:           c.SourceID.String(),
+		CountryCode:        c.CountryCode,
+		Status:             c.Status,
+		Payout:             c.Payout,
+		Revenue:            c.Revenue,
+		ExternalID:         c.ExternalID,
+	}
+}
+
 // Writer is the async ClickHouse batch writer.
 // It owns a buffered channel of ClickRecords and flushes to ClickHouse
 // every 500ms or when the batch reaches 5000 records.
 type Writer struct {
 	conn      driver.Conn
 	clickChan chan ClickRecord
+	convChan  chan ConversionRecord
 	Logger    *zap.Logger
 }
 
@@ -140,13 +179,19 @@ func NewWriter(addr, database string, Logger *zap.Logger) (*Writer, error) {
 	return &Writer{
 		conn:      conn,
 		clickChan: make(chan ClickRecord, 10_000),
+		convChan:  make(chan ConversionRecord, 5_000),
 		Logger:    Logger,
 	}, nil
 }
 
-// Chan returns the write-only channel for sending click records.
-func (w *Writer) Chan() chan<- ClickRecord {
+// ClickChan returns the write-only channel for sending click records.
+func (w *Writer) ClickChan() chan<- ClickRecord {
 	return w.clickChan
+}
+
+// ConvChan returns the write-only channel for sending conversion records.
+func (w *Writer) ConvChan() chan<- ConversionRecord {
+	return w.convChan
 }
 
 // Run starts the batch writer loop. Blocks until ctx is cancelled.
@@ -154,45 +199,62 @@ func (w *Writer) Run(ctx context.Context) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	batch := make([]ClickRecord, 0, 5000)
+	clickBatch := make([]ClickRecord, 0, 5000)
+	convBatch := make([]ConversionRecord, 0, 1000)
 
 	for {
 		select {
 		case record := <-w.clickChan:
-			batch = append(batch, record)
-			if len(batch) >= 5000 {
-				w.flush(batch)
-				batch = batch[:0]
+			clickBatch = append(clickBatch, record)
+			if len(clickBatch) >= 5000 {
+				w.flushClicks(clickBatch)
+				clickBatch = clickBatch[:0]
+			}
+
+		case record := <-w.convChan:
+			convBatch = append(convBatch, record)
+			if len(convBatch) >= 1000 {
+				w.flushConversions(convBatch)
+				convBatch = convBatch[:0]
 			}
 
 		case <-ticker.C:
-			if len(batch) > 0 {
-				w.flush(batch)
-				batch = batch[:0]
+			if len(clickBatch) > 0 {
+				w.flushClicks(clickBatch)
+				clickBatch = clickBatch[:0]
+			}
+			if len(convBatch) > 0 {
+				w.flushConversions(convBatch)
+				convBatch = convBatch[:0]
 			}
 
 		case <-ctx.Done():
 			// Drain remaining and flush before exit
 			for len(w.clickChan) > 0 {
-				batch = append(batch, <-w.clickChan)
+				clickBatch = append(clickBatch, <-w.clickChan)
 			}
-			if len(batch) > 0 {
-				w.flush(batch)
+			if len(clickBatch) > 0 {
+				w.flushClicks(clickBatch)
 			}
-			w.Logger.Info("click writer shut down", zap.Int("flushed", len(batch)))
+
+			for len(w.convChan) > 0 {
+				convBatch = append(convBatch, <-w.convChan)
+			}
+			if len(convBatch) > 0 {
+				w.flushConversions(convBatch)
+			}
+
+			w.Logger.Info("writer shut down",
+				zap.Int("clicks_flushed", len(clickBatch)),
+				zap.Int("convs_flushed", len(convBatch)),
+			)
 			return nil
 		}
 	}
 }
 
-// flush performs the actual ClickHouse batch INSERT.
-//
-// KEY DESIGN DECISIONS:
-// 1. Named column list — skip click_id (CH DEFAULT generateUUIDv4() handles it)
-// 2. UUID columns require [16]byte — parse from string at flush time
-// 3. IPv6 column requires net.IP with To16() (always 16 bytes)
-// 4. FixedString(2) requires exactly 2 bytes — pad/truncate country_code
-func (w *Writer) flush(records []ClickRecord) {
+// flushClicks performs the actual ClickHouse batch INSERT for clicks.
+func (w *Writer) flushClicks(records []ClickRecord) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -270,6 +332,62 @@ func (w *Writer) flush(records []ClickRecord) {
 	}
 
 	w.Logger.Info("clicks flushed to ClickHouse", zap.Int("count", len(records)))
+}
+
+// flushConversions performs the actual ClickHouse batch INSERT for conversions.
+func (w *Writer) flushConversions(records []ConversionRecord) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	b, err := w.conn.PrepareBatch(ctx, `INSERT INTO conversions
+		(id, created_at, click_token, campaign_id, stream_id, offer_id, landing_id,
+		 affiliate_network_id, source_id, country_code, status, payout, revenue, external_id)`)
+	if err != nil {
+		w.Logger.Error("clickhouse prepare conversions batch failed", zap.Error(err))
+		return
+	}
+
+	zero := uuid.Nil
+	for _, r := range records {
+		id := w.ParseUUIDVal(r.ID, zero)
+		campID := w.ParseUUIDVal(r.CampaignID, zero)
+		strID := w.ParseUUIDVal(r.StreamID, zero)
+		offID := w.ParseUUIDVal(r.OfferID, zero)
+		lanID := w.ParseUUIDVal(r.LandingID, zero)
+		anID := w.ParseUUIDVal(r.AffiliateNetworkID, zero)
+		srcID := w.ParseUUIDVal(r.SourceID, zero)
+
+		cc := FixedString2(r.CountryCode)
+
+		if err := b.Append(
+			id,
+			r.CreatedAt,
+			r.ClickToken,
+			campID,
+			strID,
+			offID,
+			lanID,
+			anID,
+			srcID,
+			cc,
+			r.Status,
+			decimal.NewFromFloat(r.Payout),
+			decimal.NewFromFloat(r.Revenue),
+			r.ExternalID,
+		); err != nil {
+			w.Logger.Error("conversions batch append failed", zap.Error(err), zap.String("token", r.ClickToken))
+		}
+	}
+
+	if err := b.Send(); err != nil {
+		w.Logger.Error("clickhouse send conversions batch failed",
+			zap.Error(err),
+			zap.Int("records", len(records)),
+		)
+		return
+	}
+
+	w.Logger.Info("conversions flushed to ClickHouse", zap.Int("count", len(records)))
 }
 
 // ParseUUIDVal parses a UUID string to uuid.UUID. Returns fallback on parse error.

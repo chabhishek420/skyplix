@@ -1,7 +1,6 @@
 package action
 
 import (
-	"fmt"
 	"net/http"
 )
 
@@ -27,8 +26,9 @@ type ToCampaignAction struct{}
 func (a *ToCampaignAction) Type() string { return "ToCampaign" }
 func (a *ToCampaignAction) Execute(w http.ResponseWriter, r *http.Request, ctx *ActionContext) error {
 	if alias, ok := ctx.Stream.ActionPayload["campaign_alias"].(string); ok {
-		// Internal redirect: modify path and re-dispatch or just 302
-		http.Redirect(w, r, fmt.Sprintf("/%s", alias), http.StatusFound)
+		// Signal to the pipeline to redispatch with the new campaign alias
+		ctx.Click.CampaignAlias = alias
+		return ErrRedispatch
 	}
 	return nil
 }

@@ -102,7 +102,7 @@ func TestPhase2Routing(t *testing.T) {
 	t.Run("DefaultStreamFallback", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "http://"+serverAddr+"/testcamp", nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
-		req.Header.Set("X-Forwarded-For", "1.1.1.1") 
+		req.Header.Set("X-Forwarded-For", "82.117.10.52")
 		req.Header.Set("X-SkyPlix-Test-Country", "JP") // Forces mismatch against Stream 2 (US/GB)
 
 		resp, err := client.Do(req)

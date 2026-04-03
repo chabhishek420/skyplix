@@ -56,6 +56,10 @@ type Payload struct {
 	// Abort = true stops stage iteration and sends the current response.
 	Abort     bool
 	AbortCode int // HTTP status code when aborting without a response body
+
+	// Re-dispatch control (for recursion like ToCampaign)
+	ReDispatch bool
+	Hops       int
 }
 
 // Pipeline runs an ordered slice of stages against a Payload.
@@ -71,14 +75,38 @@ func New(stages ...Stage) *Pipeline {
 // Run executes each stage in order.
 // Stops early if payload.Abort is set to true, UNLESS the stage implements
 // AlwaysRun() == true (used for storage stages that must fire after redirect).
+// Supports internal re-dispatch (recursive campaign entry) up to 10 hops.
 func (p *Pipeline) Run(payload *Payload) error {
-	for _, stage := range p.stages {
-		if payload.Abort && !stage.AlwaysRun() {
+	for {
+		for _, stage := range p.stages {
+			if payload.Abort && !stage.AlwaysRun() {
+				continue
+			}
+			if err := stage.Process(payload); err != nil {
+				return fmt.Errorf("stage %s: %w", stage.Name(), err)
+			}
+		}
+
+		// Check for internal re-dispatch
+		if payload.ReDispatch {
+			if payload.Hops >= 10 {
+				return fmt.Errorf("too many campaign hops (max 10)")
+			}
+
+			// Prepare for next iteration
+			payload.Hops++
+			payload.ReDispatch = false
+			payload.Abort = false
+			payload.Campaign = nil
+			payload.Stream = nil
+			payload.Offer = nil
+			payload.Landing = nil
+			// We DO NOT clear RawClick, as it carries the new CampaignAlias to resolve.
 			continue
 		}
-		if err := stage.Process(payload); err != nil {
-			return fmt.Errorf("stage %s: %w", stage.Name(), err)
-		}
+
+		// Exit loop if no redispatch was requested after a full run
+		break
 	}
 	return nil
 }

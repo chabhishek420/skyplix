@@ -38,6 +38,19 @@ func (r *SettingsRepository) GetAll(ctx context.Context) (map[string]string, err
 	return settings, nil
 }
 
+// Get returns a single setting value by key.
+func (r *SettingsRepository) Get(ctx context.Context, key string) (string, error) {
+	var value string
+	err := r.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", key).Scan(&value)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("get setting %q: %w", key, err)
+	}
+	return value, nil
+}
+
 // BulkUpsert updates or inserts multiple settings.
 func (r *SettingsRepository) BulkUpsert(ctx context.Context, settings map[string]string) error {
 	batch := &pgx.Batch{}

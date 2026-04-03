@@ -6,6 +6,7 @@
 package stage
 
 import (
+	"errors"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -72,6 +73,11 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 
 	err := s.ActionEngine.Execute(stream.ActionType, payload.Writer, payload.Request, ctx)
 	if err != nil {
+		if errors.Is(err, action.ErrRedispatch) {
+			s.Logger.Debug("internal campaign redispatch requested", zap.String("alias", payload.RawClick.CampaignAlias))
+			payload.ReDispatch = true
+			return nil // No abort, we want to re-run the loop in Pipeline.Run
+		}
 		s.Logger.Error("action execution failed", zap.Error(err), zap.String("type", stream.ActionType))
 		return err
 	}

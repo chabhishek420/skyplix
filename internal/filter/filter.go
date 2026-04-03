@@ -7,6 +7,10 @@ package filter
 
 import (
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
@@ -52,7 +56,7 @@ func NewEngine() *Engine {
 
 func (e *Engine) register(filters ...Filter) {
 	for _, f := range filters {
-		e.filters[strings.Title(strings.ToLower(f.Type()))] = f
+		e.filters[cases.Title(language.Und).String(strings.ToLower(f.Type()))] = f
 	}
 }
 
@@ -64,7 +68,7 @@ func (e *Engine) MatchAll(click *model.RawClick, filters []model.StreamFilter) b
 	}
 
 	for _, sf := range filters {
-		f, ok := e.filters[strings.Title(strings.ToLower(sf.Type))]
+		f, ok := e.filters[cases.Title(language.Und).String(strings.ToLower(sf.Type))]
 		if !ok {
 			// If we don't know the filter type, we skip it (doesn't fail the match).
 			// This matches Keitaro's behavior for unknown filters.

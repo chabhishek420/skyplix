@@ -23,10 +23,10 @@ import (
 // - Test Bot access (UA, IP, custom UA, Rate limit)
 // - Verify ClickHouse records
 func TestCloaking(t *testing.T) {
-	postgresDSN := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/zai_tds?sslmode=disable")
+	postgresDSN := getEnv("POSTGRES_DSN", getEnv("DATABASE_URL", "postgres://zai:zai_dev_pass@localhost:5432/zai_tds?sslmode=disable"))
 	clickhouseAddr := getEnv("CLICKHOUSE_URL", "localhost:9000")
 	serverAddr := getEnv("SERVER_ADDR", "localhost:8080")
-	apiKey := getEnv("ADMIN_API_KEY", "test-api-key-32-chars-long-exactly-!!")
+	apiKey := getEnv("ADMIN_API_KEY", "")
 
 	// 1. Setup connections
 	fmt.Println("connecting to postgres...")
@@ -36,6 +36,12 @@ func TestCloaking(t *testing.T) {
 		t.Fatalf("postgres connect: %v", err)
 	}
 	defer pgConn.Close(ctx)
+
+	if apiKey == "" {
+		if err := pgConn.QueryRow(ctx, "SELECT api_key FROM users WHERE login = 'admin'").Scan(&apiKey); err != nil {
+			t.Fatalf("load admin api key from postgres: %v", err)
+		}
+	}
 
 	fmt.Println("connecting to clickhouse...")
 	chConn, err := clickhouse.Open(&clickhouse.Options{

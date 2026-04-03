@@ -5,18 +5,17 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
 // StreamRepository handles SQL operations for the streams table.
 type StreamRepository struct {
-	db *pgxpool.Pool
+	db DB
 }
 
 // NewStreamRepository creates a new repository.
-func NewStreamRepository(db *pgxpool.Pool) *StreamRepository {
+func NewStreamRepository(db DB) *StreamRepository {
 	return &StreamRepository{db: db}
 }
 
@@ -149,46 +148,34 @@ func (r *StreamRepository) GetLandings(ctx context.Context, streamID uuid.UUID) 
 
 // SyncOffers replaces all offers for a stream.
 func (r *StreamRepository) SyncOffers(ctx context.Context, streamID uuid.UUID, offers []model.WeightedOffer) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = tx.Exec(ctx, "DELETE FROM stream_offers WHERE stream_id = $1", streamID)
+	_, err := r.db.Exec(ctx, "DELETE FROM stream_offers WHERE stream_id = $1", streamID)
 	if err != nil {
 		return err
 	}
 
 	for _, wo := range offers {
-		_, err = tx.Exec(ctx, "INSERT INTO stream_offers (stream_id, offer_id, weight) VALUES ($1, $2, $3)", streamID, wo.Offer.ID, wo.Weight)
+		_, err = r.db.Exec(ctx, "INSERT INTO stream_offers (stream_id, offer_id, weight) VALUES ($1, $2, $3)", streamID, wo.Offer.ID, wo.Weight)
 		if err != nil {
 			return err
 		}
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 // SyncLandings replaces all landings for a stream.
 func (r *StreamRepository) SyncLandings(ctx context.Context, streamID uuid.UUID, landings []model.WeightedLanding) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = tx.Exec(ctx, "DELETE FROM stream_landings WHERE stream_id = $1", streamID)
+	_, err := r.db.Exec(ctx, "DELETE FROM stream_landings WHERE stream_id = $1", streamID)
 	if err != nil {
 		return err
 	}
 
 	for _, wl := range landings {
-		_, err = tx.Exec(ctx, "INSERT INTO stream_landings (stream_id, landing_id, weight) VALUES ($1, $2, $3)", streamID, wl.Landing.ID, wl.Weight)
+		_, err = r.db.Exec(ctx, "INSERT INTO stream_landings (stream_id, landing_id, weight) VALUES ($1, $2, $3)", streamID, wl.Landing.ID, wl.Weight)
 		if err != nil {
 			return err
 		}
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
