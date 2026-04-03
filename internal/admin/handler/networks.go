@@ -3,10 +3,12 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
+	"github.com/skyplix/zai-tds/internal/macro"
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
@@ -106,9 +108,9 @@ func (h *Handler) HandleGeneratePostbackURL(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Get global postback key
-	key := ""
-	if s, err := h.settings.Get(r.Context(), "postback_key"); err == nil {
-		key = s.Value
+	key, err := h.settings.Get(r.Context(), "tracker.postback_key")
+	if err != nil {
+		h.logger.Warn("postback key lookup failed", zap.Error(err))
 	}
 
 	// Determine base URL
@@ -123,8 +125,7 @@ func (h *Handler) HandleGeneratePostbackURL(w http.ResponseWriter, r *http.Reque
 	if postbackURL == "" {
 		postbackURL = macro.GeneratePostbackURL(baseURL, key)
 	} else {
-		// If custom template exists, ensure it has the correct key
-		// This is a simple replacement for illustration
+		// If custom template exists, allow replacing {key} with actual postback key
 		postbackURL = strings.ReplaceAll(postbackURL, "{key}", key)
 	}
 
