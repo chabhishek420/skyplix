@@ -1,44 +1,98 @@
-# CONVENTIONS
+# Coding Conventions
 
-## Source of Truth for Conventions
-- Root guidance in `AGENTS.md` defines style, naming, logging, and testing expectations.
-- Package-level docs (`internal/AGENTS.md`, `test/AGENTS.md`, etc.) complement local norms.
+**Analysis Date:** 2026-04-03
 
-## Language and Naming
-- Go naming follows exported PascalCase and unexported camelCase.
-- Package names are short lowercase words (`internal/queue`, `internal/filter`, `internal/geo`).
-- Sentinel error naming pattern exists (example `ErrRedispatch` in `internal/action/action.go`).
+## Naming Patterns
 
-## Error Handling Patterns
-- Common pattern: immediate `if err != nil` returns with context wrapping (`fmt.Errorf("...: %w", err)`).
-- SQL and cache paths usually propagate errors up to handlers/stages.
-- Some non-critical async paths intentionally fail open (e.g., attribution cache in `internal/pipeline/stage/23_store_raw_clicks.go`).
+**Files:**
+- Lowercase with underscores (snake_case) for multi-word filenames.
+- Implementation files named after their primary purpose (e.g., `server.go`, `pipeline.go`).
+- Stage files prefixed with order numbers in `internal/pipeline/stage/` (e.g., `08_update_global_uniqueness.go`, `20_execute_action.go`).
+- Test files suffix with `_test.go`.
 
-## Context Usage
-- Services and repository methods typically take `context.Context` first (examples in `internal/session/session.go`, `internal/admin/repository/*.go`).
-- Worker and server lifecycle is context-driven (`internal/worker/worker.go`, `internal/server/server.go`).
+**Functions:**
+- PascalCase for exported functions (e.g., `NewEngine`, `Process`, `Run`).
+- camelCase for unexported functions (e.g., `register`, `matchIncludeExclude`).
+- Constructors follow the `New[Type]` pattern (e.g., `NewCampaignRepository`, `NewEngine`).
 
-## Logging Conventions
-- Structured zap logging is standard (`zap.String`, `zap.Duration`, `zap.Error`).
-- `cmd/zai-tds/main.go` initializes development vs production logger based on debug mode.
+**Variables:**
+- Short, descriptive camelCase names.
+- Single-letter receivers for methods (e.g., `e *Engine`, `r *CampaignRepository`, `p *Pipeline`).
+- Error variables usually named `err`.
 
-## Architectural Coding Patterns
-- Repository pattern for admin SQL access (`internal/admin/repository/*.go`).
-- Interface-based abstractions for pluggable behavior:
-- `pipeline.Stage` in `internal/pipeline/pipeline.go`.
-- `worker.Worker` in `internal/worker/worker.go`.
-- Action/filter registries for extensibility in `internal/action/action.go` and `internal/filter/filter.go`.
+**Types:**
+- PascalCase for all type definitions (e.g., `RawClick`, `Campaign`, `Stream`).
+- Interfaces named after the behavior they provide (e.g., `Filter`, `Action`, `Stage`).
 
-## HTTP/API Patterns
-- JSON responses centralized via helper methods (`internal/admin/handler/helpers.go`).
-- Route grouping and middleware layering via chi router (`internal/server/routes.go`).
-- Admin APIs rely on `X-Api-Key` auth middleware (`internal/admin/middleware.go`).
+## Code Style
 
-## Data/State Patterns
-- Read-through caching from Valkey with Postgres fallback (`internal/cache/cache.go`).
-- Time-bounded key semantics for session/rate-limit/hit-limit (`internal/session/session.go`, `internal/ratelimit/ratelimit.go`, `internal/hitlimit/hitlimit.go`).
-- Async event persistence to ClickHouse through buffered channels (`internal/queue/writer.go`).
+**Formatting:**
+- Standard `gofmt` or `goimports` formatting.
+- Tab indentation (Go default).
 
-## Notable Inconsistencies to Watch
-- Several files include maintenance headers (`/* MODIFIED: ... */`) while others do not, so header style is not uniformly enforced.
-- A few calls ignore returned errors (examples in `internal/server/server.go` and some `cache` set operations), which differs from strict guidance in `AGENTS.md`.
+**Linting:**
+- Not explicitly configured in the repository, but follows standard Go idioms.
+
+## Import Organization
+
+**Order:**
+1. Standard library imports.
+2. Third-party library imports (e.g., `github.com/google/uuid`, `go.uber.org/zap`).
+3. Internal project imports (e.g., `github.com/skyplix/zai-tds/internal/model`).
+
+**Path Aliases:**
+- Rarely used, standard package names preferred.
+
+## Error Handling
+
+**Patterns:**
+- Return early on error (guard clauses).
+- Wrap errors with context using `fmt.Errorf("context: %w", err)`.
+- Use specific error variables for branching (e.g., `ErrRedispatch`).
+- Errors are returned as the last value from functions.
+
+## Logging
+
+**Framework:** `go.uber.org/zap` (Structured logging).
+
+**Patterns:**
+- Log at appropriate levels: `Debug`, `Info`, `Warn`, `Error`.
+- Use structured fields instead of formatted strings (e.g., `zap.String("type", actionType)`).
+- Log significant pipeline events, service starts, and errors with context.
+
+## Comments
+
+**When to Comment:**
+- Header comments for package/file purpose.
+- Documentation comments for exported types and functions (though inconsistently applied).
+- "MODIFIED" and "PURPOSE" headers in some files to track changes.
+
+**JSDoc/TSDoc:**
+- N/A (Standard Go doc comments used).
+
+## Function Design
+
+**Size:**
+- Generally small and focused on a single responsibility.
+- Large structures like `New` in `server.go` orchestrate many components.
+
+**Parameters:**
+- `context.Context` is consistently the first parameter for I/O and request-aware functions.
+- Dependency injection via constructors is the primary pattern.
+
+**Return Values:**
+- Functions returning results usually return `(result, error)`.
+- Predicate functions return `bool` or `(result, bool)`.
+
+## Module Design
+
+**Exports:**
+- Explicitly exports types and functions intended for use outside the package.
+- Internal implementation details kept unexported.
+
+**Barrel Files:**
+- Packages often have a primary file (e.g., `filter.go`, `action.go`) that acts as an entry point and registry for the module.
+
+---
+
+*Convention analysis: 2026-04-03*

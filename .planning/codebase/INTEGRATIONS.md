@@ -1,51 +1,72 @@
-# INTEGRATIONS
+# External Integrations
 
-## PostgreSQL (Operational Data)
-- Connection created in `internal/server/server.go` via `pgxpool.New(ctx, cfg.Postgres.DSN)`.
-- DSN configured through `config.yaml` (`postgres.dsn`) or `DATABASE_URL` env override in `internal/config/config.go`.
-- Schema managed by SQL migrations under `db/postgres/migrations/*.sql`.
-- Admin CRUD repositories hit Postgres directly (example: `internal/admin/repository/campaigns.go`).
+**Analysis Date:** 2026-04-03
 
-## ClickHouse (Analytics Sink)
-- Click writer initialized in `internal/server/server.go` using `queue.NewWriter(...)`.
-- Batch writes implemented in `internal/queue/writer.go` (channels + periodic flush).
-- Clicks table definition in `db/clickhouse/migrations/001_create_clicks.sql`.
-- Conversions table definition in `db/clickhouse/migrations/002_create_conversions.sql`.
-- Integration tests assert persisted click rows (`test/integration/click_test.go`).
+## APIs & External Services
 
-## Valkey / Redis (Hot Path State)
-- Client created in `internal/server/server.go` with `redis.NewClient`.
-- Used by cache layer: `internal/cache/cache.go`.
-- Used by session and uniqueness keys: `internal/session/session.go`.
-- Used by rate limiting counters: `internal/ratelimit/ratelimit.go`.
-- Used by hit-limit counters: `internal/hitlimit/hitlimit.go`.
-- Used by bot IP and UA storage: `internal/botdb/valkey.go`, `internal/botdb/uastore.go`.
-- Used by attribution token cache: `internal/attribution/service.go`.
+**HTTP Fetch (Cloaking / Proxying):**
+- Arbitrary remote web servers — fetched server-side as part of cloaking/safe-page behavior
+  - Implementation: `internal/action/proxy.go` (`RemoteProxyAction`)
+  - Method: `GET` to `ActionContext.RedirectURL`
+  - Notes: Copies some browser headers; TTL caches responses in-memory
 
-## GeoIP Databases
-- Resolver loads MaxMind DB files in `internal/geo/geo.go`.
-- Configured paths from `config.yaml`:
-- `data/geoip/GeoLite2-Country.mmdb`
-- `data/geoip/GeoLite2-City.mmdb`
-- `data/geoip/GeoLite2-ASN.mmdb`
-- Output consumed in click build/update stages (e.g., `internal/pipeline/stage/3_build_raw_click.go`, `internal/pipeline/stage/6_update_raw_click.go`).
+## Data Storage
 
-## HTTP API Integration Surface
-- Public health endpoint: `/api/v1/health` in `internal/server/routes.go`.
-- Authenticated admin API under `/api/v1/*` with `X-Api-Key` middleware (`internal/admin/middleware.go`).
-- Click tracking endpoints:
-- `GET /{alias}` (L1 pipeline)
-- `GET /lp/{token}/click` (L2 pipeline)
-- `GET /` (domain gateway path)
+**PostgreSQL:**
+- Purpose: admin entities and configuration (campaigns/streams/offers/landings/users/etc.)
+  - Connection: `postgres.dsn` in `config.yaml` / `DATABASE_URL` env var
+  - Client: `github.com/jackc/pgx/v5/pgxpool` (constructed in `internal/server/server.go`)
+  - Schema/migrations: `db/`
+  - Admin auth query: `internal/admin/middleware.go`
 
-## Background Integration Points
-- Cache warmup worker checks Valkey key `warmup:scheduled` and reloads from Postgres (`internal/worker/cache_warmup.go`).
-- Hit-limit reset worker scans/deletes `hitlimit:*` keys (`internal/worker/hitlimit_reset.go`).
+**ClickHouse:**
+- Purpose: high-volume analytics/event ingestion for clicks/conversions
+  - Connection: `clickhouse.addr` + `clickhouse.database` in `config.yaml` / `CLICKHOUSE_URL` env var
+  - Client: `github.com/ClickHouse/clickhouse-go/v2` (`internal/queue/writer.go`)
+  - Write path: pipeline stage `internal/pipeline/stage/StoreRawClicksStage` → channel from `internal/queue/writer.go`
 
-## Test/Tooling Integration Requirements
-- Integration tests require running Postgres + Valkey + ClickHouse (`test/integration/*.go`).
-- Benchmark test also depends on live infra and seeded campaign alias (`test/benchmark/latency_test.go`).
+**Valkey / Redis:**
+- Purpose: cache, sessions, bot IP/UA lists, hit limiting, misc runtime state
+  - Connection: `valkey.addr` in `config.yaml` / `VALKEY_URL` env var
+  - Client: `github.com/redis/go-redis/v9` (constructed in `internal/server/server.go`)
+  - Modules using Valkey: `internal/cache/`, `internal/session/`, `internal/botdb/`, `internal/hitlimit/`, `internal/ratelimit/`, `internal/lptoken/`
 
-## Security/Auth Integration Notes
-- API key auth validates directly against `users.api_key` in Postgres (`internal/admin/middleware.go`).
-- Default admin seed user with known password appears in migration `db/postgres/migrations/004_create_domains_users.up.sql` (explicitly marked to change in production).
+**GeoIP Databases (local files):**
+- Purpose: geolocation and ASN lookups
+  - Inputs: MaxMind `.mmdb` files in `data/geoip/` configured via `geoip.*` in `config.yaml`
+  - Implementation: `internal/geo/*`
+
+## Authentication & Identity
+
+**Admin API Key:**
+- Mechanism: `X-Api-Key` HTTP header
+  - Middleware: `internal/admin/middleware.go` (`APIKeyAuth`)
+  - Validation: DB lookup in Postgres (`users` table)
+
+## Monitoring & Observability
+
+**Logging:**
+- `go.uber.org/zap` (development vs production logger selected in `cmd/zai-tds/main.go`)
+
+## CI/CD & Deployment
+
+**Local dev services:**
+- `docker-compose.yml` provides `postgres`, `valkey`, `clickhouse`
+
+**Deployment:**
+- Not defined in-repo (no `.github/workflows/` found). Likely deploys as a Go binary/container.
+
+## Environment Configuration
+
+**Config sources:**
+- YAML: `config.yaml` (overridable via `CONFIG_PATH`)
+- Env vars: see `internal/config/config.go` override list
+
+## Webhooks & Callbacks
+
+- None observed in the Go server code (no inbound webhook endpoints beyond admin + click paths in `internal/server/routes.go`).
+
+---
+
+*Integrations analysis: 2026-04-03*
+*Update as new external dependencies are added*

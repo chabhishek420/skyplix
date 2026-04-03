@@ -1,52 +1,70 @@
-# STACK
+# Technology Stack
 
-## Runtime and Language
-- Primary language: Go (`go 1.25.6`) in `go.mod`.
-- Main executable entrypoint: `cmd/zai-tds/main.go`.
-- Service boots from YAML config (`config.yaml`) plus env overrides in `internal/config/config.go`.
+**Analysis Date:** 2026-04-03
 
-## Core Backend Libraries
-- HTTP router/middleware: `github.com/go-chi/chi/v5` used in `internal/server/routes.go`.
-- Logging: `go.uber.org/zap` used across server/services (`cmd/zai-tds/main.go`, `internal/server/server.go`).
-- PostgreSQL driver/pool: `github.com/jackc/pgx/v5/pgxpool` used in `internal/server/server.go`.
-- Valkey/Redis client: `github.com/redis/go-redis/v9` used in cache/session/rate-limit layers.
-- ClickHouse client: `github.com/ClickHouse/clickhouse-go/v2` used in `internal/queue/writer.go`.
-- UUID support: `github.com/google/uuid` used in models/repositories.
-- YAML parsing: `gopkg.in/yaml.v3` used in `internal/config/config.go`.
-- GeoIP parsing: `github.com/oschwald/geoip2-golang` used in `internal/geo/geo.go`.
+## Languages
 
-## Internal Runtime Components
-- HTTP server + dependency wiring: `internal/server/server.go`.
-- Request pipelines: `internal/pipeline/pipeline.go` + `internal/pipeline/stage/*.go`.
-- Async analytics writer: `internal/queue/writer.go`.
-- Entity cache and DB fallback: `internal/cache/cache.go`.
-- Bot detection storage: `internal/botdb/store.go`, `internal/botdb/valkey.go`.
-- Session/uniqueness tracking: `internal/session/session.go`.
-- Stream/action/filter engines: `internal/action/*.go`, `internal/filter/*.go`.
-- Background workers: `internal/worker/*.go`.
+**Primary:**
+- Go (module `go.mod`, directive `go 1.25.6`) — all backend application code (`cmd/`, `internal/`, `test/`)
 
-## Data Storage Stack
-- PostgreSQL schema migrations in `db/postgres/migrations/*.sql`.
-- ClickHouse analytical tables in `db/clickhouse/migrations/*.sql`.
-- Valkey key-value store for cache/session/rate-limit/botdb.
-- GeoIP MMDB files configured under `data/geoip/*.mmdb`.
+**Secondary:**
+- YAML — configuration (`config.yaml`)
+- SQL — schemas/migrations (`db/`)
+- Shell/Docker — local service orchestration (`docker-compose.yml`)
 
-## Local Infrastructure / Dev Environment
-- Local compose services in `docker-compose.yml`:
-- PostgreSQL 16 (`postgres:16-alpine`) on `127.0.0.1:5432`.
-- Valkey 8 (`valkey/valkey:8-alpine`) on `127.0.0.1:6379`.
-- ClickHouse 24 (`clickhouse/clickhouse-server:24-alpine`) on `127.0.0.1:9000` and `8123`.
+## Runtime
 
-## Config Sources
-- Static defaults and validation in `internal/config/config.go`.
-- File config in `config.yaml`.
-- Env overrides: `SERVER_HOST`, `SERVER_PORT`, `DATABASE_URL`, `VALKEY_URL`, `CLICKHOUSE_URL`, `SYSTEM_SALT`, `DEBUG`, `LOG_LEVEL`.
+**Environment:**
+- Go toolchain — builds a single HTTP server binary (`cmd/zai-tds/main.go`)
 
-## Build and Test Tooling
-- Build/run instructions documented in `AGENTS.md`.
-- Unit and integration tests in `test/unit/*` and `test/integration/*`.
-- Benchmark scaffold in `test/benchmark/latency_test.go`.
+**Package Manager:**
+- Go modules — `go.mod`, `go.sum`
 
-## Non-runtime Reference Assets
-- `reference/` contains legacy/reference material (Next.js and Keitaro source snapshots).
-- `admin-ui/` currently contains guidance files only (`admin-ui/AGENTS.md`, `admin-ui/CLAUDE.md`), no active frontend app files detected.
+## Frameworks
+
+**Core (HTTP):**
+- `github.com/go-chi/chi/v5` — router + middleware (`internal/server/routes.go`)
+- `go.uber.org/zap` — structured logging (`cmd/zai-tds/main.go`, `internal/server/server.go`)
+
+**Persistence/Storage Clients:**
+- `github.com/jackc/pgx/v5/pgxpool` — PostgreSQL connection pool (`internal/server/server.go`)
+- `github.com/ClickHouse/clickhouse-go/v2` — ClickHouse ingestion (`internal/queue/writer.go`)
+- `github.com/redis/go-redis/v9` — Valkey/Redis client (`internal/server/server.go`)
+
+**Testing:**
+- Go `testing` stdlib — unit/integration tests (`test/unit/*`, `test/integration/*`)
+
+## Key Dependencies
+
+**Critical:**
+- `github.com/go-chi/chi/v5` — HTTP routing for admin + click endpoints (`internal/server/routes.go`)
+- `github.com/jackc/pgx/v5` — PostgreSQL data access (`internal/admin/handler/*`, `internal/server/server.go`)
+- `github.com/redis/go-redis/v9` — caching/session/botdb storage (`internal/cache/*`, `internal/session/*`, `internal/botdb/*`)
+- `github.com/ClickHouse/clickhouse-go/v2` — async analytics writes (`internal/queue/writer.go`)
+- `github.com/oschwald/geoip2-golang` — GeoIP resolution (`internal/geo/*`)
+- `github.com/mileusna/useragent` — UA parsing (`internal/device/*`)
+
+## Configuration
+
+**Runtime config:**
+- Primary config file: `config.yaml` (path override via `CONFIG_PATH` in `cmd/zai-tds/main.go`)
+- Env overrides (examples in `internal/config/config.go`): `DATABASE_URL`, `VALKEY_URL`, `CLICKHOUSE_URL`, `SERVER_HOST`, `SERVER_PORT`, `SYSTEM_SALT`, `DEBUG`, `LOG_LEVEL`
+
+**Local dependencies:**
+- `docker-compose.yml` provisions local `postgres`, `valkey`, and `clickhouse` services bound to `127.0.0.1`
+
+## Platform Requirements
+
+**Development:**
+- Go installed
+- Docker (recommended) for Postgres/Valkey/ClickHouse (`docker-compose.yml`)
+- GeoIP DB files expected in `data/geoip/` (`config.yaml`)
+
+**Production (inferred):**
+- Provide Postgres + Valkey + ClickHouse endpoints via config/env
+- Set `SYSTEM_SALT` to a secure value (validated in `internal/config/config.go`)
+
+---
+
+*Stack analysis: 2026-04-03*
+*Update after major dependency changes*

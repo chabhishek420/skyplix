@@ -1,53 +1,107 @@
-# CONCERNS
+# Codebase Concerns
 
-## 1. Startup Error Suppression in Critical Dependencies
-- In `internal/server/server.go`, `geo.New(...)` and `queue.NewWriter(...)` errors are ignored (`geoResolver, _ := ...`, `chWriter, _ := ...`).
-- Impact: service can boot in degraded mode without clear hard failure, which can silently disable geo enrichment or analytics writes.
-- Risk level: high for production observability/data completeness.
+**Analysis Date:** 2026-04-03
 
-## 2. Best-Effort Async Paths Without Logging on Failure
-- `internal/pipeline/stage/23_store_raw_clicks.go` launches attribution save in goroutine and suppresses errors.
-- Impact: attribution data loss can occur without surfaced diagnostics.
-- Risk level: medium-high for conversion attribution accuracy.
+## Tech Debt
 
-## 3. Potential Data Loss Under Queue Backpressure
-- `StoreRawClicksStage` performs non-blocking send to click channel and drops writes when channel is full (`default:` case in `internal/pipeline/stage/23_store_raw_clicks.go`).
-- Impact: dropped analytics events during burst traffic.
-- Risk level: high for reporting fidelity during spikes.
+**Bypassing Repository Layer:**
+- Issue: Several pipeline stages directly use the `Cache` or `Valkey` clients instead of a unified repository or service layer. This makes testing harder and leaks implementation details.
+- Files: `internal/pipeline/stage/4_find_campaign.go`, `internal/pipeline/stage/9_choose_stream.go`, `internal/pipeline/stage/12_choose_offer.go`
+- Impact: Increased coupling between pipeline stages and specific storage implementations (Redis/Valkey).
+- Fix approach: Introduce a domain-driven repository layer or use the existing `Service` pattern (like `lpTokenSvc`) for all entities.
 
-## 4. Security Footgun in Seed Data
-- Migration `db/postgres/migrations/004_create_domains_users.up.sql` seeds default admin credentials (`admin` / `admin123`) with note to change in production.
-- Impact: dangerous default if migration used outside controlled dev bootstrapping.
-- Risk level: high unless deployment process hardens user provisioning.
+**Manual JSON Marshalling in Cache:**
+- Issue: The `Cache` service manually marshals and unmarshals JSON for every entity.
+- Files: `internal/cache/cache.go`
+- Impact: Performance overhead in the hot path and repetitive code.
+- Fix approach: Implement a generic helper or use a more efficient serialization format (e.g., Protobuf or MessagePack) if performance becomes a bottleneck.
 
-## 5. API Key Auth Simplicity and Operational Risk
-- `internal/admin/middleware.go` checks plain API key from `users` table and returns generic unauthorized on mismatch.
-- Impact: minimal defense-in-depth controls shown here (e.g., no explicit rate limiting for admin endpoints, no key rotation metadata in this layer).
-- Risk level: medium (depends on upstream protections).
+**Large Pipeline Payload:**
+- Issue: The `Payload` struct is becoming quite large as it threads through 23+ stages.
+- Files: `internal/pipeline/pipeline.go`
+- Impact: Memory allocation overhead for each request.
+- Fix approach: Consider splitting the payload into smaller, stage-specific context objects or using an interface to limit access to only necessary fields.
 
-## 6. Convention Drift: Error Handling Policy vs Implementation
-- Project guidance in `AGENTS.md` says never suppress errors, but several paths do (for example ignored return values in `internal/server/server.go` and warmup cache set calls in `internal/cache/cache.go`).
-- Impact: harder debugging and inconsistent reliability behavior.
-- Risk level: medium.
+## Known Bugs
 
-## 7. Test Coverage Concentration
-- Unit tests are concentrated in queue/worker domains (`test/unit/queue/*`, `test/unit/worker/*`).
-- Complex pipeline stage logic (`internal/pipeline/stage/*.go`) has relatively limited direct unit coverage based on present test tree.
-- Impact: regressions in core click decisioning may escape early.
-- Risk level: medium-high.
+**Case-Sensitivity in Filter Types:**
+- Issue: Historically, filter type lookups were case-sensitive, which caused issues with external DB/UI sources.
+- Files: `internal/filter/filter.go`
+- Impact: Filters might fail to load or match if the casing doesn't exactly match "Title Case".
+- Trigger: Registering a filter with "country" but looking it up as "Country".
+- Workaround: A recent fix added `cases.Title` normalization, but existing data in DB might still have inconsistent casing.
 
-## 8. Partial/Stub Components
-- `admin-ui/` currently has no implementation files (only `AGENTS.md` and `CLAUDE.md`).
-- `SessionJanitorWorker` is intentionally no-op in `internal/worker/cache_warmup.go`.
-- Impact: roadmap assumptions may exceed currently implemented operational tooling.
-- Risk level: low-medium (depends on expected completeness).
+**ClickHouse Batch Drop:**
+- Issue: If the ClickHouse writer channel is full, clicks are silently dropped (though logged).
+- Files: `internal/pipeline/stage/23_store_raw_clicks.go`
+- Impact: Potential data loss during extreme traffic spikes.
+- Trigger: ClickHouse being slow or down while traffic is high (> 10k records in buffer).
+- Workaround: Monitor logs for "channel full" warnings and scale ClickHouse or increase buffer size.
 
-## 9. Integration Environment Coupling
-- Integration tests require external services and seeded data (`docker-compose.yml`, `test/integration/testdata/seed_phase4.sql`).
-- Impact: slower feedback loop and higher CI/environment setup complexity.
-- Risk level: medium for contributor velocity.
+## Security Considerations
 
-## 10. Root-Level Reference Data Volume
-- Large `reference/` subtree includes legacy and external artifacts.
-- Impact: repository navigation noise and potential accidental coupling to non-runtime assets.
-- Risk level: low, but impacts onboarding ergonomics.
+**Unprotected Admin API:**
+- Issue: The admin API handlers seem to rely on API keys added recently, but older migrations didn't have robust auth.
+- Files: `internal/admin/handler/`, `db/postgres/migrations/005_add_api_key.up.sql`
+- Risk: Potential unauthorized access to campaign configuration if the API key middleware is bypassed or misconfigured.
+- Current mitigation: API key validation in middleware.
+- Recommendations: Implement role-based access control (RBAC) and audit logging for all mutations.
+
+**IP Spoofing:**
+- Issue: `extractRealIP` trusts `X-Forwarded-For` and `X-Real-IP` headers blindly.
+- Files: `internal/pipeline/stage/3_build_raw_click.go`
+- Risk: Attackers can spoof their IP to bypass geo-filtering or rate limiting.
+- Current mitigation: None detected.
+- Recommendations: Add a configuration for "trusted proxies" and only accept these headers from known sources.
+
+## Performance Bottlenecks
+
+**Sequential Pipeline Execution:**
+- Problem: The pipeline runs stages sequentially. While mostly non-blocking, some stages (like GeoIP or Valkey lookups) add latency.
+- Files: `internal/pipeline/pipeline.go`
+- Cause: Synchronous loop over stages.
+- Improvement path: Identify independent stages (e.g., Geo vs. UA parsing) and run them in parallel using `errgroup`.
+
+**Reflective Rotator:**
+- Problem: The `Rotator.Pick` method uses `interface{}` and type assertions.
+- Files: `internal/rotator/rotator.go`, `internal/pipeline/stage/9_choose_stream.go`
+- Cause: Generic implementation to support streams, offers, and landings.
+- Improvement path: Use Go generics (introduced in 1.18+) to avoid type assertions and improve performance.
+
+## Fragile Areas
+
+**3-Tier Stream Selection:**
+- Files: `internal/pipeline/stage/9_choose_stream.go`
+- Why fragile: The logic for FORCED -> REGULAR -> DEFAULT is complex and relies on correct `Position` and `Type` fields. Small changes in selection logic can have large impacts on traffic distribution.
+- Safe modification: Extensive unit tests for all selection scenarios.
+- Test coverage: Partially covered by integration tests, but needs more edge-case unit tests.
+
+**Macro Replacement:**
+- Files: `internal/macro/macro.go`
+- Why fragile: Uses string replacement for a variety of tokens. If not carefully managed, it could lead to broken URLs or security issues (e.g., if a token contains control characters).
+- Safe modification: Use a structured parser or builder for URL construction.
+
+## Dependencies at Risk
+
+**Go-Redis (v9):**
+- Risk: High dependency on Valkey/Redis for the hot path. If Valkey is down, the TDS stops processing clicks.
+- Impact: Complete service outage.
+- Migration plan: Implement a degraded mode where clicks are processed using local cache or default settings if Redis is unavailable.
+
+## Missing Critical Features
+
+**Real-time Monitoring Hooks:**
+- Problem: No obvious hooks for real-time alerting on click drops or high latency within the pipeline.
+- Blocks: Proactive response to infrastructure issues.
+
+## Test Coverage Gaps
+
+**GeoIP Resolver:**
+- What's not tested: Behavior when MaxMind DBs are missing or corrupt.
+- Files: `internal/geo/geo.go`
+- Risk: Server might panic or fail to start in production environments.
+- Priority: Medium
+
+---
+
+*Concerns audit: 2026-04-03*

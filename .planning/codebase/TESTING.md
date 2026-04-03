@@ -1,48 +1,117 @@
-# TESTING
+# Testing Patterns
 
-## Test Types Present
-- Unit tests in `test/unit/`.
-- Integration tests in `test/integration/` guarded by `//go:build integration`.
-- Benchmark tests in `test/benchmark/` also behind integration build tags.
+**Analysis Date:** 2026-04-03
 
-## Test Commands (Documented)
-- Unit suite: `go test ./test/unit/...`.
-- Full suite: `go test ./...` (requires external services for integration).
-- Integration: `go test -v -tags integration ./test/integration/... -timeout 30s`.
-- Benchmark: `go test -v -tags integration -bench=BenchmarkClickLatency -benchmem ./test/benchmark/`.
-- Coverage: `go test -cover ./...`.
+## Test Framework
 
-## Current Unit Coverage Focus
-- Queue writer helpers and data conversion:
-- `test/unit/queue/writer_test.go`.
-- Worker manager lifecycle behavior:
-- `test/unit/worker/worker_test.go`.
+**Runner:**
+- Standard `go test` runner.
+- Build tags used to isolate integration tests (e.g., `//go:build integration`).
 
-## Current Integration Coverage Focus
-- End-to-end click flow and ClickHouse persistence:
-- `test/integration/click_test.go`.
-- Admin API and routing behavior:
-- `test/integration/admin_test.go`, `test/integration/routing_test.go`.
-- Cloaking/bot behavior:
-- `test/integration/cloaking_test.go`.
+**Assertion Library:**
+- Standard Go `testing` package (e.g., `t.Errorf`, `t.Fatalf`).
+- No external assertion libraries like `testify` are present.
 
-## Test Infrastructure Dependencies
-- Integration tests depend on running Postgres, Valkey, and ClickHouse.
-- Docker compose stack in `docker-compose.yml` provides local dependencies.
-- Seed data fixtures under `test/integration/testdata/seed_phase4.sql`.
+**Run Commands:**
+```bash
+go test ./test/unit/...              # Run all unit tests
+go test -v -tags integration ./test/integration/... -timeout 30s # Run integration tests
+go test -bench . ./test/benchmark/    # Run performance benchmarks
+```
 
-## Observed Test Patterns
-- Predominantly table/assert-style tests with direct `t.Errorf` checks.
-- Worker tests use mock worker structs and context cancellation orchestration.
-- Integration click tests use real HTTP calls and direct ClickHouse queries for verification.
+## Test File Organization
 
-## Gaps / Risk Areas in Current Coverage
-- No dedicated unit tests found for most pipeline stages in `internal/pipeline/stage/*.go`.
-- Limited direct tests for admin repository SQL edge cases and transaction failures.
-- Few tests around failure modes (degraded startup, partial dependency outages, queue saturation).
-- Benchmark exists but no enforced latency threshold assertions in CI-visible rules from repository files.
+**Location:**
+- Centralized `test/` directory at the project root for multi-component tests.
+- Package-level tests co-located with implementation (e.g., `internal/botdb/store_test.go`).
 
-## Suggested Testing Priorities (for future updates)
-- Add stage-level unit tests for decision-heavy pipeline stages.
-- Add failover/error-path integration tests (Valkey unavailable, ClickHouse unavailable).
-- Add security-focused tests around admin auth and API-key handling edge cases.
+**Naming:**
+- Files: `*_test.go`.
+- Functions: `Test[Name]` (e.g., `TestContains_SingleIP`, `TestEndToEndClick`).
+
+**Structure:**
+```
+/Users/roshansharma/Desktop/zai-yt-keitaro/test/
+├── unit/           # Isolated package tests
+├── integration/    # E2E and multi-component tests
+└── benchmark/      # Performance tests
+```
+
+## Test Structure
+
+**Suite Organization:**
+```go
+func TestEndToEndClick(t *testing.T) {
+    // 1. Setup (Connections, Environment)
+    // 2. Pre-test state capture
+    // 3. Execution (HTTP request)
+    // 4. Assertions (Status code, database records)
+    // 5. Teardown (Deferred Close)
+}
+```
+
+**Patterns:**
+- Setup: In-memory or real database connections depending on the test type.
+- Teardown: `defer` for closing connections and cleaning up.
+- Assertion: Simple `if got != want` style using standard Go tools.
+
+## Mocking
+
+**Framework:**
+- Manual implementation of interfaces for mocking (no mock generators like `mockery`).
+- Dependency injection via interfaces (e.g., `DB` interface in `internal/admin/repository/db.go`).
+
+**Patterns:**
+- No complex mocking observed. Integration tests prefer using real database instances.
+
+**What to Mock:**
+- External services (GeoIP lookup, ClickHouse writer, Database).
+
+**What NOT to Mock:**
+- Core business logic (Pipeline stages, Filters, Rotators).
+
+## Fixtures and Factories
+
+**Test Data:**
+```go
+input := "1.1.1.1\n2.2.2.0/24\n3.3.3.1-3.3.3.10"
+// Or SQL seeds in testdata/
+```
+
+**Location:**
+- SQL fixture and seed artifacts in `/Users/roshansharma/Desktop/zai-yt-keitaro/test/integration/testdata/`.
+
+## Coverage
+
+**Requirements:**
+- None explicitly enforced, but coverage is noted in CLAUDE.md files.
+
+**View Coverage:**
+```bash
+go test -cover ./...
+```
+
+## Test Types
+
+**Unit Tests:**
+- Fast, isolated tests for package logic (e.g., `internal/botdb/store_test.go`).
+- No external dependencies used.
+
+**Integration Tests:**
+- End-to-end tests requiring real infrastructure (PostgreSQL, ClickHouse, Valkey).
+- Located in `/Users/roshansharma/Desktop/zai-yt-keitaro/test/integration/`.
+
+**E2E Tests:**
+- Same as integration tests, exercising the full click path and admin API.
+
+## Common Patterns
+
+**Async Testing:**
+- Use of `time.Sleep` to wait for background operations (e.g., ClickHouse batch flushes).
+
+**Error Testing:**
+- Asserting `err == nil` or specific error values for expected failures.
+
+---
+
+*Testing analysis: 2026-04-03*
