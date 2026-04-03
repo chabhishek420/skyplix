@@ -87,4 +87,9 @@ tmp/
 .agent/
 .gemini/
 .bg-shell/
-.claude/worktrees/
+.claude/
+.planning/
+
+# ── Legacy CLAUDE.md files (use .gsd/CLAUDE.md instead) ──
+CLAUDE.md
+changes.md
