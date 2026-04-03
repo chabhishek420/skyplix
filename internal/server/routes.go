@@ -85,8 +85,10 @@ func (s *Server) routes() http.Handler {
 				r.Get("/", s.adminHandler.HandleGetNetwork)
 				r.Put("/", s.adminHandler.HandleUpdateNetwork)
 				r.Delete("/", s.adminHandler.HandleDeleteNetwork)
+				r.Get("/postback_url", s.adminHandler.HandleGeneratePostbackURL)
 			})
 		})
+
 
 		r.Route("/traffic_sources", func(r chi.Router) {
 			r.Get("/", s.adminHandler.HandleListSources)
@@ -136,7 +138,12 @@ func (s *Server) routes() http.Handler {
 
 		r.Get("/settings", s.adminHandler.HandleGetSettings)
 		r.Put("/settings", s.adminHandler.HandleUpdateSettings)
+
+		if s.reportsHandler != nil {
+			r.Get("/reports", s.reportsHandler.HandleReport)
+		}
 	})
+
 
 	// Click traffic routes (hot path)
 	r.Get("/lp/{token}/click", s.handleClickL2) // Level 2 (Landing → Offer)

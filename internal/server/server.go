@@ -16,7 +16,9 @@ import (
 	"github.com/skyplix/zai-tds/internal/action"
 	"github.com/skyplix/zai-tds/internal/admin/handler"
 	"github.com/skyplix/zai-tds/internal/admin/repository"
+	"github.com/skyplix/zai-tds/internal/analytics"
 	"github.com/skyplix/zai-tds/internal/attribution"
+
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/botdb"
 	"github.com/skyplix/zai-tds/internal/cache"
@@ -51,7 +53,9 @@ type Server struct {
 	workers         *worker.Manager
 	adminHandler    *handler.Handler
 	postbackHandler *handler.PostbackHandler
+	reportsHandler  *handler.ReportsHandler
 	botDB           *botdb.ValkeyStore
+
 	uaStore         *botdb.UAStore
 	ratelimiter     *ratelimit.Service
 
@@ -170,7 +174,14 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		convChan,
 	)
 
+	// Analytics & Reports (Phase 5.3)
+	if s.chReader != nil {
+		analyticsSvc := analytics.New(s.chReader, s.db, logger)
+		s.reportsHandler = handler.NewReportsHandler(logger, analyticsSvc)
+	}
+
 	// Workers (AUDIT FIX #5)
+
 	s.workers = worker.NewManager(logger,
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
 		worker.NewSessionJanitorWorker(logger),

@@ -90,7 +90,52 @@ func (h *Handler) HandleUpdateNetwork(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, n)
 }
 
+// HandleGeneratePostbackURL generates a postback URL template for an affiliate network.
+func (h *Handler) HandleGeneratePostbackURL(w http.ResponseWriter, r *http.Request) {
+	id, err := h.parseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid network id")
+		return
+	}
+
+	n, err := h.networks.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get network failed", zap.String("id", id.String()), zap.Error(err))
+		h.respondError(w, http.StatusNotFound, "network not found")
+		return
+	}
+
+	// Get global postback key
+	key := ""
+	if s, err := h.settings.Get(r.Context(), "postback_key"); err == nil {
+		key = s.Value
+	}
+
+	// Determine base URL
+	baseURL := ""
+	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
+		baseURL = "https://" + host
+	} else {
+		baseURL = "https://" + r.Host
+	}
+
+	postbackURL := n.PostbackURL
+	if postbackURL == "" {
+		postbackURL = macro.GeneratePostbackURL(baseURL, key)
+	} else {
+		// If custom template exists, ensure it has the correct key
+		// This is a simple replacement for illustration
+		postbackURL = strings.ReplaceAll(postbackURL, "{key}", key)
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]any{
+		"postback_url": postbackURL,
+		"macros":       macro.PostbackMacros,
+	})
+}
+
 // HandleDeleteNetwork deletes an affiliate network.
+
 func (h *Handler) HandleDeleteNetwork(w http.ResponseWriter, r *http.Request) {
 	id, err := h.parseUUID(chi.URLParam(r, "id"))
 	if err != nil {
