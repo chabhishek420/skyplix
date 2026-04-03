@@ -411,6 +411,37 @@ User requested /pause. Session boundary.
 
 ---
 
+## Session: 2026-04-03 01:50 IST
+
+### Objective
+Execute Phase 4 Plans 4.2–4.5 (Advanced Cloaking & Bot Detection).
+
+### Accomplished
+- **Plan 4.2**: Valkey persistence, expanded UA signatures (79), admin bot IP API (6 endpoints)
+- **Plan 4.3**: RemoteProxyAction TTL cache (60s), UAStore with Valkey, admin UA endpoints
+- **Plan 4.4**: MaxMind ASN integration, IsDatacenter heuristic, ISP/referrer/URL token filters
+- **Plan 4.5 Task 1**: Per-IP rate limiting via Valkey INCR+EXPIRE, wired into pipeline
+
+### Commits
+- `20970716` — Plan 4.2 complete
+- `ab3a32fb` — Plan 4.3 complete
+- `eb2d5e55` — Plan 4.4 complete
+
+### Verification
+- [x] `go build ./...` clean
+- [x] `go vet ./...` clean
+- [x] Manual curl: Human→302, Googlebot→200 safe page, Empty UA→200 safe page
+- [ ] Integration test suite execution (written, not run)
+- [ ] Phase 4 VERIFICATION.md
+
+### Paused Because
+Terminal process freezing — backgrounded `go run &` caused cascading hangs.
+
+### Handoff Notes
+Code is 95% done. Kill zombies first, commit rate limiter, run integration tests, then close Phase 4.
+
+---
+
 ## Session: 2026-04-03 10:48 IST
 
 ### Objective
