@@ -95,6 +95,25 @@ func (r *CampaignRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// Clone duplicates a campaign with a new name and alias.
+func (r *CampaignRepository) Clone(ctx context.Context, id uuid.UUID, newID uuid.UUID, newName, newAlias string) (*model.Campaign, error) {
+	var c model.Campaign
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO campaigns (id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id)
+		SELECT $2, $3, $4, type, bind_visitors, state, traffic_source_id, default_stream_id
+		FROM campaigns
+		WHERE id = $1
+		RETURNING id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+	`, id, newID, newAlias, newName).Scan(
+		&c.ID, &c.Alias, &c.Name, &c.Type,
+		&c.BindVisitors, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("clone campaign: %w", err)
+	}
+	return &c, nil
+}
+
 // SetState updates the campaign state (active, disabled, archived).
 func (r *CampaignRepository) SetState(ctx context.Context, id uuid.UUID, state string) error {
 	_, err := r.db.Exec(ctx, "UPDATE campaigns SET state = $1, updated_at = NOW() WHERE id = $2", state, id)

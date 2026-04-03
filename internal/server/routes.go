@@ -144,6 +144,8 @@ func (s *Server) routes() http.Handler {
 		}
 	})
 
+	// Mount the embedded Admin UI
+	r.Mount("/admin", s.handleSPA())
 
 	// Click traffic routes (hot path)
 	r.Get("/lp/{token}/click", s.handleClickL2) // Level 2 (Landing → Offer)

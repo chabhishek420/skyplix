@@ -127,25 +127,26 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Get Source Campaign
+	// Create temporary repositories bound to the transaction
+	txCampaigns := repository.NewCampaignRepository(tx)
+	txStreams := repository.NewStreamRepository(tx)
+
+	// 1. Get Source Campaign (for naming)
 	source, err := h.campaigns.GetByID(ctx, id)
 	if err != nil {
 		h.respondError(w, http.StatusNotFound, "source campaign not found")
 		return
 	}
 
-	// Create temporary repositories bound to the transaction
-	txCampaigns := repository.NewCampaignRepository(tx)
-	txStreams := repository.NewStreamRepository(tx)
+	// 2. Clone Campaign Record
+	newCampaignID := uuid.New()
+	newName := source.Name + " (Copy)"
+	newAlias := source.Alias + "_copy"
 
-	// 2. Insert New Campaign
-	newCampaign := *source
-	newCampaign.ID = uuid.New()
-	newCampaign.Name = source.Name + " (Copy)"
-	newCampaign.Alias = source.Alias + "_copy"
-	if err := txCampaigns.Create(ctx, &newCampaign); err != nil {
-		h.logger.Error("clone campaign insert failed", zap.Error(err))
-		h.respondError(w, http.StatusInternalServerError, "failed to insert cloned campaign")
+	newCampaign, err := txCampaigns.Clone(ctx, id, newCampaignID, newName, newAlias)
+	if err != nil {
+		h.logger.Error("clone campaign repo call failed", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to clone campaign")
 		return
 	}
 
@@ -158,23 +159,11 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, s := range streams {
-		sourceStreamID := s.ID
-		newStream := s
-		newStream.ID = uuid.New()
-		newStream.CampaignID = newCampaign.ID
-
-		if err := txStreams.Create(ctx, &newStream); err != nil {
-			h.logger.Error("clone stream insert failed", zap.Error(err))
-			h.respondError(w, http.StatusInternalServerError, "failed to insert cloned stream")
+		if _, err := txStreams.Clone(ctx, s.ID, uuid.New(), newCampaign.ID, s.Name, s.Position); err != nil {
+			h.logger.Error("clone stream repo call failed", zap.Error(err))
+			h.respondError(w, http.StatusInternalServerError, "failed to clone campaign streams")
 			return
 		}
-
-		// 4. Clone Offers/Landings associations
-		offers, _ := h.streams.GetOffers(ctx, sourceStreamID)
-		txStreams.SyncOffers(ctx, newStream.ID, offers)
-
-		landings, _ := h.streams.GetLandings(ctx, sourceStreamID)
-		txStreams.SyncLandings(ctx, newStream.ID, landings)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

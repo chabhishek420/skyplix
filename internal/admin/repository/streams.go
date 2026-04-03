@@ -96,6 +96,48 @@ func (r *StreamRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// Clone duplicates a stream to a new campaign or with a new position.
+func (r *StreamRepository) Clone(ctx context.Context, id uuid.UUID, newID uuid.UUID, targetCampaignID uuid.UUID, newName string, newPosition int) (*model.Stream, error) {
+	var s model.Stream
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO streams (id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit)
+		SELECT $2, $3, $4, type, $5, weight, state, action_type, action_payload, filters, daily_limit, total_limit
+		FROM streams
+		WHERE id = $1
+		RETURNING id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
+	`, id, newID, targetCampaignID, newName, newPosition).Scan(
+		&s.ID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight,
+		&s.State, &s.ActionType, &s.ActionPayload, &s.Filters, &s.DailyLimit, &s.TotalLimit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("clone stream: %w", err)
+	}
+
+	// Clone offers
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO stream_offers (stream_id, offer_id, weight)
+		SELECT $2, offer_id, weight
+		FROM stream_offers
+		WHERE stream_id = $1
+	`, id, newID)
+	if err != nil {
+		return nil, fmt.Errorf("clone stream offers: %w", err)
+	}
+
+	// Clone landings
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO stream_landings (stream_id, landing_id, weight)
+		SELECT $2, landing_id, weight
+		FROM stream_landings
+		WHERE stream_id = $1
+	`, id, newID)
+	if err != nil {
+		return nil, fmt.Errorf("clone stream landings: %w", err)
+	}
+
+	return &s, nil
+}
+
 // GetOffers returns all offers associated with a stream.
 func (r *StreamRepository) GetOffers(ctx context.Context, streamID uuid.UUID) ([]model.WeightedOffer, error) {
 	rows, err := r.db.Query(ctx, `

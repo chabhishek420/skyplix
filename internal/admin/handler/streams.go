@@ -235,35 +235,25 @@ func (h *Handler) HandleCloneStream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Get Source Stream
+	// Create temporary repository bound to the transaction
+	txStreams := repository.NewStreamRepository(tx)
+
+	// 1. Get Source Stream (for naming/position)
 	source, err := h.streams.GetByID(ctx, id)
 	if err != nil {
 		h.respondError(w, http.StatusNotFound, "source stream not found")
 		return
 	}
 
-	// Create temporary repository bound to the transaction
-	txStreams := repository.NewStreamRepository(tx)
-
-	// 2. Insert New Stream
-	newStream := *source
-	newStream.ID = uuid.New()
-	newStream.Name = source.Name + " (Copy)"
-	// Shift position to be right after the source
-	newStream.Position = source.Position + 1
-
-	if err := txStreams.Create(ctx, &newStream); err != nil {
-		h.logger.Error("clone stream insert failed", zap.Error(err))
-		h.respondError(w, http.StatusInternalServerError, "failed to insert cloned stream")
+	// 2. Clone Stream
+	newName := source.Name + " (Copy)"
+	newPosition := source.Position + 1
+	newStream, err := txStreams.Clone(ctx, id, uuid.New(), source.CampaignID, newName, newPosition)
+	if err != nil {
+		h.logger.Error("clone stream repo call failed", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to clone stream")
 		return
 	}
-
-	// 3. Clone Offers/Landings associations
-	offers, _ := h.streams.GetOffers(ctx, id)
-	txStreams.SyncOffers(ctx, newStream.ID, offers)
-
-	landings, _ := h.streams.GetLandings(ctx, id)
-	txStreams.SyncLandings(ctx, newStream.ID, landings)
 
 	if err := tx.Commit(ctx); err != nil {
 		h.logger.Error("clone stream commit failed", zap.Error(err))
