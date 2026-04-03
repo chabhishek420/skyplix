@@ -121,6 +121,11 @@ func (s *Server) routes() http.Handler {
 				r.Delete("/all", s.adminHandler.HandleClearBotIPs)
 				r.Post("/check", s.adminHandler.HandleCheckBotIP)
 			})
+			r.Route("/ua", func(r chi.Router) {
+				r.Get("/", s.adminHandler.HandleGetBotUA)
+				r.Post("/", s.adminHandler.HandleAddBotUA)
+				r.Delete("/", s.adminHandler.HandleDeleteBotUA)
+			})
 		})
 
 		r.Get("/settings", s.adminHandler.HandleGetSettings)
