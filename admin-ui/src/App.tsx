@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from './components/layout/main-layout';
 import { Dashboard } from './pages/dashboard';
+import { Campaigns } from './pages/campaigns';
+import { CampaignEdit } from './pages/campaigns/edit';
 
 function App() {
   return (
@@ -8,8 +10,11 @@ function App() {
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
-          {/* Temporary stubs for remaining routes */}
-          <Route path="campaigns" element={<div className="p-8">Campaigns UI soon...</div>} />
+          <Route path="campaigns">
+            <Route index element={<Campaigns />} />
+            <Route path="new" element={<CampaignEdit />} />
+            <Route path=":id" element={<CampaignEdit />} />
+          </Route>
           <Route path="offers" element={<div className="p-8">Offers UI soon...</div>} />
           <Route path="landings" element={<div className="p-8">Landings UI soon...</div>} />
           <Route path="networks" element={<div className="p-8">Networks UI soon...</div>} />
