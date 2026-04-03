@@ -69,3 +69,22 @@ vendor/
 coverage/
 .cache/
 tmp/
+
+# ── GSD v2 infrastructure (auto-generated, session-scoped) ──
+.gsd/examples/
+.gsd/phases/
+.gsd/templates/
+.gsd/workflows/
+.gsd/runtime/
+.gsd/activity/
+.gsd/journal/
+.gsd/*.db-shm
+.gsd/*.db-wal
+.gsd/auto.lock
+.gsd/worktrees/
+
+# ── Agent tooling (environment-specific) ──
+.agent/
+.gemini/
+.bg-shell/
+.claude/worktrees/
