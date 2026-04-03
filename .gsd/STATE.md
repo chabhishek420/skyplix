@@ -3,18 +3,17 @@
 **Status**: Active (resumed 2026-04-03T16:30:04+05:30)
 
 ## Current Position
-- **Phase**: 5.2 — Conversion Tracking (Implementing Postback & Attribution)
-- **Task**: Implement Postback (S2S) listener endpoint and Attribution Service.
+- **Phase**: 6 — Admin Dashboard UI
+- **Task**: Scaffold React/Vite project in `admin-ui/`.
 - **Milestone**: v1.0 — Production TDS
 
-## Context from Last Session
-Codebase mapping complete (2026-04-03).
-- **25** pipeline stages identified and documented (upgraded from 23).
-- **27+** filter types and **19** action types verified.
-- **5** ClickHouse migrations confirmed (including Materialized Views for stats).
-- **Technical Debt resolved**: `strings.Title` migrated, Bcrypt hashing implemented, and Pagination added to admin handlers.
-- **Outdated Packages**: Identified 3 low-risk updates (OTEL, Protobuf, Net).
-- Documentation synced in `.gsd/ARCHITECTURE.md` and `.gsd/STACK.md`.
+## Last Session Summary
+Phase 5 (Conversion Tracking & Analytics) verified and complete.
+- Postback S2S listener implemented.
+- Real-time ClickHouse Materialized Views for stats (hourly/daily) implemented.
+- Dynamic Reporting API with drilldowns and derived metrics (CR, ROI, EPC) implemented.
+- Postback URL template generator with Keitaro macro parity added.
+- **25** pipeline stages confirmed and documentation synced.
 
 ## Blockers
 - None.
