@@ -4,113 +4,112 @@
 
 ## Pattern Overview
 
-**Overall:** Pipe and Filter / Layered Architecture
+**Overall:** Monolithic Go HTTP service with a pipeline-based click-processing engine.
 
 **Key Characteristics:**
-- **Pipeline-driven Execution:** Click processing is handled by a strictly ordered sequence of stages, ensuring a predictable and extensible "hot path".
-- **Stateless Core with Progressive Payload:** Each click request is represented by a `Payload` that is passed through stages, where it is progressively enriched (Geo, Device, Campaign/Stream selection).
-- **Externalized Logic Engines:** Complex behaviors like filtering (27+ types) and actions (19+ types) are abstracted into modular engines, keeping pipeline stages lean.
+- Single backend executable (`cmd/zai-tds/main.go`) serving both admin APIs and click/redirect endpoints
+- Click handling implemented as a stage pipeline (chain-of-responsibility) (`internal/pipeline/`, `internal/pipeline/stage/`)
+- Mixed storage: PostgreSQL for configuration/entities, Valkey for runtime state/caches, ClickHouse for analytics ingestion (`internal/server/server.go`)
+- Background workers for periodic maintenance tasks (`internal/worker/*`)
 
 ## Layers
 
-**Entry Layer (HTTP):**
-- Purpose: Handles incoming HTTP requests and initiates the click pipeline.
-- Location: `internal/server/`
-- Contains: `server.go`, `routes.go`
-- Depends on: `internal/pipeline`, `internal/config`, `internal/model`
-- Used by: External traffic (visitors)
+**Entry / Bootstrap:**
+- Purpose: load config, init logger, build server, handle shutdown signals
+- Contains: `cmd/zai-tds/main.go`, config loading in `internal/config/config.go`
+- Depends on: `internal/server`
 
-**Processing Layer (Pipeline):**
-- Purpose: Orchestrates the sequential execution of logic for a click.
-- Location: `internal/pipeline/`
-- Contains: `pipeline.go`, `stage/`
-- Depends on: `internal/model`, `internal/cache`, `internal/filter`, `internal/action`
-- Used by: `internal/server`
+**HTTP / Routing Layer:**
+- Purpose: define routes and middleware for public/admin/click paths
+- Contains: `internal/server/routes.go`
+- Depends on: admin handlers (`internal/admin/handler/*`) and click pipeline (`internal/pipeline/*`)
 
-**Domain Logic Layer (Engines & Services):**
-- Purpose: Provides specialized logic for routing decisions and entity lookups.
-- Location: `internal/filter/`, `internal/action/`, `internal/rotator/`, `internal/cache/`
-- Contains: Filter engines, Action engines, Weighted rotators, Entity caches.
-- Depends on: `internal/model`, `internal/valkey`, `internal/postgres`
-- Used by: `internal/pipeline/stage`
+**Admin API Layer:**
+- Purpose: CRUD APIs for campaigns/streams/offers/landings/users/domains/etc.
+- Contains: handler package under `internal/admin/handler/`
+- Auth: `internal/admin/middleware.go` (`X-Api-Key` backed by Postgres)
+- Depends on: Postgres (`pgxpool`), cache (`internal/cache/*`), botdb (`internal/botdb/*`)
 
-**Data Access Layer:**
-- Purpose: Provides high-performance access to stateful data (Valkey) and persistence (ClickHouse/Postgres).
-- Location: `internal/cache/`, `internal/queue/`, `db/`
-- Contains: `cache.go` (Valkey + Postgres fallback), `writer.go` (ClickHouse batch writer).
-- Depends on: `internal/model`, External drivers (pgx, redis, clickhouse-go)
-- Used by: Domain Logic Layer
+**Click Processing (Hot Path):**
+- Purpose: evaluate incoming click request and decide redirect/action, while producing analytics
+- Abstraction: `pipeline.Pipeline` + `pipeline.Payload` (`internal/pipeline/*`)
+- Implementation: stage types in `internal/pipeline/stage/*` wired in `internal/server/server.go`
+- Depends on: cache/session/rotator/binding/filter/action/etc. services in `internal/*`
+
+**Data / Infra Adapters:**
+- Purpose: connect to external systems and provide typed service APIs
+- Contains:
+  - Postgres pool (`internal/server/server.go`)
+  - Valkey client (`internal/server/server.go`)
+  - ClickHouse writer (`internal/queue/writer.go`)
+  - GeoIP resolver (`internal/geo/*`)
+
+**Background Work:**
+- Purpose: periodic maintenance/warmup tasks
+- Contains: `internal/worker/*` and manager `internal/worker/manager.go` (wired in `internal/server/server.go`)
 
 ## Data Flow
 
-**Standard Click Flow (Level 1):**
+**Public click (Level 1) (`GET /{alias}` or `/`):**
+1. Request enters Chi router (`internal/server/routes.go`).
+2. `server.handleClick` builds `pipeline.Payload` with `Request`/`Writer` (`internal/server/routes.go`).
+3. `pipelineL1.Run(payload)` executes ~20+ stages (wired in `internal/server/server.go`).
+4. Stages read config/entities from cache/DB and compute click context (campaign/stream/landing/offer), uniqueness, bot checks, etc. (`internal/pipeline/stage/*`).
+5. Action stage may execute redirect/cloaking behavior (`internal/action/*`).
+6. Analytics stage pushes a `queue.ClickRecord` to ClickHouse writer channel (`internal/queue/writer.go`).
+7. Response is written (redirect/proxy/etc.).
 
-1. **Request Ingestion:** `Server.handleClick` receives a request at `/{alias}`.
-2. **Payload Initialization:** A `pipeline.Payload` is created to track the "current click state".
-3. **Sequential Processing:** The `pipelineL1` (23 stages) executes in order:
-    - `BuildRawClickStage`: Extracts IP, UA, Referrer.
-    - `FindCampaignStage`: Resolves campaign via `Cache` (Valkey/Postgres).
-    - `UpdateRawClickStage`: Enriches with Geo (MaxMind) and Device data.
-    - `ChooseStreamStage`: Evaluates `FilterEngine` and `Rotator` to select a stream.
-    - `ChooseLanding/OfferStage`: Selects the final target via `Rotator`.
-    - `ExecuteActionStage`: Runs the selected `Action` (Redirect, Proxy, etc.).
-4. **Asynchronous Persistence:** `StoreRawClicksStage` sends the final `RawClick` to `internal/queue/Writer` for batch insertion into ClickHouse.
+**Public click (Level 2) (`GET /lp/{token}/click`):**
+1. Router matches `handleClickL2` (`internal/server/routes.go`).
+2. `pipelineL2.Run(payload)` executes a smaller pipeline for landing→offer.
+3. Similar analytics write to ClickHouse.
+
+**Admin API request (`/api/v1/*`):**
+1. Router enters `/api/v1` group and enforces API key middleware (`internal/server/routes.go`, `internal/admin/middleware.go`).
+2. Handler executes DB/cache operations (`internal/admin/handler/*`).
+3. JSON response written.
 
 **State Management:**
-- **Transient State:** Stored in `pipeline.Payload` for the duration of a single request.
-- **Hot State:** Stored in Valkey (Redis) for fast lookups of campaigns, streams, and visitor uniqueness.
-- **Persistent State:** PostgreSQL for configuration/entities; ClickHouse for immutable analytics (clicks).
+- Postgres stores authoritative admin entities.
+- Valkey stores runtime caches/sessions/botdb/limits.
+- ClickHouse stores append-only analytics records via async batching.
 
 ## Key Abstractions
 
-**Stage (`internal/pipeline/pipeline.go`):**
-- Purpose: Interface for a single discrete step in the click process.
-- Examples: `DomainRedirectStage`, `BuildRawClickStage`, `ExecuteActionStage`.
-- Pattern: Strategy / Interceptor.
+**Pipelines + Stages:**
+- Purpose: keep click handling composable and benchmarkable.
+- Examples: `pipeline.Pipeline`, `stage.BuildRawClickStage`, `stage.ChooseStreamStage`, `stage.StoreRawClicksStage`.
+- Pattern: chain-of-responsibility with a shared mutable payload.
 
-**Filter (`internal/filter/filter.go`):**
-- Purpose: Interface for a single routing condition (e.g., "Is Country == US").
-- Examples: `CountryFilter`, `IpFilter`, `IsBotFilter`.
-- Pattern: Specification.
-
-**Action (`internal/action/action.go`):**
-- Purpose: Interface for the final routing result (e.g., "Redirect to URL").
-- Examples: `HttpRedirect`, `RemoteProxyAction`, `JsAction`.
-- Pattern: Command.
+**Services (small focused packages):**
+- Purpose: isolate specific domains (sessions, filters, rotators, bindings, attribution, etc.).
+- Examples: `internal/session`, `internal/filter`, `internal/rotator`, `internal/binding`.
 
 ## Entry Points
 
-**Main TDS Server:**
+**Server binary:**
 - Location: `cmd/zai-tds/main.go`
-- Triggers: System startup / CLI execution.
-- Responsibilities: Config loading, Logger initialization, Server bootstrapping, Graceful shutdown handling.
-
-**L1 Click Handler:**
-- Location: `internal/server/routes.go` (`handleClick`)
-- Triggers: HTTP GET `/{alias}` or `/`.
-- Responsibilities: Running the full 23-stage pipeline for initial campaign traffic.
-
-**L2 Click Handler:**
-- Location: `internal/server/routes.go` (`handleClickL2`)
-- Triggers: HTTP GET `/lp/{token}/click`.
-- Responsibilities: Running the Level 2 pipeline for Landing → Offer transitions.
+- Triggers: `go run cmd/zai-tds/main.go` or built binary
+- Responsibilities: config, logging, lifecycle/shutdown
 
 ## Error Handling
 
-**Strategy:** Pipeline-level abortion with centralized logging and HTTP 500 fallback.
-
-**Patterns:**
-- **Abort Flag:** `payload.Abort = true` stops further non-mandatory stages.
-- **Error Wrapping:** Stages wrap errors with their name for traceabilty.
-- **AlwaysRun Stages:** Critical stages (like storage) run even if the pipeline is aborted to ensure data integrity.
+**Strategy:**
+- Fatal errors during startup stop the process (`cmd/zai-tds/main.go`, `internal/server/server.go`).
+- Request-level errors typically log and return `http.Error` in handlers/stages.
 
 ## Cross-Cutting Concerns
 
-**Logging:** Structured logging using `uber-go/zap` throughout all layers.
-**Validation:** Filter engine handles logical validation; `internal/config` handles runtime settings validation.
-**Authentication:** Not detected in the click hot path (expected for TDS).
-**Caching:** Multi-tier caching in `internal/cache/cache.go` (Valkey with Postgres fallbacks and async re-caching).
+**Logging:**
+- `zap` logger passed/injected into most services (`internal/server/server.go`).
+
+**Authentication:**
+- Admin API key middleware (`internal/admin/middleware.go`).
+
+**Rate limiting / bot detection (inferred):**
+- Services exist for rate limiting and bot DB (`internal/ratelimit/*`, `internal/botdb/*`) and are wired into pipeline stages.
 
 ---
 
 *Architecture analysis: 2026-04-03*
+*Update when major patterns change*

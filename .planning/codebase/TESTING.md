@@ -5,113 +5,74 @@
 ## Test Framework
 
 **Runner:**
-- Standard `go test` runner.
-- Build tags used to isolate integration tests (e.g., `//go:build integration`).
+- Go `testing` package (stdlib)
 
 **Assertion Library:**
-- Standard Go `testing` package (e.g., `t.Errorf`, `t.Fatalf`).
-- No external assertion libraries like `testify` are present.
+- Built-in `testing.T`/`testing.B` with manual assertions (`t.Errorf`, `t.Fatal`, etc.)
 
 **Run Commands:**
 ```bash
-go test ./test/unit/...              # Run all unit tests
-go test -v -tags integration ./test/integration/... -timeout 30s # Run integration tests
-go test -bench . ./test/benchmark/    # Run performance benchmarks
+# Unit tests
+go test ./test/unit/...
+
+# Single file
+go test -v ./test/unit/queue/writer_test.go
+
+# Single test function (example)
+go test -v -run TestParseUUIDVal_ValidUUID ./test/unit/queue/...
+
+# Integration tests (require services)
+go test -v -tags integration ./test/integration/... -timeout 30s
+
+# Benchmarks (tagged as integration)
+go test -v -tags integration -bench=BenchmarkClickLatency -benchmem ./test/benchmark/
 ```
 
 ## Test File Organization
 
 **Location:**
-- Centralized `test/` directory at the project root for multi-component tests.
-- Package-level tests co-located with implementation (e.g., `internal/botdb/store_test.go`).
+- Tests are organized under a dedicated `test/` tree rather than colocated with source.
 
 **Naming:**
-- Files: `*_test.go`.
-- Functions: `Test[Name]` (e.g., `TestContains_SingleIP`, `TestEndToEndClick`).
+- Standard Go `*_test.go` naming (examples: `test/unit/queue/writer_test.go`, `test/integration/click_test.go`).
 
 **Structure:**
 ```
-/Users/roshansharma/Desktop/zai-yt-keitaro/test/
-├── unit/           # Isolated package tests
-├── integration/    # E2E and multi-component tests
-└── benchmark/      # Performance tests
+test/
+  unit/
+    queue/
+      writer_test.go
+    worker/
+      worker_test.go
+  integration/
+    suite_test.go
+    click_test.go
+    routing_test.go
+  benchmark/
+    latency_test.go
 ```
 
 ## Test Structure
 
-**Suite Organization:**
-```go
-func TestEndToEndClick(t *testing.T) {
-    // 1. Setup (Connections, Environment)
-    // 2. Pre-test state capture
-    // 3. Execution (HTTP request)
-    // 4. Assertions (Status code, database records)
-    // 5. Teardown (Deferred Close)
-}
-```
-
-**Patterns:**
-- Setup: In-memory or real database connections depending on the test type.
-- Teardown: `defer` for closing connections and cleaning up.
-- Assertion: Simple `if got != want` style using standard Go tools.
+**Patterns observed:**
+- Direct unit tests for pure functions and small helpers (example: `test/unit/queue/writer_test.go`).
+- Integration tests use the `integration` build tag and typically require Postgres/Valkey/ClickHouse available (see `docker-compose.yml`).
 
 ## Mocking
 
-**Framework:**
-- Manual implementation of interfaces for mocking (no mock generators like `mockery`).
-- Dependency injection via interfaces (e.g., `DB` interface in `internal/admin/repository/db.go`).
-
-**Patterns:**
-- No complex mocking observed. Integration tests prefer using real database instances.
-
-**What to Mock:**
-- External services (GeoIP lookup, ClickHouse writer, Database).
-
-**What NOT to Mock:**
-- Core business logic (Pipeline stages, Filters, Rotators).
+- Minimal/none; tests mostly use real objects with `zap.NewNop()` logger (example: `test/unit/queue/writer_test.go`).
+- HTTP-level integration/bench tests use `httptest.NewServer` (example: `test/benchmark/latency_test.go`).
 
 ## Fixtures and Factories
 
-**Test Data:**
-```go
-input := "1.1.1.1\n2.2.2.0/24\n3.3.3.1-3.3.3.10"
-// Or SQL seeds in testdata/
-```
+- Tests commonly build structs inline (example: `model.RawClick` in `test/unit/queue/writer_test.go`).
 
-**Location:**
-- SQL fixture and seed artifacts in `/Users/roshansharma/Desktop/zai-yt-keitaro/test/integration/testdata/`.
+## Integration Test Setup
 
-## Coverage
-
-**Requirements:**
-- None explicitly enforced, but coverage is noted in CLAUDE.md files.
-
-**View Coverage:**
-```bash
-go test -cover ./...
-```
-
-## Test Types
-
-**Unit Tests:**
-- Fast, isolated tests for package logic (e.g., `internal/botdb/store_test.go`).
-- No external dependencies used.
-
-**Integration Tests:**
-- End-to-end tests requiring real infrastructure (PostgreSQL, ClickHouse, Valkey).
-- Located in `/Users/roshansharma/Desktop/zai-yt-keitaro/test/integration/`.
-
-**E2E Tests:**
-- Same as integration tests, exercising the full click path and admin API.
-
-## Common Patterns
-
-**Async Testing:**
-- Use of `time.Sleep` to wait for background operations (e.g., ClickHouse batch flushes).
-
-**Error Testing:**
-- Asserting `err == nil` or specific error values for expected failures.
+- See `test/integration/suite_test.go` for suite-wide setup/teardown.
+- Local services are expected from `docker-compose.yml` unless otherwise configured via env vars.
 
 ---
 
 *Testing analysis: 2026-04-03*
+*Update as test strategy changes*
