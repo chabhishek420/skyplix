@@ -1,79 +1,130 @@
-# Project Status & Debug Log
+# Project Status: SkyPlix TDS (zai-yt-keitaro)
 
-> **Last Updated:** 2026-04-01T23:45:00+05:30
-> **Current Phase:** Pre-Phase 1 (Architecture & Research Complete)
+> Last updated: 2026-04-03 12:57 IST
 
-## 🎯 What Has Been Implemented
+## Overall Progress
 
-1. **Legacy Infrastructure Deprecation**
-   - Evaluated the existing Next.js + Prisma + SQLite prototype.
-   - Identified critical performance bottlenecks (SQLite locks, Node.js single-thread limits, framework overhead).
-   - Moved the legacy codebase to `reference/legacy-nextjs/` and initialized a fresh Git repository for the Go rewrite.
+| Milestone | v1.0 — Production TDS |
+|-----------|----------------------|
+| Phases Complete | 6 of 9 (1, 1.5, 2, 3, 4, 4.9.4) |
+| Current Phase | 5 — Conversion Tracking & Analytics |
+| Current Sub-phase | 5.1 Task 3 complete, 5.2 not started |
+| Overall Estimate | ~67% |
+| Health | `gsd:health` → **Healthy** (0 errors, 0 warnings) |
 
-2. **Deep Codebase Analysis (Keitaro PHP Reference)**
-   - Scanned 1,705 PHP files across the reference `Keitaro_source_php/` directory.
-   - Mapped the exact **two-level pipeline** architecture (23 stages for Campaign Click, 13 stages for Landing Click).
-   - Identified 51 feature modules, 27 stream filters, and 15 action types.
-   - Confirmed Keitaro's async event architecture (using Redis as the primary hot-path cache and write buffer, not just session storage).
+## Phase Completion Matrix
 
-3. **Technology Stack Finalized**
-   - **Language:** Go 1.23+ (Targeting <5ms p99 latency)
-   - **HTTP Framework:** Chi v5 (Chosen over Fiber for full `net/http` compatibility, avoiding vendor lock-in).
-   - **Primary Database:** PostgreSQL 16 (Config storage, JSONB for rules) via `pgx` v5 and `sqlc` (zero-ORM).
-   - **Cache & Message Queue:** Valkey 8 (Open-source BSD alternative to Redis, providing critical hot-path caching and async click buffering).
-   - **Analytics Database:** ClickHouse 24 (Columnar storage for real-time aggregation of billions of click events).
-   - **Frontend:** Vite + React 19 + shadcn/ui + TanStack Query (Embedded directly in the Go binary via `//go:embed` for a single-file deployment).
+| Phase | Name | Status | Evidence |
+|-------|------|--------|----------|
+| 1 | Foundation — Core Pipeline + Workers | ✅ Complete | VERIFICATION.md present |
+| 1.5 | Maintenance — Reliability & Robustness | ✅ Complete | VERIFICATION.md + SUMMARY present |
+| 2 | Campaign Engine — Streams, Filters, Rotators | ✅ Complete | VERIFICATION.md + 2 SUMMARYs present |
+| 3 | Admin API — CRUD for All Entities | ✅ Complete | VERIFICATION.md + RESEARCH present |
+| 4 | Advanced Cloaking & Bot Detection | ✅ Complete | VERIFICATION.md + 5 SUMMARYs, 8/8 test cases GREEN |
+| 4.9.4 | Gap Closure & Uniqueness Hardening | ✅ Complete | p99 latency: 2.06ms |
+| 5 | Conversion Tracking & Analytics | 🔄 In Progress | Plan 5.1 tasks 1-3 done, Plans 5.2/5.3 not started |
+| 6 | Admin Dashboard UI | ⬜ Not Started | Directory created, no plans executed |
+| 7 | Production Hardening | ⬜ Not Started | Directory created, no plans executed |
 
-4. **GSD Project Documentation Complete**
-   - `SPEC.md` - Technical specification and architecture overview.
-   - `ROADMAP.md` - 7-Phase execution plan.
-   - `ARCHITECTURE.md` - Detailed Keitaro-to-Go mapping.
-   - `STACK.md` - Complete technology inventory.
-   - `RESEARCH.md` - 12-layer deep-dive research with source verifications.
-   - `DECISIONS.md` - ADRs logging critical shifts (Chi, Valkey, sqlc, etc.).
-   - Cleaned up all stale `.gsd` files from the Next.js era.
+## Current Implementation State
+
+### What exists and works
+- **Click Pipeline**: 23-stage L1 pipeline + 13-stage L2 pipeline, fully operational
+- **Campaign Routing**: 3-tier stream selection (FORCED→REGULAR→DEFAULT), 27 filter types, position/weight rotation
+- **Bot Detection & Cloaking**: Multi-layer detection (79 UA signatures, IP/CIDR, ASN/datacenter, ISP blacklist, referrer analysis, rate limiting), safe page delivery (Remote proxy, LocalFile, Status404, ShowHtml)
+- **Admin API**: Full CRUD for campaigns, streams, offers, landings, domains, networks, traffic sources, users, settings; campaign/stream cloning; API key auth
+- **Data Pipeline**: Async ClickHouse batch writer (clicks + conversions), 10k record channel buffer, 500ms/5000-record flush
+- **Visitor Tracking**: Global/campaign/stream uniqueness via Valkey sessions, entity binding (cookies + Valkey)
+- **Attribution Cache**: Valkey-based click attribution caching (attr:{click_token} with 24h TTL) — implemented in `internal/attribution/service.go`
+- **Conversion Model**: `internal/model/conversion.go` defined with full ClickHouse-compatible schema
+- **Queue Writer**: Upgraded to multi-table batcher with separate `ClickChan` and `ConvChan` typed channels
+
+### What doesn't exist yet
+- **Postback endpoint** (`/postback`) — no S2S conversion ingestion yet
+- **Attribution Engine** — Valkey lookup → ClickHouse conversion write flow not wired
+- **Reporting/Stats API** — no ClickHouse materialized views, no query builder, no drilldowns
+- **Admin Dashboard UI** — empty `admin-ui/` scaffold, no React components
+- **Production ops** — no Prometheus metrics, no Docker image, no systemd, no Keitaro migration script
+
+## Performance Baseline
+
+| Metric | Value | Target |
+|--------|-------|--------|
+| p99 latency (1k RPS) | 2.06ms | <5ms |
+| Cloaking test suite | 8/8 GREEN | All pass |
+| Integration tests | All passing | All pass |
+
+## Tech Stack
+
+- **Language**: Go 1.25 (single binary)
+- **Router**: chi v5
+- **Databases**: PostgreSQL 16, ClickHouse 24, Valkey 8
+- **Key libs**: pgx v5, clickhouse-go v2, go-redis v9, zap, oschwald/geoip2
+- **Frontend** (planned): Vite + React 19 + shadcn/ui, embedded via `//go:embed`
+
+## GSD Planning State
+
+| Artifact | Location | Status |
+|----------|----------|--------|
+| PROJECT.md | `.planning/PROJECT.md` | ✅ Created this session |
+| ROADMAP.md | `.planning/ROADMAP.md` | ✅ Synced from `.gsd/` |
+| STATE.md | `.planning/STATE.md` | ✅ Synced from `.gsd/` |
+| config.json | `.planning/config.json` | ✅ Created by health repair |
+| Codebase map | `.planning/codebase/` | ✅ 7 documents (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, INTEGRATIONS, CONCERNS) |
+| Phase dirs | `.planning/phases/` | ✅ Normalized to NN-name format |
+| Continue file | `.planning/phases/05-*/  .continue-here.md` | ⚠️ Says Task 3 incomplete — but code shows it IS complete (see Debug Log) |
+
+## Known Discrepancies
+
+1. **`.continue-here.md` vs actual code**: The handoff file created this session says `flushConversions` still needs implementation, but `internal/queue/writer.go` already contains `ConvChan()` (line 192-194) and `flushConversions()` (line 337+). This was a stale checkpoint — Task 3 was actually completed in a previous session (commit `b4c76970`).
+
+2. **ROADMAP current phase pointer**: ROADMAP.md header says "Current Phase: 4" but Phase 4 is complete and Phase 5.1 work has been done. The header was not updated when Phase 4 completed.
+
+3. **Missing REQUIREMENTS.md**: The GSD new-project flow expects `.planning/REQUIREMENTS.md` but it was never generated. The roadmap serves as the de-facto requirements source.
+
+## Next Steps
+
+1. **Immediate**: Run `/gsd:plan-phase 5` or execute Plan 5.2 (Postback API & Attribution Engine)
+2. **Then**: Execute Plan 5.3 (Analytics Reporting Service & Stats API)
+3. **After Phase 5**: Phase 6 (Admin Dashboard UI) — React SPA consuming existing APIs
+4. **Final**: Phase 7 (Production Hardening) — metrics, Docker, benchmarks, migration
+
+## Debug Log
+
+### Session: 2026-04-03 (This Session)
+
+**Problem 1: GSD health showed `broken` status**
+- Root cause: `.planning/` directory existed from codebase mapping but was missing `ROADMAP.md`, `STATE.md`, `config.json`
+- Fix: Ran `gsd:health --repair` which auto-created `STATE.md` and `config.json`
+- Then manually synced `ROADMAP.md`, `TODO.md`, `JOURNAL.md` from `.gsd/` source of truth
+- Result: Status improved from `broken` → `degraded`
+
+**Problem 2: Phase directory naming warnings (W005)**
+- Root cause: Phase folders copied from `.gsd/phases/` used legacy naming (`1`, `1.5`, `2`, etc.) instead of GSD's expected `NN-name` format
+- Fix: Renamed all phase directories:
+  - `1` → `01-foundation`
+  - `1.5` → `01.5-maintenance-reliability-robustness`
+  - `2` → `02-campaign-engine`
+  - `3` → `03-admin-api`
+  - `4` → `04-advanced-cloaking-bot-detection`
+  - `4.9` → `04.9-gap-closure-uniqueness-hardening`
+  - `5` → `05-conversion-tracking-analytics`
+- Result: All W005 warnings resolved
+
+**Problem 3: Roadmap phase dirs missing (W006)**
+- Root cause: ROADMAP.md references phases 4.9.4, 6, 7 but no directories existed
+- Fix: Created placeholder directories:
+  - `04.9.4-gap-closure-uniqueness-hardening/`
+  - `06-admin-dashboard-ui/`
+  - `07-production-hardening/`
+- Result: All W006 warnings resolved
+
+**Problem 4: Stale `.continue-here.md` handoff**
+- Root cause: Handoff file was written during this session saying Task 3 is incomplete, but the code was already completed in a previous session (commit `b4c76970`)
+- Impact: Misleading for future resume — would cause re-work of already-done task
+- Status: Documented here; should be corrected on next resume
+
+**Final health status**: `healthy` — 0 errors, 0 warnings, info-only items (missing SUMMARYs for legacy plans)
 
 ---
-
-## 🚀 What's Next
-
-**Immediate Next Step:** Run `/plan 1` to begin Phase 1 execution.
-
-**Phase 1 Focus:**
-- Scaffolding the Go project structure (`/cmd`, `/internal`, etc.).
-- Setting up the Docker Compose environment (PostgreSQL, Valkey, ClickHouse).
-- Implementing the core Level 1 Click Pipeline (Stages 1-6, 9, 20, 23).
-- Integrating MaxMind GeoLite2 and `device-detector`.
-
----
-
-## 🐛 Detailed Debug Log (Architecture Pivot)
-
-**Context:** During the transition from the Next.js prototype to the Go architecture, several critical assumptions were evaluated and corrected based on deep source code inspection.
-
-1. **The "22-Stage Pipeline" Myth:**
-   - *Initial Assumption:* The Keitaro pipeline was a single 22-stage flow.
-   - *Verification:* Inspected `Traffic/Pipeline/Pipeline.php`.
-   - *Correction:* The pipeline consists of **two distinct levels**. Level 1 handles Campaign clicks (23 stages), and Level 2 handles Landing-to-Offer clicks (13 stages), linked by a `visitor_code` cookie. `SPEC.md` was updated.
-
-2. **The Role of Redis (Valkey):**
-   - *Initial Assumption:* Redis was just for rate-limiting and user sessions.
-   - *Verification:* Analyzed `CommandQueue/QueueStorage/RedisStorage.php` and `CachedData/Storage/RedisStorage.php`.
-   - *Correction:* Redis is the core of Keitaro's performance. MySQL is *never* hit on the hot path. Configs are pre-loaded into Redis, and incoming clicks are buffered in Redis (`RPUSH`) before a cron worker flushes them to the DB. We replaced Redis with Valkey 8 for licensing reasons, but the architectural pattern is identical.
-
-3. **HTTP Framework: Fiber vs. Chi:**
-   - *Initial Assumption:* Fiber should be used because synthetic benchmarks show it's the fastest.
-   - *Verification:* Researched 2026 benchmarks and evaluated the impact of `fasthttp` (used by Fiber).
-   - *Correction:* Fiber breaks compatibility with the vast `net/http` middleware ecosystem. Furthermore, in a DB-bound (Postgres/Valkey) and I/O-bound (GeoIP) system, the ~50µs routing advantage of Fiber is statistically invisible. Switched to Chi v5 for a robust, standards-compliant foundation.
-
-4. **The ORM Trap:**
-   - *Initial Assumption:* GORM should be used for database interactions.
-   - *Verification:* Keitaro uses raw ADODB SQL. GORM introduces heavy reflection overhead and N+1 query risks.
-   - *Correction:* Adopted `sqlc` + `pgx` to generate compile-time type-safe Go code from plain `.sql` files, guaranteeing zero reflection overhead on the critical path.
-
-5. **Next.js vs. Vite + React:**
-   - *Initial Assumption:* A Next.js App Router (static export) is the best choice for the admin UI.
-   - *Verification:* Next.js static exports strip out Server Components and API routes, leaving behind unnecessary framework bloat for a pure SPA.
-   - *Correction:* Switched to Vite + React 19 + shadcn/ui. This provides lightning-fast HMR during development and compiles into a clean static bundle that can be seamlessly embedded into the Go binary via `//go:embed`.
-
-**Git State:** All documentation and architectural updates are synchronized and cleanly committed to the `main` branch.
+*This file tracks project state across sessions. Update on each significant milestone.*

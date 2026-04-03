@@ -18,6 +18,7 @@ Core application business logic organized by domain. Contains HTTP handlers, mod
 | `admin/` | Admin UI handlers and repositories (see `admin/AGENTS.md`) |
 | `auth/` | Authentication middleware |
 | `binding/` | Request binding and validation |
+| `botdb/` | Bot detection IP/UA store (see `botdb/AGENTS.md`) |
 | `cache/` | Caching layer |
 | `config/` | Configuration management |
 | `cookie/` | Cookie handling |
@@ -28,6 +29,7 @@ Core application business logic organized by domain. Contains HTTP handlers, mod
 | `macro/` | Macro substitution |
 | `metrics/` | Prometheus metrics |
 | `pipeline/` | Processing pipeline stages |
+| `ratelimit/` | Redis-based rate limiting (see `ratelimit/AGENTS.md`) |
 | `rotator/` | URL rotation |
 | `session/` | Session management |
 | `valkey/` | Redis/Valkey client |
