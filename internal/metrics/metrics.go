@@ -90,6 +90,34 @@ var (
 		[]string{"table"}, // "clicks" or "conversions"
 	)
 
+	ConvQueueDepth = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "skyplix_conv_queue_depth",
+			Help: "Current number of conversions in the channel buffer.",
+		},
+	)
+
+	CacheHitsTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "skyplix_cache_hits_total",
+			Help: "Total number of cache hits.",
+		},
+	)
+
+	CacheMissesTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "skyplix_cache_misses_total",
+			Help: "Total number of cache misses.",
+		},
+	)
+
+	CHWriteErrorsTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "skyplix_ch_write_errors_total",
+			Help: "Total number of ClickHouse write errors.",
+		},
+	)
+
 	// Cache Metrics
 	CacheOperationsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{

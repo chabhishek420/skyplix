@@ -7,17 +7,66 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/config"
 	"github.com/skyplix/zai-tds/internal/server"
 )
 
-const version = "0.1.0"
+var (
+	version  = "1.0.0"
+	cfgPath  string
+	mysqlDSN string
+	pgDSN    string
+)
 
 func main() {
-	// Load configuration
-	cfgPath := "config.yaml"
+	rootCmd := &cobra.Command{
+		Use:   "skyplix",
+		Short: "SkyPlix TDS - High Performance Traffic Delivery System",
+		Run:   runServer,
+	}
+
+	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "path to config file")
+
+	serveCmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start the TDS server",
+		Run:   runServer,
+	}
+
+	migrateCmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Migrate data from external sources",
+	}
+
+	keitaroCmd := &cobra.Command{
+		Use:   "keitaro",
+		Short: "Migrate from Keitaro MySQL database",
+		Run:   runKeitaroMigration,
+	}
+	keitaroCmd.Flags().StringVar(&mysqlDSN, "mysql", "", "Keitaro MySQL DSN (user:pass@tcp(host:port)/db)")
+	keitaroCmd.Flags().StringVar(&pgDSN, "postgres", "", "SkyPlix Postgres DSN")
+
+	migrateCmd.AddCommand(keitaroCmd)
+	rootCmd.AddCommand(serveCmd, migrateCmd, versionCmd)
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of SkyPlix",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("SkyPlix TDS v%s\n", version)
+	},
+}
+
+func runServer(cmd *cobra.Command, args []string) {
 	if v := os.Getenv("CONFIG_PATH"); v != "" {
 		cfgPath = v
 	}
@@ -28,30 +77,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize logger
 	logger, err := newLogger(cfg.System.Debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FATAL: logger init: %v\n", err)
 		os.Exit(1)
 	}
-	defer logger.Sync() //nolint:errcheck
+	defer logger.Sync()
 
-	logger.Info("ZAI TDS starting",
+	logger.Info("SkyPlix TDS starting",
 		zap.String("version", version),
 		zap.String("addr", cfg.Addr()),
-		zap.Bool("debug", cfg.System.Debug),
 	)
 
-	// Log configuration warnings
-	for _, warning := range cfg.Warnings() {
-		logger.Warn("config warning", zap.String("issue", warning))
-	}
-
-	// Context with OS signal cancellation for graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Build and run server
 	srv, err := server.New(cfg, logger, version)
 	if err != nil {
 		logger.Fatal("server init failed", zap.Error(err))
@@ -61,8 +101,11 @@ func main() {
 		logger.Error("server exited with error", zap.Error(err))
 		os.Exit(1)
 	}
+}
 
-	logger.Info("ZAI TDS shutdown complete")
+func runKeitaroMigration(cmd *cobra.Command, args []string) {
+	fmt.Println("Keitaro migration not fully implemented in this binary yet.")
+	fmt.Println("Please use 'go run scripts/migrate_keitaro.go' for now.")
 }
 
 func newLogger(debug bool) (*zap.Logger, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"github.com/skyplix/zai-tds/internal/metrics"
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
@@ -204,6 +205,7 @@ func (c *Cache) GetCampaignByAlias(ctx context.Context, alias string) (*model.Ca
 func (c *Cache) GetCampaignByID(ctx context.Context, id uuid.UUID) (*model.Campaign, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("campaign:%s", id)).Result()
 	if err == redis.Nil {
+		metrics.CacheMissesTotal.Inc()
 		// Fallback to DB
 		var camp model.Campaign
 		err := c.db.QueryRow(ctx, `
@@ -224,6 +226,7 @@ func (c *Cache) GetCampaignByID(ctx context.Context, id uuid.UUID) (*model.Campa
 		return nil, err
 	}
 
+	metrics.CacheHitsTotal.Inc()
 	var camp model.Campaign
 	if err := json.Unmarshal([]byte(val), &camp); err != nil {
 		return nil, err
@@ -235,6 +238,7 @@ func (c *Cache) GetCampaignByID(ctx context.Context, id uuid.UUID) (*model.Campa
 func (c *Cache) GetStreamsByCampaign(ctx context.Context, campaignID uuid.UUID) ([]model.Stream, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("streams:%s", campaignID)).Result()
 	if err == redis.Nil {
+		metrics.CacheMissesTotal.Inc()
 		// Should have been warmed up, but fallback just in case
 		rows, err := c.db.Query(ctx, `
 			SELECT id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
@@ -257,6 +261,7 @@ func (c *Cache) GetStreamsByCampaign(ctx context.Context, campaignID uuid.UUID) 
 		return nil, err
 	}
 
+	metrics.CacheHitsTotal.Inc()
 	var streams []model.Stream
 	if err := json.Unmarshal([]byte(val), &streams); err != nil {
 		return nil, err

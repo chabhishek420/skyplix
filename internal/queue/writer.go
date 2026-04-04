@@ -226,6 +226,7 @@ func (w *Writer) Run(ctx context.Context) error {
 			}
 
 		case record := <-w.convChan:
+			metrics.ConvQueueDepth.Set(float64(len(w.convChan)))
 			convBatch = append(convBatch, record)
 			if len(convBatch) >= 1000 {
 				w.flushConversions(convBatch)
@@ -288,6 +289,7 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 	if err != nil {
 		w.Logger.Error("clickhouse prepare batch failed", zap.Error(err))
 		metrics.ClickHouseFlushesTotal.WithLabelValues("clicks", "error").Inc()
+		metrics.CHWriteErrorsTotal.Inc()
 		return
 	}
 
@@ -352,6 +354,7 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 			zap.Int("records", len(records)),
 		)
 		metrics.ClickHouseFlushesTotal.WithLabelValues("clicks", "error").Inc()
+		metrics.CHWriteErrorsTotal.Inc()
 		return
 	}
 
@@ -374,6 +377,7 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 	if err != nil {
 		w.Logger.Error("clickhouse prepare conversions batch failed", zap.Error(err))
 		metrics.ClickHouseFlushesTotal.WithLabelValues("conversions", "error").Inc()
+		metrics.CHWriteErrorsTotal.Inc()
 		return
 	}
 
@@ -415,6 +419,7 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 			zap.Int("records", len(records)),
 		)
 		metrics.ClickHouseFlushesTotal.WithLabelValues("conversions", "error").Inc()
+		metrics.CHWriteErrorsTotal.Inc()
 		return
 	}
 
