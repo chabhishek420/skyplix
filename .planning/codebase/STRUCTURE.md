@@ -6,9 +6,10 @@
 
 ```
 [zai-yt-keitaro]/
-├── admin-ui/              # (stub) admin UI area (no implementation files currently)
+├── admin-ui/              # React-based Admin Dashboard (Vite, TypeScript, Tailwind)
 ├── cmd/                   # Go entrypoints/binaries
-│   └── zai-tds/            # Main server binary
+│   ├── zai-tds/            # Main server binary
+│   └── migrate-ch/         # ClickHouse migration runner
 ├── data/                  # Local data assets (GeoIP DB files expected under `data/geoip/`)
 ├── db/                    # SQL schema/migrations
 ├── docs/                  # Project documentation
@@ -28,12 +29,15 @@
 
 **cmd/:**
 - Purpose: executable entry points.
-- Key files: `cmd/zai-tds/main.go`
+- Key files:
+  - `cmd/zai-tds/main.go` — Main TDS application
+  - `cmd/migrate-ch/main.go` — ClickHouse migration utility
 
 **internal/:**
 - Purpose: application logic grouped by domain.
 - Key subdirectories (examples):
   - `internal/server/` — HTTP server wiring + routes
+  - `internal/analytics/` — ClickHouse reporting engine
   - `internal/pipeline/` — pipeline engine
   - `internal/pipeline/stage/` — pipeline stages (click processing)
   - `internal/admin/` — admin middleware + handler layer

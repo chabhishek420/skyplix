@@ -10,6 +10,7 @@
 | PostgreSQL | 16-alpine | Primary entity storage |
 | Valkey | 8-alpine | Cache, sessions, binding, hit limits |
 | ClickHouse | 24-alpine | Click analytics (OLAP) |
+| Prometheus | latest | Built-in observability |
 | Docker Compose | v2 | Local development orchestration |
 
 ## Production Dependencies
@@ -49,7 +50,7 @@
 | 005 | (ALTER) | Add daily_limit/total_limit to streams, api_key to users |
 | 006 | `settings` | Key-value config store, default settings |
 
-### ClickHouse — 5 Migrations
+### ClickHouse — 8 Migrations
 
 | Migration | Table | Engine | Purpose |
 |-----------|-------|--------|---------|
@@ -57,15 +58,17 @@
 | 002 | `conversions` | MergeTree | Postback conversion tracking |
 | 003 | `clicks` | MergeTree | Optimized schema and column types |
 | 004 | `conversions` | MergeTree | Expanded attribution fields |
-| 005 | `stats_views` | MaterializedView | Pre-aggregated statistics |
+| 005 | `stats_views` | SummingMergeTree | Hourly/Daily pre-aggregated statistics |
+| 007 | `stats_views` | SummingMergeTree | Upgraded MVs with LowCardinality columns |
+| 008 | `clicks` | (ALTER) | Added bot_reason column to click logs |
 
 ## Codebase Metrics
 
 | Metric | Value |
 |--------|-------|
-| Go source files (`internal/`) | ~82 |
-| Lines of Go code (`internal/`) | ~7,200 |
-| Internal packages | 25 |
+| Go source files (`internal/`) | ~86 |
+| Lines of Go code (`internal/`) | ~8,100 |
+| Internal packages | 26 |
 | Pipeline stages | 25 (24 L1 + 1 L2-specific) |
 | Filter types | 27+ |
 | Action types | 19 |
