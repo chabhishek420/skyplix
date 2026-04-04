@@ -62,18 +62,25 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-all group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <stat.icon className="w-5 h-5 text-primary" />
+          <div key={i} className={`bg-card border-t-[3px] border-b border-l border-r border-border p-5 rounded-lg shadow-sm hover:shadow transition-all group ${
+            stat.label === 'Total Clicks' ? 'border-t-blue-500' :
+            stat.label === 'Conversions' ? 'border-t-emerald-500' :
+            stat.label === 'Revenue' ? 'border-t-emerald-400' :
+            'border-t-slate-400'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">{stat.label}</h3>
+              <div className="w-8 h-8 rounded-md bg-slate-50 flex items-center justify-center border border-slate-100 group-hover:scale-110 transition-transform">
+                <stat.icon className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
               </div>
-              <div className={`flex items-center space-x-1 text-sm font-medium ${stat.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                {stat.isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="text-2xl font-bold tracking-tight text-foreground">{stat.value}</div>
+              <div className={`flex items-center space-x-1 text-[11px] font-semibold mb-1 ${stat.isPositive ? 'text-emerald-600' : 'text-rose-500'}`}>
+                {stat.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                 <span>{stat.trend}</span>
               </div>
             </div>
-            <h3 className="text-muted-foreground font-medium text-sm mb-1">{stat.label}</h3>
-            <div className="text-3xl font-bold tracking-tight text-card-foreground">{stat.value}</div>
           </div>
         ))}
       </div>
@@ -86,23 +93,23 @@ export function Dashboard() {
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorConvs" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="entity_name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
+                <XAxis dataKey="entity_name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '4px', fontSize: '12px' }}
                   itemStyle={{ color: 'hsl(var(--foreground))' }}
                 />
-                <Area type="monotone" dataKey="clicks" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#colorClicks)" />
-                <Area type="monotone" dataKey="conversions" stroke="hsl(var(--accent))" strokeWidth={2} fillOpacity={1} fill="url(#colorConvs)" />
+                <Area type="monotone" dataKey="clicks" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorClicks)" />
+                <Area type="monotone" dataKey="conversions" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorConvs)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -113,16 +120,16 @@ export function Dashboard() {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="entity_name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                <XAxis dataKey="entity_name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.2 }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '4px', fontSize: '12px' }}
+                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.1 }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
-                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={20} />
-                <Bar dataKey="cost" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} barSize={20} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
+                <Bar dataKey="revenue" fill="#10b981" radius={[2, 2, 0, 0]} barSize={16} />
+                <Bar dataKey="cost" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
