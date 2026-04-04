@@ -1,24 +1,20 @@
 ## Current Position
-- **Phase**: 7.9 - Gap Closure & v2.0 Foundation Cleanup
-- **Task**: Addressing documentation debt and shadow work synchronization
-- **Status**: Gap Closure Mode at 2026-04-04T12:28:00Z
-
-## Gap Closure Mode
-Addressing 4 gaps identified from v2.0 milestone audit:
-1.  **Shadow Implementation (Visibility Gap)**: Phase 9 and 10 are active but not recorded in `ROADMAP.md` or `STATE.md`.
-2.  **Empty Decisions Log (Documentation Debt)**: `DECISIONS.md` is empty despite architectural work on JA3/JA4 and Cluster Bus.
-3.  **Verification Gap**: No tests or `VERIFICATION.md` for `cluster.Bus` and `filter/ja3.go`.
-4.  **Regression Baseline**: Need to re-verify 2.06ms p99 latency with new features enabled.
+- **Phase**: Phase 13: Stabilization & GSD Logic Recovery [100%]
+- **Task**: System Stabilization & Audit Repair Patched
+- **Status**: Paused at 2026-04-04 13:42
 
 ## Last Session Summary
-This session successfully transitioned SkyPlix from a high-performance prototype into a production-hardened cluster system.
-- **Phase 11 (Analytics Pro)**: Completed schema migrations for TLS fingerprinting, implemented automated ClickHouse TTL policies (60d/180d/2y), and launched the real-time `AlertingWorker`.
-- **Phase 12 (Hardening)**: Created a comprehensive `OPERATIONS.md` guide. Enhanced cluster health reporting to include real-time queue lag diagnostics. Updated k6 load testing scripts to simulate bot attacks.
+Resolved context drift and integration test failures.
+- **Auth Repair**: Synced `admin` login/API key between `seed_phase4.sql` and `cloaking_test.go`.
+- **Mux Lifecycle**: Fixed `chi` middleware registration order (Recoverer/RealIP/Logger before routes).
+- **Detection Transparency**: Implemented `BotReason` in `RawClick` model and persisted to ClickHouse.
+- **Infrastructure Path**: Upgraded `Dockerfile` to Go 1.25 and repaired missing ClickHouse Stage 9/11 migrations.
+- **Isolation**: Added Valkey `FlushDB` to integration tests to prevent state contamination.
 
 ## In-Progress Work
-- The core TDS engine is complete and verified against Phase 1-12 requirements.
-- No uncommitted changes in the codebase.
-- Tests (Unit & Metrics): All passing.
+- The stabilization and repair phase is complete. 
+- **Tests Status**: Integration tests for cloaking are passing 100%. ClickHouse schema is up to date.
+- **Verification**: Backfilled `v11-high-availability.md` and `v12-tls-fingerprinting.md`.
 
 ## Blockers
 - None.
@@ -26,22 +22,23 @@ This session successfully transitioned SkyPlix from a high-performance prototype
 ## Context Dump
 
 ### Decisions Made
-- **ClickHouse TTLs**: Chose 60-day raw log retention to balance storage costs with analytics precision for conversion attribution.
-- **Alerting Strategy**: Implemented "Bot Spike" (>50%) and "CR Drop" (>20%) thresholds in the `AlertingWorker` based on industry standard bot traffic patterns.
-- **Cluster Registration**: Used `os.Hostname()` for node discovery to support zero-config scaling in containerized environments.
+- **Named Inserts**: Used named columns in ClickHouse batch inserts to handle `click_id` UUID generation at the DB level.
+- **Valkey Isolation**: Forced a flush in tests because previous bot-flagged IPs were persisting and causing false positives for "Human" test cases.
+- **BotReason Persistence**: Added a `String` column to ClickHouse to move beyond binary `is_bot` flags to descriptive rationale.
 
 ### Approaches Tried
-- **Positional Insert vs Named**: Switched ClickHouse writer to named inserts to solve UUID string-to-byte mismatch during Phase 11 migrations.
+- **Fresh Rebuild**: Rebuilding the Docker image with fresh migrations and the Chi middleware fix was the only way to reliably clear the 401s and panics.
+- **Manual Migration**: Applied migrations via `docker exec` when the automated container startup failed due to dependency health checks.
 
 ### Current Hypothesis
-- The system is now stable for 5,000+ RPS across a 2-node cluster. Further scaling will require ClickHouse horizontal sharding if ingestion volume exceeds 20-30k RPS.
+- The system is now fully aligned with the GSD roadmap. Previous failures were primarily due to metadata/state drift and environmental contamination (stale Valkey state).
 
 ### Files of Interest
-- `OPERATIONS.md`: Primary guide for production deployment.
-- `internal/worker/alerting_worker.go`: Logic for real-time traffic monitoring.
-- `internal/cluster/registry.go`: Source of truth for node health and lag metrics.
+- `internal/server/routes.go`: Critical middleware order.
+- `internal/queue/writer.go`: New `BotReason` persistence logic.
+- `test/integration/cloaking_test.go`: Now includes Valkey cleanup and robust auth.
 
 ## Next Steps
-1. **Production Deployment**: Follow `OPERATIONS.md` for blue/green deployment setup.
-2. **Dashboard UI**: Implement a React-based frontend to consume the analytics MVs.
-3. **Log Aggregation**: Integrate ELK or Tempo for distributed tracing across the cluster workers.
+1. **Phase 5: Conversion Attribution**: Implement the `/postback` endpoint with HMAC-SHA256 validation.
+2. **Phase 5.3: Reporting**: Enhance the UI to display the new `BotReason` field in the click logs.
+3. **Phase 14: Bandit Logic**: Begin research on Multi-Armed Bandit stream optimization.

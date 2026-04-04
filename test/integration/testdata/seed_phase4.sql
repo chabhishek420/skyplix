@@ -4,10 +4,10 @@
 -- Stream 2: Bot (DEFAULT), Filter {IsBot: true}, Action: ShowHtml (safe-page-v1)
 
 DELETE FROM campaigns WHERE alias = 'cloaked-test';
-DELETE FROM users WHERE login = 'test-admin';
+DELETE FROM users WHERE login = 'admin' OR login = 'test-admin';
 
 INSERT INTO users (id, login, password_hash, role, state, api_key)
-VALUES ('eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee', 'test-admin', 'not-used', 'admin', 'active', 'test-api-key-32-chars-long-exactly-!!')
+VALUES ('eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee', 'admin', 'not-used', 'admin', 'active', 'test-api-key-32-chars-long-exactly-!!')
 ON CONFLICT (id) DO UPDATE SET api_key = EXCLUDED.api_key;
 
 

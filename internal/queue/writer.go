@@ -49,6 +49,10 @@ type ClickRecord struct {
 	Payout           float64
 	ActionType       string
 	ClickToken       string
+	JA3              string
+	JA4              string
+	TLSHost          string
+	BotReason        string
 }
 
 // ConversionRecord is the serialized form of a Conversion, ready for ClickHouse batch INSERT.
@@ -94,6 +98,10 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 		Payout:         rc.Payout,
 		ActionType:     rc.ActionType,
 		ClickToken:     rc.ClickToken,
+		JA3:            rc.JA3,
+		JA4:            rc.JA4,
+		TLSHost:        rc.TLSHost,
+		BotReason:      rc.BotReason,
 	}
 
 	if rc.IsBot {
@@ -195,6 +203,11 @@ func (w *Writer) ConvChan() chan<- ConversionRecord {
 	return w.convChan
 }
 
+// Stats returns the current number of records waiting in the queues.
+func (w *Writer) Stats() (int, int) {
+	return len(w.clickChan), len(w.convChan)
+}
+
 // Run starts the batch writer loop. Blocks until ctx is cancelled.
 func (w *Writer) Run(ctx context.Context) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -271,7 +284,7 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 		 browser, browser_version, user_agent, referrer,
 		 is_bot, is_unique_global, is_unique_campaign, is_unique_stream,
 		 sub_id_1, sub_id_2, sub_id_3, sub_id_4, sub_id_5,
-		 cost, payout, action_type, click_token)`)
+		 cost, payout, action_type, click_token, ja3, ja4, tls_host, bot_reason)`)
 	if err != nil {
 		w.Logger.Error("clickhouse prepare batch failed", zap.Error(err))
 		metrics.ClickHouseFlushesTotal.WithLabelValues("clicks", "error").Inc()
@@ -324,6 +337,10 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 			decimal.NewFromFloat(r.Payout),
 			r.ActionType,
 			r.ClickToken,
+			r.JA3,
+			r.JA4,
+			r.TLSHost,
+			r.BotReason,
 		); err != nil {
 			w.Logger.Error("batch append failed", zap.Error(err), zap.String("token", r.ClickToken))
 		}

@@ -19,14 +19,14 @@ import (
 // routes wires all HTTP routes and returns the handler.
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
-
-	// Expose Prometheus metrics endpoint before any logging or recovering middleware
-	// so that standard scrape requests don't fill up application logs.
-	r.Handle("/metrics", promhttp.Handler())
-
+	
+	// Middlewares must be defined before any routes are registered
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
 	r.Use(s.requestLogger())
+
+	// Expose Prometheus metrics endpoint
+	r.Handle("/metrics", promhttp.Handler())
 
 	// Public Administrative routes
 	r.Get("/api/v1/health", s.handleHealth)
@@ -147,6 +147,8 @@ func (s *Server) routes() http.Handler {
 		r.Get("/settings", s.adminHandler.HandleGetSettings)
 		r.Put("/settings", s.adminHandler.HandleUpdateSettings)
 
+		r.Get("/cluster/nodes", s.adminHandler.ListClusterNodes)
+
 		if s.reportsHandler != nil {
 			r.Get("/reports", s.reportsHandler.HandleReport)
 			r.Route("/logs", func(r chi.Router) {
@@ -257,8 +259,9 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 
 	if payload.RawClick != nil && payload.Campaign != nil {
 		l.Info("click processed",
-			zap.String("campaign", payload.Campaign.Name),
 			zap.String("token", payload.RawClick.ClickToken),
+			zap.Bool("is_bot", payload.RawClick.IsBot),
+			zap.String("bot_reason", payload.RawClick.BotReason),
 			zap.Duration("latency", elapsed),
 		)
 	}

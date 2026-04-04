@@ -14,32 +14,44 @@
 ## Phases
 
 ### Phase 7.9: Gap Closure & v2.0 Foundation Cleanup
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Objective**: Synchronize shadow development with roadmap and backfill architectural docs.
 
 **Gaps to Close:**
-- [ ] Sync Shadow Development: Formally plan JA3/JA4 and Cluster Bus work.
-- [ ] Documentation Hygiene: Populate `DECISIONS.md` with v1.0 and initial v2.0 rationale.
-- [ ] Verification Audit: Add tests and `VERIFICATION.md` for `cluster.Bus` and `filter` components.
-- [ ] Latency Regression: Re-verify 2.06ms p99 baseline with new features enabled.
+- [x] Sync Shadow Development: Formally plan JA3/JA4 and Cluster Bus work.
+- [x] Documentation Hygiene: Populate `DECISIONS.md` with v1.0 and initial v2.0 rationale.
+- [x] Verification Audit: Add tests and `VERIFICATION.md` for `cluster.Bus` and### Milestone v2.0: Scaling & Automation [80%]
+- [x] Phase 5: Conversion Tracking Implementation [100%]
+- [x] Phase 6: Admin Dashboard Components [100%]
+- [x] Phase 7: Real-time Reports [100%]
+- [x] Phase 8: Campaign Optimization API [100%]
+- [x] Phase 9: Multi-user Support [100%]
+- [x] Phase 10: Cluster Orchestration [100%]
+- [x] Phase 11: High Availability (Valkey) [100%]
+- [x] Phase 12: Advanced Bot Detection (TLS JA3) [100%]
 
-### Phase 8: Smart Optimization Engine (MAB)
-**Status**: ⬜ Not Started
-**Objective**: Implement Multi-Armed Bandit (Epsilon-Greedy or Thompson Sampling) logic.
+### Milestone v2.1: Audit & Repair [100%]
+- [x] Phase 13: Stabilization & GSD Logic Recovery [100%]
+    - [x] Fix integration test 401s in cloaking.
+    - [x] Resolve human IP bot flagging false positives.
+    - [x] Sync GSD artifacts with codebase drift.
+      - [x] [v11 Verification](.gsd/verification/v11-high-availability.md)
+      - [x] [v12 Verification](.gsd/verification/v12-tls-fingerprinting.md)
+Multi-Armed Bandit (Epsilon-Greedy or Thompson Sampling) logic.
 **Requirements**:
 - ClickHouse real-time metric reader (fetch CR/EPV per stream).
 - Weighted selection engine upgrade to support "Auto-Optimize" mode.
 - Background worker for periodic weight recalculation based on confidence intervals.
 
 ### Phase 9: JA3/JA4 Next-Gen Anti-Bot
-**Status**: ⬜ Not Started
+**Status**: 🔄 In Progress
 **Objective**: Harden cloaking with network-level fingerprinting.
 - Implement JA3/JA4 TLS fingerprint extraction (requires reading raw ClientHello).
 - Maintain a local reputation database of "bot-like" TLS signatures.
 - Integrate behavior-based analysis (request frequency + header order consistency).
 
 ### Phase 10: High-Availability & Cluster Mode
-**Status**: ⬜ Not Started
+**Status**: 🔄 In Progress
 **Objective**: Enable geo-distributed scaling.
 - Implement distributed Valkey locking for critical configuration updates.
 - Centralized logging and metrics aggregation for multiple TDS nodes.

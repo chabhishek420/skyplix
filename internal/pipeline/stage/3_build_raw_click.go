@@ -86,24 +86,26 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	}
 
 	// --- Inline Bot Detection (ADR-008) ---
-	rc.IsBot = s.detectBot(rc.IP, rc.UserAgent)
+	isBot, reason := s.detectBot(rc.IP, rc.UserAgent)
+	rc.IsBot = isBot
+	rc.BotReason = reason
 
 	return nil
 }
 
 // detectBot runs the basic bot detection checks inline.
-// Returns true if any check triggers.
-func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
+// Returns (true, reason) if any check triggers.
+func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	// 1. Empty User-Agent
 	if strings.TrimSpace(ua) == "" {
-		return true
+		return true, "empty_ua"
 	}
 
 	// 2. Known bot UA patterns (case-insensitive substring match)
 	uaLower := strings.ToLower(ua)
 	for _, pattern := range botUAPatterns {
 		if strings.Contains(uaLower, pattern) {
-			return true
+			return true, fmt.Sprintf("ua_pattern:%s", pattern)
 		}
 	}
 
@@ -111,7 +113,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 	if ip != nil {
 		for _, prefix := range botIPPrefixes {
 			if prefix.Contains(ip) {
-				return true
+				return true, fmt.Sprintf("ip_prefix:%s", prefix.String())
 			}
 		}
 	}
@@ -119,7 +121,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 	// 4. Advanced bot IP database (Phase 4 upgrade)
 	if s.BotDB != nil && ip != nil {
 		if s.BotDB.Contains(ip) {
-			return true
+			return true, "bot_db_ip"
 		}
 	}
 
@@ -128,7 +130,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 		customPatterns := s.CustomUA.Patterns()
 		for _, pattern := range customPatterns {
 			if strings.Contains(uaLower, pattern) {
-				return true
+				return true, fmt.Sprintf("custom_ua:%s", pattern)
 			}
 		}
 	}
@@ -136,7 +138,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 	// 6. Datacenter/VPN heuristic check (Phase 4 upgrade)
 	if s.Geo != nil && ip != nil {
 		if s.Geo.IsDatacenter(ip) {
-			return true
+			return true, "datacenter_asn"
 		}
 	}
 
@@ -158,14 +160,14 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) bool {
 		allowed, _, err := s.RateLimiter.CheckIPLimit(ctx, ip, limit, window)
 		if err != nil {
 			// Fail open on rate limiting error
-			return false
+			return false, ""
 		}
 		if !allowed {
-			return true // Flag as bot if rate limited
+			return true, "rate_limited"
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 // extractRealIP extracts the real client IP from the request.

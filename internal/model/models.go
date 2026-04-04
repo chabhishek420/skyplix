@@ -48,8 +48,9 @@ type RawClick struct {
 	Language string
 
 	// --- Bot detection (populated in stage 3) ---
-	IsBot   bool
-	IsProxy bool
+	IsBot     bool
+	BotReason string
+	IsProxy   bool
 
 	// --- Uniqueness flags (populated in stages 8+10) ---
 	IsUniqueGlobal   bool
@@ -67,6 +68,11 @@ type RawClick struct {
 	Cost   float64
 	Payout float64
 
+	// --- Phase 9: TLS Fingerprinting ---
+	JA3      string
+	JA4      string
+	TLSHost  string
+
 	// --- Action result ---
 	ActionType string
 
@@ -77,14 +83,17 @@ type RawClick struct {
 // Campaign represents a traffic campaign entity.
 // Mirrors Keitaro's Campaign model including 3-tier stream selection fields.
 type Campaign struct {
-	ID              uuid.UUID
-	Alias           string
-	Name            string
-	Type            CampaignType // POSITION or WEIGHT
-	BindVisitors    bool
-	State           string
-	TrafficSourceID *uuid.UUID
-	DefaultStreamID *uuid.UUID
+	ID                     uuid.UUID
+	Alias                  string
+	Name                   string
+	Type                   CampaignType // POSITION or WEIGHT
+	BindVisitors           bool
+	IsOptimizationEnabled  bool
+	OptimizationMetric     string // 'CR' or 'EPC'
+	OptimizationPeriodHours uint
+	State                  string
+	TrafficSourceID        *uuid.UUID
+	DefaultStreamID        *uuid.UUID
 }
 
 // CampaignType controls stream selection mode (POSITION = sequential, WEIGHT = weighted random).

@@ -15,6 +15,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/redis/go-redis/v9"
 )
 
 // TestCloaking validates the full Phase 4 cloaking and bot detection system.
@@ -25,6 +26,7 @@ import (
 func TestCloaking(t *testing.T) {
 	postgresDSN := getEnv("POSTGRES_DSN", getEnv("DATABASE_URL", "postgres://zai:zai_dev_pass@localhost:5432/zai_tds?sslmode=disable"))
 	clickhouseAddr := getEnv("CLICKHOUSE_URL", "localhost:9000")
+	valkeyAddr := getEnv("VALKEY_URL", "localhost:6379")
 	serverAddr := getEnv("SERVER_ADDR", "localhost:8080")
 	apiKey := getEnv("ADMIN_API_KEY", "")
 
@@ -38,8 +40,9 @@ func TestCloaking(t *testing.T) {
 	defer pgConn.Close(ctx)
 
 	if apiKey == "" {
-		if err := pgConn.QueryRow(ctx, "SELECT api_key FROM users WHERE login = 'admin'").Scan(&apiKey); err != nil {
-			t.Fatalf("load admin api key from postgres: %v", err)
+		err = pgConn.QueryRow(ctx, "SELECT api_key FROM users WHERE (login = $1 OR login = 'admin') AND state = 'active' LIMIT 1", "test-admin").Scan(&apiKey)
+		if err != nil {
+			t.Fatalf("failed to get api key from db: %v", err)
 		}
 	}
 
@@ -53,6 +56,20 @@ func TestCloaking(t *testing.T) {
 		t.Fatalf("clickhouse connect: %v", err)
 	}
 	defer chConn.Close()
+
+	fmt.Println("connecting to valkey...")
+	rdb := redis.NewClient(&redis.Options{
+		Addr: valkeyAddr,
+	})
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		t.Fatalf("valkey connect: %v", err)
+	}
+	defer rdb.Close()
+
+	fmt.Println("cleaning up valkey...")
+	if err := rdb.FlushDB(ctx).Err(); err != nil {
+		t.Fatalf("valkey flush: %v", err)
+	}
 
 	fmt.Println("waiting for server...")
 	if err := waitForServer(serverAddr, 5*time.Second); err != nil {
