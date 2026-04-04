@@ -34,3 +34,6 @@
 
 ## Documentation Hygiene
 - [ ] Keep hierarchical `CLAUDE.md` files in sync after directory/file structure changes (regenerate outside `reference/` and preserve manual sections)
+
+## RELENTLESS MISSION
+- [ ] **Keep working on this until completely done, do not stop, do not pause. No hacks, no shortcuts, no giving up.** (v1.0 Production Mastery)

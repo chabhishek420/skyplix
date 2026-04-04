@@ -20,6 +20,7 @@ var (
 	cfgPath  string
 	mysqlDSN string
 	pgDSN    string
+	dryRun   bool
 )
 
 func main() {
@@ -49,6 +50,7 @@ func main() {
 	}
 	keitaroCmd.Flags().StringVar(&mysqlDSN, "mysql", "", "Keitaro MySQL DSN (user:pass@tcp(host:port)/db)")
 	keitaroCmd.Flags().StringVar(&pgDSN, "postgres", "", "SkyPlix Postgres DSN")
+	keitaroCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print plan without writing to database")
 
 	migrateCmd.AddCommand(keitaroCmd)
 	rootCmd.AddCommand(serveCmd, migrateCmd, versionCmd)
@@ -111,7 +113,7 @@ func runKeitaroMigration(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err := migrate.RunKeitaro(mysqlDSN, pgDSN); err != nil {
+	if err := migrate.RunKeitaro(mysqlDSN, pgDSN, dryRun); err != nil {
 		fmt.Fprintf(os.Stderr, "Migration failed: %v\n", err)
 		os.Exit(1)
 	}

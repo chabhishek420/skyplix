@@ -19,8 +19,12 @@ type LegacyCampaign struct {
 	State string
 }
 
-func RunKeitaro(mysqlDSN, pgDSN string) error {
-	log.Printf("Starting Keitaro to SkyPlix Migration...")
+func RunKeitaro(mysqlDSN, pgDSN string, dryRun bool) error {
+	if dryRun {
+		log.Printf("[DRY RUN] Starting Keitaro to SkyPlix Migration (no changes will be written)...")
+	} else {
+		log.Printf("Starting Keitaro to SkyPlix Migration...")
+	}
 
 	// Connect to MySQL (Keitaro)
 	mysqlDB, err := sql.Open("mysql", mysqlDSN)
@@ -71,17 +75,21 @@ func RunKeitaro(mysqlDSN, pgDSN string) error {
 				status = "inactive"
 			}
 
-			_, err = pgPool.Exec(context.Background(), `
-			INSERT INTO campaigns (id, name, alias, state, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, NOW(), NOW())
-			ON CONFLICT (alias) DO NOTHING
-			`, newID, c.Name, c.Alias, status)
+			if !dryRun {
+				_, err = pgPool.Exec(context.Background(), `
+				INSERT INTO campaigns (id, name, alias, state, created_at, updated_at)
+				VALUES ($1, $2, $3, $4, NOW(), NOW())
+				ON CONFLICT (alias) DO NOTHING
+				`, newID, c.Name, c.Alias, status)
 
-			if err != nil {
-				log.Printf("Failed to insert campaign %s: %v", c.Name, err)
+				if err != nil {
+					log.Printf("Failed to insert campaign %s: %v", c.Name, err)
+					continue
+				}
 			} else {
-				migrated++
+				log.Printf("[DRY RUN] Would migrate campaign: %s (%s)", c.Name, c.Alias)
 			}
+			migrated++
 		}
 		log.Printf("Successfully migrated %d campaigns.", migrated)
 	}
