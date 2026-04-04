@@ -7,15 +7,21 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/admin"
+	"github.com/skyplix/zai-tds/internal/metrics"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
 // routes wires all HTTP routes and returns the handler.
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
+
+	// Expose Prometheus metrics endpoint before any logging or recovering middleware
+	// so that standard scrape requests don't fill up application logs.
+	r.Handle("/metrics", promhttp.Handler())
 
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
@@ -191,11 +197,21 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(payload.AbortCode)
 	}
 
+	elapsed := time.Since(start)
+	if payload.RawClick != nil {
+		metrics.ClicksTotal.Inc()
+		if payload.RawClick.IsBot {
+			metrics.ClicksBotTotal.Inc()
+		}
+	}
+	metrics.PipelineDuration.WithLabelValues("L1").Observe(elapsed.Seconds())
+	metrics.HTTPRequestDuration.WithLabelValues("GET", r.URL.Path).Observe(elapsed.Seconds())
+
 	if payload.RawClick != nil && payload.Campaign != nil {
 		l.Info("click processed",
 			zap.String("campaign", payload.Campaign.Name),
 			zap.String("token", payload.RawClick.ClickToken),
-			zap.Duration("latency", time.Since(start)),
+			zap.Duration("latency", elapsed),
 		)
 	}
 }
@@ -218,10 +234,20 @@ func (s *Server) handleClickL2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	elapsed := time.Since(start)
+	if payload.RawClick != nil {
+		metrics.ClicksTotal.Inc()
+		if payload.RawClick.IsBot {
+			metrics.ClicksBotTotal.Inc()
+		}
+	}
+	metrics.PipelineDuration.WithLabelValues("L2").Observe(elapsed.Seconds())
+	metrics.HTTPRequestDuration.WithLabelValues("GET", r.URL.Path).Observe(elapsed.Seconds())
+
 	if payload.RawClick != nil {
 		s.logger.Info("L2 click processed",
 			zap.String("token", payload.RawClick.ClickToken),
-			zap.Duration("latency", time.Since(start)),
+			zap.Duration("latency", elapsed),
 		)
 	}
 }

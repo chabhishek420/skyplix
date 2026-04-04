@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
+	"github.com/skyplix/zai-tds/internal/metrics"
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
@@ -219,6 +220,9 @@ func (w *Writer) Run(ctx context.Context) error {
 			}
 
 		case <-ticker.C:
+			metrics.ClickHouseChannelDepth.WithLabelValues("clicks").Set(float64(len(w.clickChan)))
+			metrics.ClickHouseChannelDepth.WithLabelValues("conversions").Set(float64(len(w.convChan)))
+			
 			if len(clickBatch) > 0 {
 				w.flushClicks(clickBatch)
 				clickBatch = clickBatch[:0]
@@ -255,6 +259,7 @@ func (w *Writer) Run(ctx context.Context) error {
 
 // flushClicks performs the actual ClickHouse batch INSERT for clicks.
 func (w *Writer) flushClicks(records []ClickRecord) {
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -269,6 +274,7 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 		 cost, payout, action_type, click_token)`)
 	if err != nil {
 		w.Logger.Error("clickhouse prepare batch failed", zap.Error(err))
+		metrics.ClickHouseFlushesTotal.WithLabelValues("clicks", "error").Inc()
 		return
 	}
 
@@ -328,14 +334,20 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 			zap.Error(err),
 			zap.Int("records", len(records)),
 		)
+		metrics.ClickHouseFlushesTotal.WithLabelValues("clicks", "error").Inc()
 		return
 	}
+
+	metrics.ClickHouseFlushesTotal.WithLabelValues("clicks", "success").Inc()
+	metrics.ClickHouseFlushDuration.Observe(time.Since(start).Seconds())
+	metrics.ClickHouseBatchSize.Observe(float64(len(records)))
 
 	w.Logger.Info("clicks flushed to ClickHouse", zap.Int("count", len(records)))
 }
 
 // flushConversions performs the actual ClickHouse batch INSERT for conversions.
 func (w *Writer) flushConversions(records []ConversionRecord) {
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -344,6 +356,7 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 		 affiliate_network_id, source_id, country_code, status, payout, revenue, external_id)`)
 	if err != nil {
 		w.Logger.Error("clickhouse prepare conversions batch failed", zap.Error(err))
+		metrics.ClickHouseFlushesTotal.WithLabelValues("conversions", "error").Inc()
 		return
 	}
 
@@ -384,8 +397,13 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 			zap.Error(err),
 			zap.Int("records", len(records)),
 		)
+		metrics.ClickHouseFlushesTotal.WithLabelValues("conversions", "error").Inc()
 		return
 	}
+
+	metrics.ClickHouseFlushesTotal.WithLabelValues("conversions", "success").Inc()
+	metrics.ClickHouseFlushDuration.Observe(time.Since(start).Seconds())
+	metrics.ClickHouseBatchSize.Observe(float64(len(records)))
 
 	w.Logger.Info("conversions flushed to ClickHouse", zap.Int("count", len(records)))
 }

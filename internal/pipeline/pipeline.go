@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/skyplix/zai-tds/internal/metrics"
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
@@ -82,7 +84,11 @@ func (p *Pipeline) Run(payload *Payload) error {
 			if payload.Abort && !stage.AlwaysRun() {
 				continue
 			}
-			if err := stage.Process(payload); err != nil {
+			startStage := time.Now()
+			err := stage.Process(payload)
+			metrics.PipelineStagesDuration.WithLabelValues(stage.Name()).Observe(time.Since(startStage).Seconds())
+			
+			if err != nil {
 				return fmt.Errorf("stage %s: %w", stage.Name(), err)
 			}
 		}
