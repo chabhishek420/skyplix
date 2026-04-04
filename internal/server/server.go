@@ -43,6 +43,7 @@ type Server struct {
 	cfg             *config.Config
 	logger          *zap.Logger
 	version         string
+	startTime       time.Time
 	http            *http.Server
 	db              *pgxpool.Pool
 	valkey          *redis.Client
@@ -76,10 +77,11 @@ type Server struct {
 // New constructs a Server, connects to all databases, initializes workers.
 func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error) {
 	s := &Server{
-		cfg:     cfg,
-		logger:  logger,
-		version: version,
-		device:  device.New(),
+		cfg:       cfg,
+		logger:    logger,
+		version:   version,
+		startTime: time.Now(),
+		device:    device.New(),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

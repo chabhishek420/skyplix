@@ -42,6 +42,11 @@ func main() {
 		zap.Bool("debug", cfg.System.Debug),
 	)
 
+	// Log configuration warnings
+	for _, warning := range cfg.Warnings() {
+		logger.Warn("config warning", zap.String("issue", warning))
+	}
+
 	// Context with OS signal cancellation for graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

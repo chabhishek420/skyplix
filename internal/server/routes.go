@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -29,6 +30,7 @@ func (s *Server) routes() http.Handler {
 
 	// Public Administrative routes
 	r.Get("/api/v1/health", s.handleHealth)
+	r.Get("/api/v1/ready", s.handleReady)
 
 	// Public postback endpoint (Phase 5.2)
 	r.Get("/postback/{key}", s.postbackHandler.HandlePostback)
@@ -168,9 +170,55 @@ func (s *Server) routes() http.Handler {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status":  "ok",
 		"version": s.version,
+		"uptime":  time.Since(s.startTime).String(),
+	})
+}
+
+func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	status := "ok"
+	statusCode := http.StatusOK
+	deps := map[string]string{
+		"postgres": "ok",
+		"valkey":   "ok",
+	}
+
+	if err := s.db.Ping(ctx); err != nil {
+		deps["postgres"] = err.Error()
+		status = "degraded"
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	if err := s.valkey.Ping(ctx).Err(); err != nil {
+		deps["valkey"] = err.Error()
+		status = "degraded"
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	if s.chReader != nil {
+		if err := s.chReader.Ping(ctx); err != nil {
+			deps["clickhouse"] = err.Error()
+		} else {
+			deps["clickhouse"] = "ok"
+		}
+	} else if s.cfg.ClickHouse.Addr != "" && s.chWriter != nil {
+		deps["clickhouse"] = "ok (writer only)"
+	} else {
+		deps["clickhouse"] = "skipped"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":       status,
+		"version":      s.version,
+		"uptime":       time.Since(s.startTime).String(),
+		"dependencies": deps,
 	})
 }
 

@@ -132,6 +132,9 @@ func defaults() *Config {
 }
 
 func (c *Config) validate() error {
+	if c.Server.Port < 1 || c.Server.Port > 65535 {
+		return fmt.Errorf("server.port must be between 1 and 65535, got %d", c.Server.Port)
+	}
 	if c.Postgres.DSN == "" {
 		return fmt.Errorf("postgres.dsn is required (or set DATABASE_URL env var)")
 	}
@@ -143,5 +146,31 @@ func (c *Config) validate() error {
 			return fmt.Errorf("system.salt must be set to a secure value in production")
 		}
 	}
+	if c.System.RateLimitPerIP < 1 {
+		return fmt.Errorf("system.rate_limit_per_ip must be >= 1, got %d", c.System.RateLimitPerIP)
+	}
+	if c.System.RateLimitWindow < time.Second {
+		return fmt.Errorf("system.rate_limit_window must be at least 1s, got %v", c.System.RateLimitWindow)
+	}
 	return nil
+}
+
+// Warnings returns a list of non-fatal configuration issues or sub-optimal settings.
+func (c *Config) Warnings() []string {
+	var warnings []string
+
+	if c.System.Debug {
+		warnings = append(warnings, "system.debug is ENABLED (do not use in production)")
+	}
+	if c.System.Salt == "" || c.System.Salt == "change-me-in-production-min-32-chars" {
+		warnings = append(warnings, "system.salt is using default/insecure value (unsafe if debug is disabled)")
+	}
+	if c.ClickHouse.Addr == "" {
+		warnings = append(warnings, "clickhouse.addr is missing; postback analytics and raw click streaming are disabled")
+	}
+	if c.GeoIP.CountryDB == "" || c.GeoIP.CityDB == "" || c.GeoIP.ASNDB == "" {
+		warnings = append(warnings, "geoip databases are not fully configured; geographic reporting will be degraded")
+	}
+
+	return warnings
 }
