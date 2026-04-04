@@ -1,44 +1,81 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Save, ArrowLeft, Layers } from 'lucide-react';
+import { Save, ArrowLeft, Layers, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { StreamEditor } from '@/components/campaigns/stream-editor';
 
 const campaignSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
+  alias: z.string().min(2, 'Alias must be at least 2 characters'),
   state: z.enum(['active', 'disabled']),
-  cost_type: z.enum(['cpa', 'cpc', 'revshare']),
-  cost_value: z.coerce.number().min(0).optional(),
+  type: z.enum(['POSITION', 'WEIGHT']),
 });
 
 type CampaignFormValues = z.infer<typeof campaignSchema>;
 
 export function CampaignEdit() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'general' | 'streams'>('general');
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { data: campaign, isLoading } = useQuery({
+    queryKey: ['campaign', id],
+    queryFn: async () => {
+      if (id === 'new') return null;
+      const res = await api.get(`/campaigns/${id}`);
+      return res.data;
+    },
+    enabled: id !== 'new',
+  });
+
+  const { register, handleSubmit, formState: { errors }, reset } = useForm({
     resolver: zodResolver(campaignSchema),
-    defaultValues: { state: 'active', cost_type: 'cpa' }
+    values: campaign || { state: 'active', type: 'POSITION' }
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: CampaignFormValues) => {
+      if (id === 'new') {
+        return api.post('/campaigns', data);
+      }
+      return api.put(`/campaigns/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      navigate('/campaigns');
+    }
   });
 
   const onSubmit = (data: CampaignFormValues) => {
-    console.log('Save Campaign', data);
-    // API Call here
+    saveMutation.mutate(data);
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors">
+          <button
+            onClick={() => navigate('/campaigns')}
+            className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Edit Campaign</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            {id === 'new' ? 'Create Campaign' : 'Edit Campaign'}
+          </h1>
         </div>
-        <button onClick={handleSubmit(onSubmit)} className="flex items-center space-x-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-md hover:opacity-90 transition-opacity">
-          <Save className="w-4 h-4" />
-          <span>Save Changes</span>
+        <button
+          onClick={handleSubmit(onSubmit)}
+          disabled={saveMutation.isPending}
+          className="flex items-center space-x-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <span>{id === 'new' ? 'Create Campaign' : 'Save Changes'}</span>
         </button>
       </div>
 
@@ -61,14 +98,26 @@ export function CampaignEdit() {
       {activeTab === 'general' ? (
         <div className="bg-card border border-border p-8 rounded-xl shadow-sm max-w-3xl">
           <form className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Campaign Name</label>
-              <input 
-                {...register('name')}
-                placeholder="e.g., US sweepstakes traffic"
-                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-              />
-              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Campaign Name</label>
+                <input
+                  {...register('name')}
+                  placeholder="e.g., US sweepstakes traffic"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                />
+                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Alias</label>
+                <input
+                  {...register('alias')}
+                  placeholder="e.g., us-sweep"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                />
+                {errors.alias && <p className="text-sm text-destructive">{errors.alias.message}</p>}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
@@ -81,23 +130,12 @@ export function CampaignEdit() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Cost Type</label>
-                <select {...register('cost_type')} className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
-                  <option value="cpa">CPA (Cost Per Action)</option>
-                  <option value="cpc">CPC (Cost Per Click)</option>
-                  <option value="revshare">RevShare</option>
+                <label className="text-sm font-medium text-foreground">Rotation Type</label>
+                <select {...register('type')} className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                  <option value="POSITION">Position (Sequential)</option>
+                  <option value="WEIGHT">Weight (Random)</option>
                 </select>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Cost Value ($)</label>
-              <input 
-                type="number"
-                step="0.01"
-                {...register('cost_value')}
-                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-              />
             </div>
           </form>
         </div>

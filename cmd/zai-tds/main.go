@@ -11,7 +11,12 @@ import (
 	"strings"
 	"syscall"
 
+	"database/sql"
+
 	"github.com/ClickHouse/clickhouse-go/v2"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -49,7 +54,15 @@ func main() {
 		Short: "Run ClickHouse migrations",
 		Run:   runMigrateCH,
 	}
-	migrateCmd.AddCommand(migrateCHCmd)
+
+	migrateKeitaroCmd := &cobra.Command{
+		Use:   "keitaro",
+		Short: "Migrate data from Keitaro MySQL",
+		Run:   runMigrateKeitaro,
+	}
+	migrateKeitaroCmd.Flags().String("mysql", "", "MySQL DSN for Keitaro (required)")
+
+	migrateCmd.AddCommand(migrateCHCmd, migrateKeitaroCmd)
 
 	rootCmd.AddCommand(serveCmd, migrateCmd)
 
@@ -90,6 +103,65 @@ func runServe(cmd *cobra.Command, args []string) {
 		logger.Error("server exited with error", zap.Error(err))
 		os.Exit(1)
 	}
+}
+
+func runMigrateKeitaro(cmd *cobra.Command, args []string) {
+	mysqlDSN, _ := cmd.Flags().GetString("mysql")
+	if mysqlDSN == "" {
+		log.Fatal("--mysql DSN is required")
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	log.Println("Starting Keitaro Migration...")
+
+	mysqlDB, err := sql.Open("mysql", mysqlDSN)
+	if err != nil {
+		log.Fatalf("mysql connect error: %v", err)
+	}
+	defer mysqlDB.Close()
+
+	ctx := context.Background()
+	pgPool, err := pgxpool.New(ctx, cfg.Postgres.DSN)
+	if err != nil {
+		log.Fatalf("postgres connect error: %v", err)
+	}
+	defer pgPool.Close()
+
+	rows, err := mysqlDB.Query("SELECT id, name, alias, state FROM campaigns WHERE state != 'deleted'")
+	if err != nil {
+		log.Fatalf("failed to query Keitaro: %v", err)
+	}
+	defer rows.Close()
+
+	migrated := 0
+	for rows.Next() {
+		var id int
+		var name, alias, state string
+		if err := rows.Scan(&id, &name, &alias, &state); err != nil {
+			log.Printf("scan error: %v", err)
+			continue
+		}
+
+		status := "active"
+		if state == "disabled" {
+			status = "inactive"
+		}
+
+		_, err = pgPool.Exec(ctx, `
+			INSERT INTO campaigns (id, name, alias, status, default_action_type, default_action_payload, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, 'redirect', '{}', NOW(), NOW())
+			ON CONFLICT (alias) DO NOTHING
+		`, uuid.New(), name, alias, status)
+
+		if err == nil {
+			migrated++
+		}
+	}
+	log.Printf("Successfully migrated %d campaigns", migrated)
 }
 
 func runMigrateCH(cmd *cobra.Command, args []string) {
@@ -159,12 +231,8 @@ func runMigrateCH(cmd *cobra.Command, args []string) {
 	for _, name := range toApply {
 		log.Printf("Applying: %s", name)
 		content, _ := os.ReadFile(filepath.Join(migrationDir, name))
-		statements := strings.Split(string(content), ";")
+		statements := splitSQLStatements(string(content))
 		for _, stmt := range statements {
-			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
 			if err := conn.Exec(ctx, stmt); err != nil {
 				log.Fatalf("failed in %s: %v\nStmt: %s", name, err, stmt)
 			}
@@ -174,6 +242,48 @@ func runMigrateCH(cmd *cobra.Command, args []string) {
 		conn.Exec(ctx, "INSERT INTO migrations (version, name) VALUES (?, ?)", version, name)
 	}
 	log.Println("Migrations complete")
+}
+
+func splitSQLStatements(sql string) []string {
+	var statements []string
+	var current strings.Builder
+	inString := false
+	var quoteChar rune
+
+	for i, r := range sql {
+		switch r {
+		case '\'', '"', '`':
+			if !inString {
+				inString = true
+				quoteChar = r
+			} else if quoteChar == r {
+				// Check for escaped quote
+				if i > 0 && sql[i-1] != '\\' {
+					inString = false
+				}
+			}
+			current.WriteRune(r)
+		case ';':
+			if !inString {
+				stmt := strings.TrimSpace(current.String())
+				if stmt != "" {
+					statements = append(statements, stmt)
+				}
+				current.Reset()
+			} else {
+				current.WriteRune(r)
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+
+	stmt := strings.TrimSpace(current.String())
+	if stmt != "" {
+		statements = append(statements, stmt)
+	}
+
+	return statements
 }
 
 func newLogger(debug bool) (*zap.Logger, error) {
