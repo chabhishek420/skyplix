@@ -24,10 +24,9 @@ RUN apk --no-cache add ca-certificates tzdata \
     && addgroup -S skyplix && adduser -S skyplix -G skyplix
 WORKDIR /app
 COPY --from=go-builder /app/zai-tds .
-COPY --from=go-builder /app/migrate-ch .
 COPY db/clickhouse/migrations/ ./db/clickhouse/migrations/
 COPY config.yaml .
 RUN chown -R skyplix:skyplix /app
 USER skyplix
 EXPOSE 8080
-CMD ["./zai-tds"]
+CMD ["./zai-tds", "serve"]

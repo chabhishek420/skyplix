@@ -85,6 +85,82 @@ func (h *ReportsHandler) HandleConversionsLog(w http.ResponseWriter, r *http.Req
 	h.respondJSON(w, http.StatusOK, logs)
 }
 
+// HandleCampaignsStats handles stats grouped by campaign.
+// GET /api/v1/stats/campaigns
+func (h *ReportsHandler) HandleCampaignsStats(w http.ResponseWriter, r *http.Request) {
+	query, err := h.parseQuery(r)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	query.GroupBy = []string{"campaign"}
+
+	report, err := h.analytics.GenerateReport(r.Context(), query)
+	if err != nil {
+		h.logger.Error("failed to generate campaign stats", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to generate stats")
+		return
+	}
+	h.respondJSON(w, http.StatusOK, report)
+}
+
+// HandleOffersStats handles stats grouped by offer.
+// GET /api/v1/stats/offers
+func (h *ReportsHandler) HandleOffersStats(w http.ResponseWriter, r *http.Request) {
+	query, err := h.parseQuery(r)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	query.GroupBy = []string{"offer"}
+
+	report, err := h.analytics.GenerateReport(r.Context(), query)
+	if err != nil {
+		h.logger.Error("failed to generate offer stats", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to generate stats")
+		return
+	}
+	h.respondJSON(w, http.StatusOK, report)
+}
+
+// HandleGeoStats handles stats grouped by country.
+// GET /api/v1/stats/geo
+func (h *ReportsHandler) HandleGeoStats(w http.ResponseWriter, r *http.Request) {
+	query, err := h.parseQuery(r)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	query.GroupBy = []string{"country"}
+
+	report, err := h.analytics.GenerateReport(r.Context(), query)
+	if err != nil {
+		h.logger.Error("failed to generate geo stats", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to generate stats")
+		return
+	}
+	h.respondJSON(w, http.StatusOK, report)
+}
+
+// HandleSummaryStats handles overall summary stats.
+// GET /api/v1/stats/summary
+func (h *ReportsHandler) HandleSummaryStats(w http.ResponseWriter, r *http.Request) {
+	query, err := h.parseQuery(r)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	query.GroupBy = nil // Aggregate everything
+
+	report, err := h.analytics.GenerateReport(r.Context(), query)
+	if err != nil {
+		h.logger.Error("failed to generate summary stats", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to generate stats")
+		return
+	}
+	h.respondJSON(w, http.StatusOK, report.Summary)
+}
+
 func (h *ReportsHandler) parseQuery(r *http.Request) (*analytics.ReportQuery, error) {
 	q := r.URL.Query()
 

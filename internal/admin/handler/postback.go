@@ -59,6 +59,8 @@ func NewPostbackHandler(
 	}
 }
 
+// HandlePostback handles public postbacks with a key in the URL.
+// GET/POST /postback/{key}
 func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 	expectedKey, err := h.getPostbackKey(r.Context())
@@ -76,6 +78,17 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	h.processPostback(w, r)
+}
+
+// HandleAdminPostback handles authenticated internal postbacks.
+// POST /api/v1/postback
+func (h *PostbackHandler) HandleAdminPostback(w http.ResponseWriter, r *http.Request) {
+	// Auth is handled by middleware (admin.APIKeyAuth)
+	h.processPostback(w, r)
+}
+
+func (h *PostbackHandler) processPostback(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		h.writeText(w, http.StatusBadRequest, "error: invalid_form")
 		return
@@ -111,6 +124,18 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		r.Form.Get("transaction_id"),
 		r.Form.Get("tid"),
 	)
+
+	// Deduplication (Phase 5.2 hardening)
+	if externalID != "" && h.attribution != nil {
+		isDup, err := h.attribution.IsDuplicate(r.Context(), externalID)
+		if err != nil {
+			h.logger.Warn("deduplication check failed", zap.Error(err), zap.String("txid", externalID))
+		} else if isDup {
+			h.logger.Info("duplicate postback ignored", zap.String("txid", externalID), zap.String("token", token))
+			h.writeText(w, http.StatusOK, "ok (duplicate)")
+			return
+		}
+	}
 
 	attr, err := h.getAttribution(r.Context(), token)
 	if err != nil {

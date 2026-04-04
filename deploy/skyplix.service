@@ -1,0 +1,18 @@
+[Unit]
+Description=SkyPlix TDS Service
+After=network.target postgresql.service clickhouse-server.service valkey.service
+
+[Service]
+Type=simple
+User=skyplix
+Group=skyplix
+WorkingDirectory=/opt/skyplix
+EnvironmentFile=/etc/skyplix/skyplix.env
+ExecStartPre=/opt/skyplix/migrate-ch
+ExecStart=/opt/skyplix/zai-tds
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

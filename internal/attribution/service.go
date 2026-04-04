@@ -64,3 +64,20 @@ func (s *Service) GetClickAttribution(ctx context.Context, token string) (*model
 
 	return &data, nil
 }
+
+// IsDuplicate checks if a transaction ID has already been processed in the last 24h.
+// Returns true if duplicate, false if new.
+func (s *Service) IsDuplicate(ctx context.Context, txid string) (bool, error) {
+	if txid == "" {
+		return false, nil
+	}
+
+	key := fmt.Sprintf("conv:dedup:%s", txid)
+	// SET with NX (Set if Not eXists) and EX (EXpire)
+	ok, err := s.vk.SetNX(ctx, key, "1", 24*time.Hour).Result()
+	if err != nil {
+		return false, fmt.Errorf("check duplicate in valkey: %w", err)
+	}
+
+	return !ok, nil
+}

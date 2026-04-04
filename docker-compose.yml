@@ -52,7 +52,7 @@ services:
   zai-tds-migrate:
     build:
       context: .
-    command: ["./migrate-ch"]
+    command: ["./zai-tds", "migrate", "clickhouse"]
     environment:
       - CLICKHOUSE_URL=clickhouse:9000
     depends_on:
