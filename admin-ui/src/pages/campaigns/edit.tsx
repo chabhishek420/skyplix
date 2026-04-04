@@ -23,7 +23,7 @@ export function CampaignEdit() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'general' | 'streams'>('general');
 
-  const { data: campaign, isLoading } = useQuery({
+  const { data: campaign } = useQuery({
     queryKey: ['campaign', id],
     queryFn: async () => {
       if (id === 'new') return null;
@@ -33,7 +33,7 @@ export function CampaignEdit() {
     enabled: id !== 'new',
   });
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(campaignSchema),
     values: campaign || { state: 'active', type: 'POSITION' }
   });
@@ -106,7 +106,7 @@ export function CampaignEdit() {
                   placeholder="e.g., US sweepstakes traffic"
                   className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                {errors.name && <p className="text-sm text-destructive">{errors.name.message as string}</p>}
               </div>
 
               <div className="space-y-2">
@@ -116,7 +116,7 @@ export function CampaignEdit() {
                   placeholder="e.g., us-sweep"
                   className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 />
-                {errors.alias && <p className="text-sm text-destructive">{errors.alias.message}</p>}
+                {errors.alias && <p className="text-sm text-destructive">{errors.alias.message as string}</p>}
               </div>
             </div>
 

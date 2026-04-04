@@ -30,8 +30,8 @@ var cfgPath string
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "skyplix",
-		Short: "SkyPlix TDS - High Performance Traffic Distribution System",
+		Use:   "zai-tds",
+		Short: "SkyPlix (ZAI) TDS - High Performance Traffic Distribution System",
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "config.yaml", "path to config file")

@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import { Globe, Trash2 } from 'lucide-react';
+import { Globe, Trash2, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 
@@ -39,17 +39,33 @@ const columns: ColumnDef<Domain, any>[] = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: '',
-    cell: () => (
-      <div className="flex justify-end">
-        <button className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Remove Domain">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    ),
+    cell: ({ row }) => <DomainActions domain={row.original} />,
   }),
 ];
 
+function DomainActions({ domain }: { domain: Domain }) {
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/domains/${domain.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['domains'] }),
+  });
+
+  return (
+    <div className="flex justify-end">
+      <button
+        onClick={() => deleteMutation.mutate()}
+        disabled={deleteMutation.isPending}
+        className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md disabled:opacity-50"
+        title="Remove Domain"
+      >
+        {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
 export function Domains() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['domains'],
     queryFn: async () => {
@@ -58,13 +74,21 @@ export function Domains() {
     }
   });
 
+  const createMutation = useMutation({
+    mutationFn: (domain: string) => api.post('/domains', { domain, state: 'active' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['domains'] }),
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PageHeader
         title="Domains"
         description="Attach custom hostnames to campaigns or global routing."
         icon={Globe}
-        onAdd={() => console.log('Add Domain')}
+        onAdd={() => {
+          const domain = prompt('Enter domain (e.g. track.example.com):');
+          if (domain) createMutation.mutate(domain);
+        }}
         addLabel="Add Domain"
       />
       

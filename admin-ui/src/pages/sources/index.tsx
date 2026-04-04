@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import { Activity, LayoutGrid, Trash2, Copy } from 'lucide-react';
+import { Activity, LayoutGrid, Trash2, Copy, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 
@@ -46,29 +46,50 @@ const columns: ColumnDef<TrafficSource, any>[] = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: '',
-    cell: () => (
-      <div className="flex justify-end space-x-1">
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Configure Params">
-          <LayoutGrid className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy Pixel">
-          <Copy className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    ),
+    cell: ({ row }) => <SourceActions source={row.original} />,
   }),
 ];
 
+function SourceActions({ source }: { source: TrafficSource }) {
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/traffic_sources/${source.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sources'] }),
+  });
+
+  return (
+    <div className="flex justify-end space-x-1">
+      <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Configure Params">
+        <LayoutGrid className="w-4 h-4" />
+      </button>
+      <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy Pixel">
+        <Copy className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => deleteMutation.mutate()}
+        disabled={deleteMutation.isPending}
+        className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md disabled:opacity-50"
+        title="Delete"
+      >
+        {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
 export function Sources() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['sources'],
     queryFn: async () => {
-      const res = await api.get('/sources');
+      const res = await api.get('/traffic_sources');
       return res.data;
     }
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (name: string) => api.post('/traffic_sources', { name, state: 'active', params: {} }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sources'] }),
   });
 
   return (
@@ -77,7 +98,10 @@ export function Sources() {
         title="Traffic Sources"
         description="Configure dynamic parameters and postback links for incoming traffic."
         icon={Activity}
-        onAdd={() => console.log('Add Traffic Source')}
+        onAdd={() => {
+          const name = prompt('Enter source name:');
+          if (name) createMutation.mutate(name);
+        }}
         addLabel="Add Source"
       />
       

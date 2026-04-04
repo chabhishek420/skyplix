@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { createColumnHelper } from '@tanstack/react-table';
-import { FileBox, Link as LinkIcon, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { FileBox, Link as LinkIcon, Trash2, Copy, ExternalLink, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 
@@ -38,23 +38,39 @@ const columns = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: '',
-    cell: () => (
-      <div className="flex justify-end space-x-1">
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy URL">
-          <LinkIcon className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Clone">
-          <Copy className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    ),
+    cell: ({ row }) => <LandingActions landing={row.original} />,
   }),
 ];
 
+function LandingActions({ landing }: { landing: Landing }) {
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/landings/${landing.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['landings'] }),
+  });
+
+  return (
+    <div className="flex justify-end space-x-1">
+      <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy URL">
+        <LinkIcon className="w-4 h-4" />
+      </button>
+      <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Clone">
+        <Copy className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => deleteMutation.mutate()}
+        disabled={deleteMutation.isPending}
+        className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md disabled:opacity-50"
+        title="Delete"
+      >
+        {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
 export function Landings() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['landings'],
     queryFn: async () => {
@@ -63,13 +79,21 @@ export function Landings() {
     }
   });
 
+  const createMutation = useMutation({
+    mutationFn: (name: string) => api.post('/landings', { name, url: 'https://example.com', state: 'active' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['landings'] }),
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PageHeader
         title="Landings"
         description="Landing pages for Level 1 → Level 2 click conversion."
         icon={FileBox}
-        onAdd={() => console.log('Add Landing')}
+        onAdd={() => {
+          const name = prompt('Enter landing name:');
+          if (name) createMutation.mutate(name);
+        }}
         addLabel="Create Landing"
       />
       

@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import { Target, Link as LinkIcon, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { Target, Link as LinkIcon, Trash2, Copy, ExternalLink, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
@@ -49,23 +49,39 @@ const columns: ColumnDef<Offer, any>[] = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: () => <div className="text-center">Actions</div>,
-    cell: () => (
-      <div className="flex justify-center space-x-1">
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL">
-          <LinkIcon className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
-          <Copy className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    ),
+    cell: ({ row }) => <OfferActions offer={row.original} />,
   }),
 ];
 
+function OfferActions({ offer }: { offer: Offer }) {
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/offers/${offer.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['offers'] }),
+  });
+
+  return (
+    <div className="flex justify-center space-x-1">
+      <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL">
+        <LinkIcon className="w-3.5 h-3.5" />
+      </button>
+      <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
+        <Copy className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => deleteMutation.mutate()}
+        disabled={deleteMutation.isPending}
+        className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded disabled:opacity-50"
+        title="Delete"
+      >
+        {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  );
+}
+
 export function Offers() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['offers'],
     queryFn: async () => {
@@ -74,13 +90,21 @@ export function Offers() {
     }
   });
 
+  const createMutation = useMutation({
+    mutationFn: (name: string) => api.post('/offers', { name, url: 'https://example.com', state: 'active', payout: 0 }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['offers'] }),
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PageHeader
         title="Offers"
         description="Target destinations for your traffic flows."
         icon={Target}
-        onAdd={() => console.log('Add Offer')}
+        onAdd={() => {
+          const name = prompt('Enter offer name:');
+          if (name) createMutation.mutate(name);
+        }}
         addLabel="Create Offer"
       />
       
