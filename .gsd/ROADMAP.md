@@ -13,6 +13,16 @@
 
 ## Phases
 
+### Phase 7.9: Gap Closure & v2.0 Foundation Cleanup
+**Status**: ⬜ Not Started
+**Objective**: Synchronize shadow development with roadmap and backfill architectural docs.
+
+**Gaps to Close:**
+- [ ] Sync Shadow Development: Formally plan JA3/JA4 and Cluster Bus work.
+- [ ] Documentation Hygiene: Populate `DECISIONS.md` with v1.0 and initial v2.0 rationale.
+- [ ] Verification Audit: Add tests and `VERIFICATION.md` for `cluster.Bus` and `filter` components.
+- [ ] Latency Regression: Re-verify 2.06ms p99 baseline with new features enabled.
+
 ### Phase 8: Smart Optimization Engine (MAB)
 **Status**: ⬜ Not Started
 **Objective**: Implement Multi-Armed Bandit (Epsilon-Greedy or Thompson Sampling) logic.
