@@ -1,0 +1,38 @@
+<!-- Parent: ../CLAUDE.md -->
+<!-- Generated: 2026-04-03 10:25 | Updated: 2026-04-03 10:25 -->
+# research
+
+## Purpose
+Implementation assets for `research` within the repository structure.
+
+## Key Files
+| File | Purpose / Responsibility |
+|------|--------------------------|
+| `JA3_FINGERPRINTING.md` | Project documentation for design decisions, plans, or usage notes. |
+
+## Claude-specific Guidance
+### When Editing Files Here
+- Keep edits scoped to this directory's responsibility; avoid cross-layer changes unless required by compilation or correctness.
+- Follow existing naming and file organization patterns before introducing new abstractions.
+- Avoid broad refactors during bugfixes; prefer surgical, reviewable changes.
+
+### Testing Expectations
+- Run the most local tests first, then expand to broader suites when behavior crosses package boundaries.
+- If behavior affects the click path, verify with integration coverage before considering work complete.
+- Do not ship untested behavior changes; add or update tests when logic changes.
+
+### Common Patterns & Conventions
+- Prefer explicit, composable functions over implicit side effects.
+- Keep control flow easy to audit; avoid hidden mutation and surprising state transitions.
+- Document non-obvious invariants near the code they protect.
+
+### Dependencies - Internal
+- `internal/` packages provide most runtime dependencies for backend code.
+- Use interfaces and package boundaries already present in this subtree before creating new coupling.
+
+### Dependencies - External
+- `go-chi/chi` for routing, `pgx` for PostgreSQL, `go-redis` for Valkey, `clickhouse-go/v2` for analytics writes.
+- `zap` is the standard logger; avoid ad-hoc logging frameworks.
+
+<!-- MANUAL SECTION -->
+<!-- Add project-specific notes, warnings, future plans, etc. below -->

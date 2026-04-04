@@ -7,7 +7,7 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-6">
+    <header className="h-16 border-b border-border bg-card sticky top-0 z-10 flex items-center justify-between px-6">
       <div className="flex items-center space-x-4">
         {/* Breadcrumb or title context could go here */}
       </div>

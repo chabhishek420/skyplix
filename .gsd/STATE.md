@@ -1,24 +1,19 @@
 # GSD State
 
-**Status**: Paused (2026-04-04T04:15:20Z)
+**Status**: Active (resumed 2026-04-04T09:43:19+05:30)
 
 ## Current Position
-- **Phase**: 6 — Admin Dashboard UI (verified)
-- **Task**: Phase 6 Complete
-- **Status**: ✅ All Phase 6 requirements verified and committed.
+- **Phase**: 6 — Admin Dashboard UI (Redesign)
+- **Task**: 6.7 — Theme & Navigation Overhaul
+- **Status**: 🟢 Planning complete, starting "Original Clean White" implementation.
 
 ## Last Session Summary
-Successfully implemented and verified the entire Phase 6: Admin Dashboard UI.
-- **Scaffolding & Embedding**: Created the Vite/React project and wired it to the Go binary via `//go:embed`.
-- **API Integration**: Built a robust Axios-based API client with API Key authentication.
-- **Entity Management**: Completed CRUD interfaces for Campaigns, Streams, Offers, Landings, Affiliate Networks, Traffic Sources, and Domains.
-- **Analytics & Logs**: Developed a real-time dashboard with metrics visualization and raw record log viewers for Clicks and Conversions (integrated with ClickHouse).
-- **Premium UI/UX**: Applied an Indigo-based dark theme with glassmorphism and page transitions for a professional look and feel.
-- **Verification**: Conducted a formal verification of all Phase 6 must-haves, confirming single-binary deployment and feature parity with Keitaro.
+Finalized the "Indigo Dark" baseline and successfully measured a 2.06ms p99 latency in the click pipeline. Now pivoting to the "Original" aesthetic based on user feedback and reference analysis.
 
 ## In-Progress Work
-- **Status**: Clean state. Phase 6 is 100% complete.
-- **Tests**: All build checks and path verifications passed.
+- **Step 6.7**: Redefining Tailwind v4 tokens and reskinning Sidebar/TopBar.
+- **Step 6.8**: Implementing high-density data tables and white card surfaces.
+- **Step 6.9**: Final analytics chart restyling and polish.
 
 ## Decisions Made
 - **Routing**: Chose a centralized `App.tsx` router with nested routes for clean path management.

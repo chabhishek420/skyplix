@@ -47,9 +47,9 @@ const MENU_GROUPS = [
 
 export function Sidebar() {
   return (
-    <aside className="w-64 border-r border-border bg-card/60 backdrop-blur-xl flex flex-col transition-all h-screen sticky top-0 overflow-hidden select-none">
+    <aside className="w-64 border-r border-border bg-card flex flex-col transition-all h-screen sticky top-0 overflow-hidden select-none">
       <div className="p-8 flex items-center space-x-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-sm">
           <ShieldCheck className="w-6 h-6 text-primary-foreground" />
         </div>
         <div>
@@ -68,10 +68,10 @@ export function Sidebar() {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center space-x-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                    `flex items-center space-x-3 px-4 py-2 rounded-md text-[13px] font-medium transition-all group ${
                       isActive
-                        ? 'bg-primary/10 text-primary font-semibold ring-1 ring-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.05)]'
-                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary'
+                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground border-l-2 border-transparent'
                     }`
                   }
                 >
@@ -88,12 +88,12 @@ export function Sidebar() {
         ))}
       </nav>
       
-      <div className="p-6 border-t border-border/50 bg-muted/20 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Settings className="w-3 h-3" />
+      <div className="p-6 border-t border-border bg-muted/20 flex flex-col items-center gap-2">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
+          <Settings className="w-3.5 h-3.5" />
           <span>System Settings</span>
         </div>
-        <div className="text-[10px] text-muted-foreground/40 font-mono">v1.2.0-STABLE</div>
+        <div className="text-[10px] text-muted-foreground/50 font-mono">v1.2.0-STABLE</div>
       </div>
     </aside>
   );
