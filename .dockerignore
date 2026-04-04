@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+node_modules
+admin-ui/node_modules
+*.exe
+*.o
+*.so
+tmp/
+.gsd/
+*.local
+.env*
