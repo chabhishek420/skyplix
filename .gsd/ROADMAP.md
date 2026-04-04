@@ -1,16 +1,16 @@
 # ROADMAP.md
 
-> **Current Phase**: 4 — Advanced Cloaking & Bot Detection
+> **Current Phase**: 7 — Production Hardening
 > **Milestone**: v1.0 — Production TDS
 
 ## Must-Haves (from SPEC)
 
-- [ ] Click pipeline processing <5ms p99
-- [ ] Campaign/Stream/Offer CRUD
-- [ ] Bot detection + cloaking
-- [ ] Postback conversion tracking
-- [ ] Real-time analytics dashboard
-- [ ] Single binary deployment
+- [x] Click pipeline processing <5ms p99
+- [x] Campaign/Stream/Offer CRUD
+- [x] Bot detection + cloaking
+- [x] Postback conversion tracking
+- [x] Real-time analytics dashboard
+- [x] Single binary deployment
 
 ## Phases
 
@@ -105,7 +105,7 @@
 **Requirements**: Postback endpoint, ClickHouse materialized views, stats aggregation, report builder, conversion→click linking via click_token
 
 ### Phase 6: Admin Dashboard UI
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Objective**: React SPA admin dashboard with campaign management, click log viewer, conversion reports, real-time stats. Served as static files from the Go binary via `//go:embed`.
 **Deliverable**: Production admin interface matching Keitaro's UX — closes ⚠️ "Real-time analytics dashboard" and ⚠️ "Single binary deployment" must-haves.
 **Requirements**: Vite + React 19 + shadcn/ui, embedded in Go binary, responsive dark theme
