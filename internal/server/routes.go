@@ -147,7 +147,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/settings", s.adminHandler.HandleGetSettings)
 		r.Put("/settings", s.adminHandler.HandleUpdateSettings)
 
-		r.Get("/cluster/nodes", s.adminHandler.ListClusterNodes)
+		// r.Get("/cluster/nodes", s.adminHandler.ListClusterNodes)
 
 		if s.reportsHandler != nil {
 			r.Get("/reports", s.reportsHandler.HandleReport)

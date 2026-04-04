@@ -64,6 +64,25 @@ type RawClick struct {
 	SubID4 string
 	SubID5 string
 
+	// --- Extended Macros (Phase 19) ---
+	Keyword        string
+	VisitorCode    string
+	ConnectionType string
+	Carrier        string
+	Brand          string
+	ExternalID     string
+	Source         string
+	ExtraParam1    string
+	ExtraParam2    string
+	ExtraParam3    string
+	ExtraParam4    string
+	ExtraParam5    string
+	ExtraParam6    string
+	ExtraParam7    string
+	ExtraParam8    string
+	ExtraParam9    string
+	ExtraParam10   string
+
 	// --- Cost model ---
 	Cost   float64
 	Payout float64

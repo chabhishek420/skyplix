@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -27,6 +27,7 @@ type BuildRawClickStage struct {
 	BotDB       interface{ Contains(net.IP) bool }
 	CustomUA    interface{ Patterns() []string }
 	Geo         interface{ IsDatacenter(net.IP) bool }
+	CIDRFilter  interface{ ContainsIP(netip.Addr) bool }
 	RateLimiter interface {
 		CheckIPLimit(context.Context, net.IP, int, time.Duration) (bool, int64, error)
 	}
@@ -44,8 +45,7 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	}
 	rc := payload.RawClick
 
-	// Extract real IP (respects X-Forwarded-For, X-Real-IP)
-	rc.IP = extractRealIP(r)
+	// IP is now extracted in NormalizeIPStage
 
 	// User Agent
 	rc.UserAgent = r.Header.Get("User-Agent")
@@ -118,6 +118,15 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 		}
 	}
 
+	// 3.5 CIDR Blocklist
+	if s.CIDRFilter != nil && ip != nil {
+		if addr, ok := netip.AddrFromSlice(ip); ok {
+			if s.CIDRFilter.ContainsIP(addr.Unmap()) {
+				return true, "cidr_blocklist"
+			}
+		}
+	}
+
 	// 4. Advanced bot IP database (Phase 4 upgrade)
 	if s.BotDB != nil && ip != nil {
 		if s.BotDB.Contains(ip) {
@@ -168,31 +177,6 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	}
 
 	return false, ""
-}
-
-// extractRealIP extracts the real client IP from the request.
-// Checks X-Forwarded-For, X-Real-IP, then falls back to RemoteAddr.
-func extractRealIP(r *http.Request) net.IP {
-	// X-Forwarded-For may contain multiple IPs (client, proxy1, proxy2...)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		if ip := net.ParseIP(strings.TrimSpace(parts[0])); ip != nil {
-			return ip
-		}
-	}
-
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		if ip := net.ParseIP(strings.TrimSpace(xri)); ip != nil {
-			return ip
-		}
-	}
-
-	// Fall back to RemoteAddr (strip port)
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return net.ParseIP(r.RemoteAddr)
-	}
-	return net.ParseIP(host)
 }
 
 // parseFloat parses a string to float64 and stores result in dest.
