@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"path/filepath"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -62,6 +63,7 @@ type Server struct {
 
 	cache          *cache.Cache
 	filterEngine   *filter.Engine
+	cidrFilter     *filter.CIDRFilter
 	sessionSvc     *session.Service
 	rotator        *rotator.Rotator
 	actionEngine   *action.Engine
@@ -137,6 +139,16 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.cache = cache.New(s.valkey, s.db, logger)
 	s.filterEngine = filter.NewEngine()
 	s.sessionSvc = session.New(s.valkey, logger)
+
+	// CIDR Filter (Phase 19)
+	botsFilePath := filepath.Join("reference", "YellowCloaker", "bases", "bots.txt")
+	cidrF, err := filter.NewCIDRFilterFromFile(botsFilePath)
+	if err != nil {
+		logger.Warn("Failed to load CIDR bots file, using empty filter", zap.Error(err))
+		// Optional: s.cidrFilter = &filter.CIDRFilter{} // will just return false for all Contains
+	} else {
+		s.cidrFilter = cidrF
+	}
 	s.rotator = rotator.New()
 	s.actionEngine = action.NewEngine()
 	s.hitlimitSvc = hitlimit.New(s.valkey, logger)
@@ -203,10 +215,12 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.pipelineL1 = pipeline.New(
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
+		&stage.NormalizeIPStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
 			Geo:          s.geo,
+			CIDRFilter:   s.cidrFilter,
 			RateLimiter:  s.ratelimiter,
 			IPRateLimit:  cfg.System.RateLimitPerIP,
 			IPRateWindow: cfg.System.RateLimitWindow,
@@ -236,10 +250,12 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	)
 
 	s.pipelineL2 = pipeline.New(
+		&stage.NormalizeIPStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
 			Geo:          s.geo,
+			CIDRFilter:   s.cidrFilter,
 			RateLimiter:  s.ratelimiter,
 			IPRateLimit:  cfg.System.RateLimitPerIP,
 			IPRateWindow: cfg.System.RateLimitWindow,
