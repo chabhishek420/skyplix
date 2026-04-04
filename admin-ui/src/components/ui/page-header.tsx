@@ -11,19 +11,19 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, icon: Icon, onAdd, addLabel }: PageHeaderProps) {
   return (
-    <div className="flex justify-between items-center bg-card p-6 border border-border rounded-xl shadow-sm">
-      <div className="flex items-center space-x-3">
-        <div className="p-3 bg-primary/10 rounded-lg">
-          <Icon className="w-6 h-6 text-primary" />
+    <div className="flex justify-between items-end mb-6">
+      <div className="flex items-center space-x-4">
+        <div className="w-12 h-12 rounded bg-white border border-slate-100 flex items-center justify-center whisper-shadow shadow-slate-100">
+          <Icon className="w-6 h-6 text-[#2563eb]" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
-          <p className="text-muted-foreground text-sm">{description}</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{title}</h1>
+          <p className="text-slate-500 text-[13px] font-medium mt-0.5">{description}</p>
         </div>
       </div>
       <button 
         onClick={onAdd}
-        className="flex items-center space-x-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium shadow hover:opacity-90 transition-opacity"
+        className="flex items-center space-x-1.5 bg-[#2563eb] text-white px-5 py-2 rounded text-[13px] font-bold shadow-sm shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
       >
         <Plus className="w-4 h-4" />
         <span>{addLabel}</span>

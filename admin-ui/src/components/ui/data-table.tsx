@@ -25,20 +25,20 @@ export function DataTable<TData>({
   });
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-white border border-[#e2e8f0] rounded whisper-shadow overflow-hidden">
       {isLoading ? (
-        <div className="p-8 text-center text-muted-foreground animate-pulse flex flex-col items-center gap-2">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <span>Loading data...</span>
+        <div className="p-12 text-center text-slate-400 font-medium animate-pulse flex flex-col items-center gap-3">
+          <div className="w-5 h-5 border-2 border-[#2563eb] border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-[13px]">Synchronizing data...</span>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px] text-left">
-            <thead className="bg-muted text-muted-foreground border-b border-border">
+          <table className="w-full text-left">
+            <thead className="bg-[#fcfdfe] border-b border-slate-100">
               {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map(header => (
-                    <th key={header.id} className="px-4 py-2.5 font-medium whitespace-nowrap">
+                    <th key={header.id} className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -50,11 +50,11 @@ export function DataTable<TData>({
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y divide-border">
-              {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="even:bg-slate-50/50 hover:bg-muted/50 transition-colors group">
+            <tbody className="divide-y divide-slate-50/50">
+              {table.getRowModel().rows.map((row, i) => (
+                <tr key={row.id} className={`${i % 2 === 1 ? 'bg-[#fcfdfe]' : ''} hover:bg-slate-50 transition-colors`}>
                   {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-4 py-2 whitespace-nowrap">
+                    <td key={cell.id} className="px-6 py-3.5 whitespace-nowrap border-r border-slate-50/50 last:border-0">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -62,7 +62,7 @@ export function DataTable<TData>({
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={columns.length} className="px-6 py-16 text-center text-slate-400 text-[13px] font-medium">
                     {emptyMessage}
                   </td>
                 </tr>

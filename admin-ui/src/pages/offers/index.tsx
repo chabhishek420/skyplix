@@ -4,6 +4,7 @@ import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Target, Link as LinkIcon, Trash2, Copy, ExternalLink } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
+import { Badge } from '@/components/ui/badge';
 
 type Offer = {
   id: string;
@@ -23,9 +24,9 @@ const columns: ColumnDef<Offer, any>[] = [
     header: 'Offer Name',
     cell: info => (
       <div>
-        <div className="font-medium text-foreground">{info.getValue()}</div>
-        <div className="text-xs text-muted-foreground truncate max-w-[200px] flex items-center gap-1 mt-0.5">
-          <ExternalLink className="w-3 h-3" />
+        <div className="font-bold text-slate-900 tracking-tight">{info.getValue()}</div>
+        <div className="text-[11px] text-slate-400 truncate max-w-[300px] flex items-center gap-1 mt-1 font-medium italic underline decoration-slate-100 underline-offset-2">
+          <ExternalLink className="w-2.5 h-2.5" />
           {info.row.original.url}
         </div>
       </div>
@@ -33,29 +34,31 @@ const columns: ColumnDef<Offer, any>[] = [
   }),
   columnHelper.accessor('payout', {
     header: 'Payout',
-    cell: info => <div className="font-mono text-primary">${info.getValue().toFixed(2)}</div>,
+    cell: info => <div className="font-mono text-emerald-600 font-bold tabular-nums">${info.getValue().toFixed(2)}</div>,
   }),
   columnHelper.accessor('state', {
     header: 'Status',
     cell: info => (
-      <span className={`px-2.5 py-0.5 rounded-md text-[11px] uppercase tracking-wider font-bold border ${info.getValue() === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-muted text-muted-foreground border-border'}`}>
+      <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wide border-0 shadow-none px-2 py-0 h-5 leading-none ${
+        info.getValue() === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+      }`}>
         {info.getValue()}
-      </span>
+      </Badge>
     ),
   }),
   columnHelper.accessor('id', {
     id: 'actions',
-    header: '',
+    header: () => <div className="text-center">Actions</div>,
     cell: () => (
-      <div className="flex justify-end space-x-1">
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy URL">
-          <LinkIcon className="w-4 h-4" />
+      <div className="flex justify-center space-x-1">
+        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL">
+          <LinkIcon className="w-3.5 h-3.5" />
         </button>
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Clone">
-          <Copy className="w-4 h-4" />
+        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
+          <Copy className="w-3.5 h-3.5" />
         </button>
-        <button className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete">
-          <Trash2 className="w-4 h-4" />
+        <button className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete">
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
     ),

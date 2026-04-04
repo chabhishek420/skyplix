@@ -9,7 +9,6 @@ import {
   MonitorOff, 
   FileBox, 
   Globe,
-  Settings,
   ShieldCheck
 } from 'lucide-react';
 
@@ -47,38 +46,38 @@ const MENU_GROUPS = [
 
 export function Sidebar() {
   return (
-    <aside className="w-64 border-r border-border bg-card flex flex-col transition-all h-screen sticky top-0 overflow-hidden select-none">
-      <div className="p-8 flex items-center space-x-3 mb-4">
-        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-          <ShieldCheck className="w-6 h-6 text-primary-foreground" />
+    <aside className="w-64 border-r border-[#e2e8f0] bg-white flex flex-col transition-all h-screen fixed left-0 top-0 z-20 overflow-hidden select-none">
+      <div className="p-6 flex items-center space-x-3 mb-4">
+        <div className="w-9 h-9 rounded bg-[#2563eb] flex items-center justify-center shadow-sm">
+          <ShieldCheck className="w-5 h-5 text-white" />
         </div>
         <div>
-          <span className="font-extrabold text-xl tracking-tight text-foreground block leading-none">SkyPlix</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold text-primary/80">TDS Core</span>
+          <span className="font-extrabold text-xl tracking-tight text-slate-900 block leading-none">SkyPlix</span>
+          <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400 mt-1 block">TDS CORE</span>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 space-y-8 overflow-y-auto pb-8 scrollbar-hide">
+      <nav className="flex-1 space-y-6 overflow-y-auto pb-8 scrollbar-hide">
         {MENU_GROUPS.map((group) => (
           <div key={group.label}>
-            <h3 className="px-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{group.label}</h3>
-            <div className="space-y-1">
+            <h3 className="px-6 mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">{group.label}</h3>
+            <div className="space-y-0.5">
               {group.items.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center space-x-3 px-4 py-2 rounded-md text-[13px] font-medium transition-all group ${
+                    `flex items-center space-x-3 px-6 py-2.5 text-[13px] font-medium transition-all group ${
                       isActive
-                        ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary'
-                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground border-l-2 border-transparent'
+                        ? 'bg-[#f8fafc] text-[#2563eb] font-semibold border-l-2 border-[#2563eb]'
+                        : 'text-slate-500 hover:bg-[#f8fafc] hover:text-slate-900 border-l-2 border-transparent'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <item.icon className={`w-4.5 h-4.5 transition-transform group-hover:scale-110 group-active:scale-95 duration-200 ${isActive ? 'text-primary' : 'opacity-70'}`} />
-                      <span>{item.label}</span>
+                      <item.icon className={`w-4 h-4 transition-transform group-hover:scale-110 duration-200 ${isActive ? 'text-[#2563eb]' : 'text-slate-400'}`} />
+                      <span className="font-inter">{item.label}</span>
                     </>
                   )}
                 </NavLink>
@@ -88,12 +87,11 @@ export function Sidebar() {
         ))}
       </nav>
       
-      <div className="p-6 border-t border-border bg-muted/20 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
-          <Settings className="w-3.5 h-3.5" />
-          <span>System Settings</span>
+      <div className="p-6 border-t border-slate-100 bg-white">
+        <div className="flex items-center gap-2 text-[10px] font-mono font-medium text-slate-400">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span>v1.2.0-STABLE</span>
         </div>
-        <div className="text-[10px] text-muted-foreground/50 font-mono">v1.2.0-STABLE</div>
       </div>
     </aside>
   );

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SkyPlix | Admin Console</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        .tabular-nums {
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9f9ff;
+        }
+        .whisper-shadow {
+            box-shadow: 0 1px 3px rgba(30, 41, 59, 0.04);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "on-secondary": "#ffffff",
+                "secondary-container": "#d0e1fb",
+                "inverse-on-surface": "#ecf1ff",
+                "secondary-fixed-dim": "#b7c8e1",
+                "outline": "#737686",
+                "on-error-container": "#93000a",
+                "tertiary-fixed-dim": "#4edea3",
+                "on-error": "#ffffff",
+                "on-surface-variant": "#434655",
+                "secondary": "#505f76",
+                "on-tertiary-fixed": "#002113",
+                "background": "#f9f9ff",
+                "on-tertiary-fixed-variant": "#005236",
+                "tertiary-fixed": "#6ffbbe",
+                "on-secondary-fixed": "#0b1c30",
+                "surface-dim": "#cfdaf2",
+                "inverse-surface": "#263143",
+                "surface-container": "#e7eeff",
+                "surface-container-lowest": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-surface": "#111c2d",
+                "primary": "#004ac6",
+                "on-background": "#111c2d",
+                "on-tertiary": "#ffffff",
+                "secondary-fixed": "#d3e4fe",
+                "error-container": "#ffdad6",
+                "surface-variant": "#d8e3fb",
+                "surface-container-low": "#f0f3ff",
+                "surface-container-high": "#dee8ff",
+                "primary-container": "#2563eb",
+                "surface": "#f9f9ff",
+                "primary-fixed": "#dbe1ff",
+                "surface-tint": "#0053db",
+                "surface-container-highest": "#d8e3fb",
+                "surface-bright": "#f9f9ff",
+                "on-primary-fixed-variant": "#003ea8",
+                "outline-variant": "#c3c6d7",
+                "primary-fixed-dim": "#b4c5ff",
+                "tertiary": "#006242",
+                "on-primary-container": "#eeefff",
+                "on-secondary-container": "#54647a",
+                "on-primary-fixed": "#00174b",
+                "tertiary-container": "#007d55",
+                "on-tertiary-container": "#bdffdb",
+                "on-secondary-fixed-variant": "#38485d",
+                "inverse-primary": "#b4c5ff",
+                "error": "#ba1a1a"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+              }
+            },
+          }
+        }
+      </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar (Execution from JSON) -->
+<aside class="w-64 h-screen fixed left-0 top-0 border-r border-slate-200 bg-white z-20 flex flex-col py-4">
+<div class="px-6 mb-8">
+<h1 class="text-xl font-extrabold tracking-tight text-slate-900">SkyPlix</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mt-1">Admin Console</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="px-6 py-2">
+<span class="text-[11px] font-bold text-slate-400 tracking-wider uppercase">Main</span>
+</div>
+<!-- Active Navigation Logic: "Dashboard" matches intent -->
+<a class="flex items-center gap-3 px-6 py-2 text-blue-600 font-semibold border-l-2 border-blue-600 bg-slate-50 transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-inter text-[13px]">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2 text-slate-500 hover:bg-slate-50 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span>
+<span class="font-inter text-[13px]">Traffic Analysis</span>
+</a>
+<div class="px-6 py-2 mt-4">
+<span class="text-[11px] font-bold text-slate-400 tracking-wider uppercase">Landers &amp; Offers</span>
+</div>
+<a class="flex items-center gap-3 px-6 py-2 text-slate-500 hover:bg-slate-50 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="campaign">campaign</span>
+<span class="font-inter text-[13px]">Campaigns</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2 text-slate-500 hover:bg-slate-50 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span class="font-inter text-[13px]">Nodes</span>
+</a>
+<div class="px-6 py-2 mt-4">
+<span class="text-[11px] font-bold text-slate-400 tracking-wider uppercase">Settings</span>
+</div>
+<a class="flex items-center gap-3 px-6 py-2 text-slate-500 hover:bg-slate-50 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-inter text-[13px]">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2 text-slate-500 hover:bg-slate-50 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-inter text-[13px]">Reports</span>
+</a>
+</nav>
+<div class="px-6 pt-4 border-t border-slate-100">
+<div class="flex items-center gap-2 text-slate-400">
+<span class="text-[10px] font-mono">v1.2.0-STABLE</span>
+<div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen">
+<!-- TopNavBar (Execution from JSON) -->
+<header class="h-16 w-[calc(100%-16rem)] fixed top-0 border-b border-slate-200 bg-white z-10 flex items-center justify-between px-6">
+<div class="flex items-center gap-2 text-sm">
+<span class="text-slate-400">Admin</span>
+<span class="material-symbols-outlined text-slate-300 scale-75">chevron_right</span>
+<span class="text-slate-900 font-semibold">Dashboard</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined text-slate-500 cursor-pointer hover:text-blue-600 transition-opacity" data-icon="notifications">notifications</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
+</div>
+<div class="h-8 w-8 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="professional corporate headshot of a modern tech executive clean lighting neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRvY4vJWSw1M7ArdjrwODL0uVmXXXoxWeB_Zs1GzW77oGeFOcllD4nu_Vsx5TPOCGmyZl_tdDaow6YeZ5EAggGLJ3QwWKpIxM9NjTnGTgRSj0hYeP_8y6jpIPBFLDuwAIHoO3NKULsPGxtsP5vBwz6y1zZ3fIsw9VmwNOIc1l3QuMKz1hLrqJqPon6pNwjflc9nSV2Cvav8Nwhx4oMOUQDL2BEz1fJfGyqjZHluNLQCAsLAtyBAVVIeTnzPMaa3gX1PHcuTsFnUOU0"/>
+</div>
+<span class="material-symbols-outlined text-slate-500 cursor-pointer" data-icon="account_circle">account_circle</span>
+</div>
+</header>
+<!-- Canvas -->
+<div class="pt-24 px-8 pb-12">
+<!-- KPI Row (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+<!-- Total Clicks -->
+<div class="bg-surface-container-lowest p-5 border-t-2 border-blue-600 whisper-shadow rounded">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Clicks</span>
+<span class="material-symbols-outlined text-blue-500" data-icon="ads_click">ads_click</span>
+</div>
+<div class="tabular-nums text-2xl font-bold text-slate-900">1,284,502</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="text-emerald-600 text-[11px] font-bold">+12.4%</span>
+<span class="text-[11px] text-slate-400">vs last period</span>
+</div>
+</div>
+<!-- Conversions -->
+<div class="bg-surface-container-lowest p-5 border-t-2 border-emerald-500 whisper-shadow rounded">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Conversions</span>
+<span class="material-symbols-outlined text-emerald-500" data-icon="check_circle">check_circle</span>
+</div>
+<div class="tabular-nums text-2xl font-bold text-slate-900">42,903</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="text-emerald-600 text-[11px] font-bold">+5.2%</span>
+<span class="text-[11px] text-slate-400">vs last period</span>
+</div>
+</div>
+<!-- Revenue -->
+<div class="bg-surface-container-lowest p-5 border-t-2 border-emerald-600 whisper-shadow rounded">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Revenue</span>
+<span class="material-symbols-outlined text-emerald-600" data-icon="payments">payments</span>
+</div>
+<div class="tabular-nums text-2xl font-bold text-slate-900">$184,209.00</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="text-emerald-600 text-[11px] font-bold">+8.1%</span>
+<span class="text-[11px] text-slate-400">vs last period</span>
+</div>
+</div>
+<!-- ROI -->
+<div class="bg-surface-container-lowest p-5 border-t-2 border-slate-800 whisper-shadow rounded">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Avg ROI</span>
+<span class="material-symbols-outlined text-slate-800" data-icon="trending_up">trending_up</span>
+</div>
+<div class="tabular-nums text-2xl font-bold text-slate-900">314.2%</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="text-rose-600 text-[11px] font-bold">-1.4%</span>
+<span class="text-[11px] text-slate-400">vs last period</span>
+</div>
+</div>
+</div>
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+<!-- Clicks vs Conversions -->
+<div class="bg-surface-container-lowest p-6 rounded border border-slate-100 whisper-shadow">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-sm font-bold text-slate-800 uppercase tracking-tight">Clicks vs Conversions</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-blue-600"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Clicks</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Conversions</span>
+</div>
+</div>
+</div>
+<!-- Placeholder Visual Representation for High-Density UI -->
+<div class="h-48 flex items-end gap-1.5 pb-2 relative">
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+<div class="border-b border-slate-100 w-full h-0"></div>
+<div class="border-b border-slate-100 w-full h-0"></div>
+<div class="border-b border-slate-100 w-full h-0"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[60%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[40%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[80%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[55%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[45%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[30%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[95%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[65%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[70%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[45%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[55%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[25%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+<div class="flex-1 bg-blue-600/10 hover:bg-blue-600/20 transition-colors h-[85%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full h-[50%] bg-emerald-500/30 rounded-t-sm"></div>
+</div>
+</div>
+<div class="flex justify-between mt-3 px-1">
+<span class="text-[10px] text-slate-400 font-mono">01 MAY</span>
+<span class="text-[10px] text-slate-400 font-mono">03 MAY</span>
+<span class="text-[10px] text-slate-400 font-mono">05 MAY</span>
+<span class="text-[10px] text-slate-400 font-mono">07 MAY</span>
+</div>
+</div>
+<!-- Revenue & Cost Analysis -->
+<div class="bg-surface-container-lowest p-6 rounded border border-slate-100 whisper-shadow">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-sm font-bold text-slate-800 uppercase tracking-tight">Revenue &amp; Cost Analysis</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded bg-emerald-600"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Net Rev</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded bg-amber-500"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Ad Spend</span>
+</div>
+</div>
+</div>
+<div class="h-48 flex items-end gap-4 pb-2">
+<div class="flex-1 flex items-end gap-1">
+<div class="w-full bg-emerald-600 h-[75%] rounded-t-sm"></div>
+<div class="w-full bg-amber-500 h-[30%] rounded-t-sm"></div>
+</div>
+<div class="flex-1 flex items-end gap-1">
+<div class="w-full bg-emerald-600 h-[85%] rounded-t-sm"></div>
+<div class="w-full bg-amber-500 h-[45%] rounded-t-sm"></div>
+</div>
+<div class="flex-1 flex items-end gap-1">
+<div class="w-full bg-emerald-600 h-[65%] rounded-t-sm"></div>
+<div class="w-full bg-amber-500 h-[20%] rounded-t-sm"></div>
+</div>
+<div class="flex-1 flex items-end gap-1">
+<div class="w-full bg-emerald-600 h-[92%] rounded-t-sm"></div>
+<div class="w-full bg-amber-500 h-[50%] rounded-t-sm"></div>
+</div>
+<div class="flex-1 flex items-end gap-1">
+<div class="w-full bg-emerald-600 h-[70%] rounded-t-sm"></div>
+<div class="w-full bg-amber-500 h-[35%] rounded-t-sm"></div>
+</div>
+</div>
+<div class="flex justify-between mt-3 px-1">
+<span class="text-[10px] text-slate-400 font-mono">NORTH AMERICA</span>
+<span class="text-[10px] text-slate-400 font-mono">EUROPE</span>
+<span class="text-[10px] text-slate-400 font-mono">ASIA</span>
+<span class="text-[10px] text-slate-400 font-mono">LATAM</span>
+<span class="text-[10px] text-slate-400 font-mono">APAC</span>
+</div>
+</div>
+</div>
+<!-- Recent Campaigns Table -->
+<div class="bg-surface-container-lowest rounded border border-slate-100 whisper-shadow overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+<h3 class="text-[13px] font-bold text-slate-800 uppercase tracking-tight">Recent Campaigns</h3>
+<button class="text-[11px] font-bold text-blue-600 hover:underline">View All Records</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-slate-50/30">
+<tr>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Campaign Name</th>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">Clicks</th>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">Conv.</th>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">Revenue</th>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">ROI%</th>
+<th class="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-50">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50/50 transition-colors">
+<td class="px-6 py-4 text-[13px] font-medium text-slate-900">US_Tier1_Desktop_Native_v4</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 uppercase tracking-wide">Active</span>
+</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">412,042</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">8,204</td>
+<td class="px-6 py-4 text-[13px] font-semibold text-slate-900 tabular-nums text-right">$12,940.40</td>
+<td class="px-6 py-4 text-[13px] text-emerald-600 font-bold tabular-nums text-right">284.1%</td>
+<td class="px-6 py-4 text-center">
+<button class="text-slate-400 hover:text-blue-600"><span class="material-symbols-outlined">edit_square</span></button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="bg-slate-50/50 hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-[13px] font-medium text-slate-900">EU_Generic_Mobile_Inter_v1</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wide">Paused</span>
+</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">104,221</td>
+<td class="px-12 py-4 text-[13px] text-slate-600 tabular-nums text-right">1,102</td>
+<td class="px-6 py-4 text-[13px] font-semibold text-slate-900 tabular-nums text-right">$4,120.00</td>
+<td class="px-6 py-4 text-[13px] text-slate-500 font-bold tabular-nums text-right">112.5%</td>
+<td class="px-6 py-4 text-center">
+<button class="text-slate-400 hover:text-blue-600"><span class="material-symbols-outlined">edit_square</span></button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50/50 transition-colors">
+<td class="px-6 py-4 text-[13px] font-medium text-slate-900">SEA_Utility_Android_Push_Global</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 uppercase tracking-wide">Active</span>
+</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">892,104</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">24,551</td>
+<td class="px-6 py-4 text-[13px] font-semibold text-slate-900 tabular-nums text-right">$52,901.12</td>
+<td class="px-6 py-4 text-[13px] text-emerald-600 font-bold tabular-nums text-right">412.0%</td>
+<td class="px-6 py-4 text-center">
+<button class="text-slate-400 hover:text-blue-600"><span class="material-symbols-outlined">edit_square</span></button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="bg-slate-50/50 hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-[13px] font-medium text-slate-900">UK_Finance_Search_Lander_A</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 uppercase tracking-wide">Active</span>
+</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">54,093</td>
+<td class="px-6 py-4 text-[13px] text-slate-600 tabular-nums text-right">3,012</td>
+<td class="px-6 py-4 text-[13px] font-semibold text-slate-900 tabular-nums text-right">$8,290.00</td>
+<td class="px-6 py-4 text-[13px] text-emerald-600 font-bold tabular-nums text-right">189.4%</td>
+<td class="px-6 py-4 text-center">
+<button class="text-slate-400 hover:text-blue-600"><span class="material-symbols-outlined">edit_square</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</body></html>

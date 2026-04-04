@@ -1,7 +1,7 @@
 # ROADMAP.md
 
-> **Current Phase**: 7 — Production Hardening
-> **Milestone**: v1.0 — Production TDS
+> **Current Phase**: Milestone v1.0 — Finalized
+> **Milestone**: v1.0 — Production TDS (Complete)
 
 ## Must-Haves (from SPEC)
 
@@ -111,7 +111,7 @@
 **Requirements**: Vite + React 19 + shadcn/ui, embedded in Go binary, responsive dark theme
 
 ### Phase 7: Production Hardening
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Objective**: Production readiness — graceful shutdown, health checks, metrics (Prometheus), structured logging, config validation, Docker image, systemd unit, backup/restore, performance benchmarks, Keitaro→SkyPlix data migration script.
 **Deliverable**: Battle-tested binary ready for live affiliate traffic
 **Requirements**:

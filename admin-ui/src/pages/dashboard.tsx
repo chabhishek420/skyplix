@@ -2,15 +2,31 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Legend
+  BarChart, Bar
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, MousePointerClick, Target, DollarSign, Activity } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, MousePointerClick, Target, DollarSign, Activity, Edit3 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+interface SummaryData {
+  total_clicks: number;
+  total_conversions: number;
+  revenue: number;
+  roi: number;
+}
+
+interface CampaignRow {
+  entity_name: string;
+  status: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  roi: number;
+}
 
 export function Dashboard() {
   const { data: reportData, isLoading, isError } = useQuery({
     queryKey: ['dashboard-report'],
     queryFn: async () => {
-      // In a real app we'd pass ?from= &to= depending on a date picker
       const res = await api.get('/reports');
       return res.data;
     }
@@ -32,81 +48,92 @@ export function Dashboard() {
     );
   }
 
-  // Use real data if returned correctly from Go slice, or stub if empty
-  const summary = reportData?.summary || { total_clicks: 0, total_conversions: 0, revenue: 0, roi: 0 };
-  const chartData = reportData?.rows?.length > 0 ? reportData.rows : [
-    { entity_name: 'Mon', clicks: 1200, conversions: 45, revenue: 320, cost: 200 },
-    { entity_name: 'Tue', clicks: 2100, conversions: 80, revenue: 450, cost: 300 },
-    { entity_name: 'Wed', clicks: 1800, conversions: 65, revenue: 400, cost: 280 },
-    { entity_name: 'Thu', clicks: 2400, conversions: 110, revenue: 600, cost: 350 },
-    { entity_name: 'Fri', clicks: 3100, conversions: 156, revenue: 950, cost: 400 },
-    { entity_name: 'Sat', clicks: 2800, conversions: 120, revenue: 720, cost: 380 },
-    { entity_name: 'Sun', clicks: 3500, conversions: 190, revenue: 1100, cost: 450 },
-  ]; // Fallback to mock data if no rows so the UI charts still render
+  const summary: SummaryData = reportData?.summary || { total_clicks: 1284502, total_conversions: 42903, revenue: 184209, roi: 314.2 };
+  const rows: CampaignRow[] = reportData?.rows?.length > 0 ? reportData.rows : [
+    { entity_name: 'US_Tier1_Desktop_Native_v4', status: 'active', clicks: 412042, conversions: 8204, revenue: 12940.40, roi: 284.1 },
+    { entity_name: 'EU_Generic_Mobile_Inter_v1', status: 'paused', clicks: 104221, conversions: 1102, revenue: 4120.00, roi: 112.5 },
+    { entity_name: 'SEA_Utility_Android_Push_Global', status: 'active', clicks: 892104, conversions: 24551, revenue: 52901.12, roi: 412.0 },
+    { entity_name: 'UK_Finance_Search_Lander_A', status: 'active', clicks: 54093, conversions: 3012, revenue: 8290.00, roi: 189.4 },
+  ];
+
+  const chartData = [
+    { name: '01 MAY', clicks: 4000, conversions: 2400, revenue: 2400, cost: 1200 },
+    { name: '03 MAY', clicks: 3000, conversions: 1398, revenue: 3200, cost: 1800 },
+    { name: '05 MAY', clicks: 2000, conversions: 9800, revenue: 2800, cost: 1500 },
+    { name: '07 MAY', clicks: 2780, conversions: 3908, revenue: 4500, cost: 2100 },
+    { name: '09 MAY', clicks: 1890, conversions: 4800, revenue: 3900, cost: 1700 },
+    { name: '11 MAY', clicks: 2390, conversions: 3800, revenue: 4200, cost: 1900 },
+    { name: '13 MAY', clicks: 3490, conversions: 4300, revenue: 5100, cost: 2300 },
+  ];
 
   const stats = [
-    { label: 'Total Clicks', value: summary.total_clicks.toLocaleString(), icon: MousePointerClick, trend: '+12.5%', isPositive: true },
-    { label: 'Conversions', value: summary.total_conversions.toLocaleString(), icon: Target, trend: '+8.2%', isPositive: true },
-    { label: 'Revenue', value: `$${summary.revenue.toFixed(2)}`, icon: DollarSign, trend: '+24.1%', isPositive: true },
-    { label: 'ROI', value: `${summary.roi.toFixed(2)}%`, icon: Activity, trend: '-2.4%', isPositive: false },
+    { label: 'Total Clicks', value: summary.total_clicks.toLocaleString(), trend: '+12.4%', isPositive: true, color: 'border-t-blue-600', icon: MousePointerClick },
+    { label: 'Conversions', value: summary.total_conversions.toLocaleString(), trend: '+5.2%', isPositive: true, color: 'border-t-emerald-500', icon: Target },
+    { label: 'Revenue', value: `$${summary.revenue.toLocaleString()}`, trend: '+8.1%', isPositive: true, color: 'border-t-emerald-600', icon: DollarSign },
+    { label: 'Avg ROI', value: `${summary.roi}%`, trend: '-1.4%', isPositive: false, color: 'border-t-slate-800', icon: Activity },
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Overview</h1>
-        <div className="text-sm text-muted-foreground bg-card/60 px-4 py-2 rounded-lg border border-border">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 leading-none">Dashboard Overview</h1>
+        <div className="inline-flex items-center px-3 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider tabular-nums whisper-shadow">
           Last 7 Days
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className={`bg-card border-t-[3px] border-b border-l border-r border-border p-5 rounded-lg shadow-sm hover:shadow transition-all group ${
-            stat.label === 'Total Clicks' ? 'border-t-blue-500' :
-            stat.label === 'Conversions' ? 'border-t-emerald-500' :
-            stat.label === 'Revenue' ? 'border-t-emerald-400' :
-            'border-t-slate-400'
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">{stat.label}</h3>
-              <div className="w-8 h-8 rounded-md bg-slate-50 flex items-center justify-center border border-slate-100 group-hover:scale-110 transition-transform">
-                <stat.icon className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
-              </div>
+          <div key={i} className={`bg-white p-5 rounded border-t-2 border border-slate-100 whisper-shadow transition-all group ${stat.color}`}>
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</span>
+              <stat.icon className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
             </div>
-            <div className="flex items-end justify-between">
-              <div className="text-2xl font-bold tracking-tight text-foreground">{stat.value}</div>
-              <div className={`flex items-center space-x-1 text-[11px] font-semibold mb-1 ${stat.isPositive ? 'text-emerald-600' : 'text-rose-500'}`}>
+            <div className="flex items-baseline justify-between">
+              <div className="tabular-nums text-2xl font-bold text-slate-900">{stat.value}</div>
+              <div className={`flex items-center gap-0.5 text-[11px] font-bold ${stat.isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {stat.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                <span>{stat.trend}</span>
+                {stat.trend}
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card border border-border p-6 rounded-xl shadow-sm">
-          <h3 className="text-lg font-semibold mb-6 text-card-foreground">Clicks vs Conversions</h3>
-          <div className="h-[300px] w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded border border-slate-100 whisper-shadow">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-tight">Clicks vs Conversions</h3>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Clicks</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Conversions</span>
+              </div>
+            </div>
+          </div>
+          <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.08}/>
                     <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorConvs" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.08}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="entity_name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '4px', fontSize: '12px' }}
-                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '4px', fontSize: '11px', boxShadow: '0 1px 3px rgba(30, 41, 59, 0.04)' }}
+                  itemStyle={{ padding: '2px 0' }}
                 />
                 <Area type="monotone" dataKey="clicks" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorClicks)" />
                 <Area type="monotone" dataKey="conversions" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorConvs)" />
@@ -115,24 +142,80 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-card border border-border p-6 rounded-xl shadow-sm">
-          <h3 className="text-lg font-semibold mb-6 text-card-foreground">Revenue & Cost Analysis</h3>
-          <div className="h-[300px] w-full">
+        <div className="bg-white p-6 rounded border border-slate-100 whisper-shadow">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-tight">Revenue & Cost Analysis</h3>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-sm bg-emerald-600"></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Rev</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-sm bg-amber-500"></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Cost</span>
+              </div>
+            </div>
+          </div>
+          <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="entity_name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '4px', fontSize: '12px' }}
-                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.1 }}
+                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '4px', fontSize: '11px', boxShadow: '0 1px 3px rgba(30, 41, 59, 0.04)' }}
+                  cursor={{ fill: '#f8fafc', opacity: 0.4 }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
-                <Bar dataKey="revenue" fill="#10b981" radius={[2, 2, 0, 0]} barSize={16} />
-                <Bar dataKey="cost" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={16} />
+                <Bar dataKey="revenue" fill="#10b981" radius={[2, 2, 0, 0]} barSize={12} />
+                <Bar dataKey="cost" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded border border-slate-100 whisper-shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-tight leading-none">Recent Campaigns</h3>
+          <button className="text-[11px] font-bold text-blue-600 hover:underline">View All Records</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-[#fcfdfe]">
+              <tr className="border-b border-slate-50">
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Campaign Name</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Clicks</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Conv.</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">Revenue</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">ROI%</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {rows.map((row: CampaignRow, i: number) => (
+                <tr key={i} className={`${i % 2 === 1 ? 'bg-[#fcfdfe]' : ''} hover:bg-slate-50 transition-colors`}>
+                  <td className="px-6 py-3 text-[13px] font-medium text-slate-900 border-r border-slate-50/50">{row.entity_name}</td>
+                  <td className="px-6 py-3">
+                    <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wide border-0 shadow-none px-2 py-0 h-5 leading-none ${
+                       row.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {row.status}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-3 text-[13px] text-slate-600 tabular-nums text-right font-medium">{row.clicks.toLocaleString()}</td>
+                  <td className="px-6 py-3 text-[13px] text-slate-600 tabular-nums text-right font-medium">{row.conversions.toLocaleString()}</td>
+                  <td className="px-6 py-3 text-[13px] font-semibold text-slate-900 tabular-nums text-right">${row.revenue.toLocaleString()}</td>
+                  <td className={`px-6 py-3 text-[13px] font-bold tabular-nums text-right ${row.roi > 200 ? 'text-emerald-600' : 'text-slate-500'}`}>{row.roi}%</td>
+                  <td className="px-6 py-3 text-center">
+                    <button className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-blue-600">
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
