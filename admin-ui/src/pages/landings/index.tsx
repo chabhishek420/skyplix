@@ -30,7 +30,7 @@ const columns = [
   columnHelper.accessor('state', {
     header: 'Status',
     cell: info => (
-      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${info.getValue() === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-muted text-muted-foreground'}`}>
+      <span className={`px-2.5 py-0.5 rounded-md text-[11px] uppercase tracking-wider font-bold border ${info.getValue() === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-muted text-muted-foreground border-border'}`}>
         {info.getValue()}
       </span>
     ),

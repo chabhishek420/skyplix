@@ -33,12 +33,12 @@ export function DataTable<TData>({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+          <table className="w-full text-[13px] text-left">
+            <thead className="bg-muted text-muted-foreground border-b border-border">
               {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map(header => (
-                    <th key={header.id} className="px-6 py-4 font-medium">
+                    <th key={header.id} className="px-4 py-2.5 font-medium whitespace-nowrap">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -52,9 +52,9 @@ export function DataTable<TData>({
             </thead>
             <tbody className="divide-y divide-border">
               {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="hover:bg-muted/50 transition-colors group">
+                <tr key={row.id} className="even:bg-slate-50/50 hover:bg-muted/50 transition-colors group">
                   {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-6 py-4">
+                    <td key={cell.id} className="px-4 py-2 whitespace-nowrap">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -62,7 +62,7 @@ export function DataTable<TData>({
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={columns.length} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
                     {emptyMessage}
                   </td>
                 </tr>

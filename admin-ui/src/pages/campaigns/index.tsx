@@ -25,7 +25,7 @@ const columns = [
   columnHelper.accessor('state', {
     header: 'Status',
     cell: info => (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${info.getValue() === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-muted text-muted-foreground'}`}>
+      <span className={`px-2.5 py-0.5 rounded-md text-[11px] uppercase tracking-wider font-bold border ${info.getValue() === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-muted text-muted-foreground border-border'}`}>
         {info.getValue()}
       </span>
     ),
@@ -89,12 +89,12 @@ export function Campaigns() {
           <div className="p-8 text-center text-muted-foreground">Loading campaigns...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+            <table className="w-full text-[13px] text-left">
+              <thead className="bg-muted text-muted-foreground border-b border-border">
                 {table.getHeaderGroups().map(headerGroup => (
                   <tr key={headerGroup.id}>
                     {headerGroup.headers.map(header => (
-                      <th key={header.id} className="px-6 py-4 font-medium">
+                      <th key={header.id} className="px-4 py-2.5 font-medium whitespace-nowrap">
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -108,9 +108,9 @@ export function Campaigns() {
               </thead>
               <tbody className="divide-y divide-border">
                 {table.getRowModel().rows.map(row => (
-                  <tr key={row.id} className="hover:bg-muted/50 transition-colors group">
+                  <tr key={row.id} className="even:bg-slate-50/50 hover:bg-muted/50 transition-colors group">
                     {row.getVisibleCells().map(cell => (
-                      <td key={cell.id} className="px-6 py-4">
+                      <td key={cell.id} className="px-4 py-2 whitespace-nowrap">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -118,7 +118,7 @@ export function Campaigns() {
                 ))}
                 {tableData.length === 0 && (
                   <tr>
-                    <td colSpan={columns.length} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
                       No campaigns found. Create your first campaign to get started.
                     </td>
                   </tr>
