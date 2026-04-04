@@ -7,6 +7,7 @@
 package stage
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -44,7 +45,7 @@ func (s *ChooseLandingStage) Process(p *pipeline.Payload) error {
 	// 2. Load and Pick
 	landings, err := s.Cache.GetLandingsByStream(p.Ctx, p.Stream.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("choose landing: %w", err)
 	}
 	if len(landings) == 0 {
 		return nil

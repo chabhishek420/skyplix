@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -21,6 +22,9 @@ func NewCampaignRepository(db DB) *CampaignRepository {
 
 // List returns a paginated list of campaigns.
 func (r *CampaignRepository) List(ctx context.Context, limit, offset int) ([]model.Campaign, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
 		FROM campaigns
@@ -50,6 +54,9 @@ func (r *CampaignRepository) List(ctx context.Context, limit, offset int) ([]mod
 
 // GetByID retrieves a single campaign by uuid.
 func (r *CampaignRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Campaign, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
 	var c model.Campaign
 	err := r.db.QueryRow(ctx, `
 		SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
@@ -67,6 +74,9 @@ func (r *CampaignRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 
 // Create inserts a new campaign.
 func (r *CampaignRepository) Create(ctx context.Context, c *model.Campaign) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if c.ID == uuid.Nil {
 		c.ID = uuid.New()
 	}
@@ -80,6 +90,9 @@ func (r *CampaignRepository) Create(ctx context.Context, c *model.Campaign) erro
 
 // Update modifies an existing campaign.
 func (r *CampaignRepository) Update(ctx context.Context, c *model.Campaign) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	_, err := r.db.Exec(ctx, `
 		UPDATE campaigns
 		SET alias = $2, name = $3, type = $4, bind_visitors = $5, state = $6, 
@@ -91,6 +104,9 @@ func (r *CampaignRepository) Update(ctx context.Context, c *model.Campaign) erro
 
 // Delete archives or deletes a campaign.
 func (r *CampaignRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	_, err := r.db.Exec(ctx, "DELETE FROM campaigns WHERE id = $1", id)
 	return err
 }

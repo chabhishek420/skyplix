@@ -52,7 +52,7 @@ func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
 	lpCtx, err := s.LPToken.Resolve(p.Ctx, token)
 	if err != nil {
 		s.Logger.Error("failed to resolve LP token", zap.Error(err), zap.String("token", token))
-		return err
+		return fmt.Errorf("resolve lp token: %w", err)
 	}
 	if lpCtx == nil {
 		s.Logger.Warn("LP token not found or expired", zap.String("token", token))
@@ -64,11 +64,11 @@ func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
 	// 2. Hydrate campaign and stream
 	camp, err := s.Cache.GetCampaignByID(p.Ctx, lpCtx.CampaignID)
 	if err != nil {
-		return err
+		return fmt.Errorf("get campaign: %w", err)
 	}
 	stream, err := s.Cache.GetStream(p.Ctx, lpCtx.StreamID)
 	if err != nil {
-		return err
+		return fmt.Errorf("get stream: %w", err)
 	}
 
 	if camp == nil || stream == nil {

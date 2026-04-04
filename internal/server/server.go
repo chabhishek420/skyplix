@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/analytics"
 	"github.com/skyplix/zai-tds/internal/attribution"
+	"github.com/skyplix/zai-tds/internal/auth"
 
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/botdb"
@@ -56,6 +58,7 @@ type Server struct {
 	adminHandler    *handler.Handler
 	postbackHandler *handler.PostbackHandler
 	reportsHandler  *handler.ReportsHandler
+	authSvc         *auth.Service
 	botDB           *botdb.ValkeyStore
 
 	uaStore         *botdb.UAStore
@@ -170,6 +173,9 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.uaStore = uaStore
 
 	s.ratelimiter = ratelimit.New(s.valkey, logger)
+
+	// Auth Service (Phase 6)
+	s.authSvc = auth.NewService(s.db, cfg.System.Salt)
 
 	// Admin Handler
 	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
@@ -287,6 +293,28 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 // Handler returns the HTTP handler (multiplexer) for this server.
 func (s *Server) Handler() http.Handler {
 	return s.http.Handler
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		ApiKey string `json:"api_key"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, `{"error": "invalid request"}`, http.StatusBadRequest)
+		return
+	}
+
+	token, err := s.authSvc.Login(r.Context(), payload.ApiKey)
+	if err != nil {
+		http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"token": token,
+	})
 }
 
 // Run starts the HTTP server. Blocks until ctx is cancelled.

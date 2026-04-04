@@ -48,13 +48,21 @@ export function Dashboard() {
     );
   }
 
-  const summary: SummaryData = reportData?.summary || { total_clicks: 1284502, total_conversions: 42903, revenue: 184209, roi: 314.2 };
-  const rows: CampaignRow[] = reportData?.rows?.length > 0 ? reportData.rows : [
-    { entity_name: 'US_Tier1_Desktop_Native_v4', status: 'active', clicks: 412042, conversions: 8204, revenue: 12940.40, roi: 284.1 },
-    { entity_name: 'EU_Generic_Mobile_Inter_v1', status: 'paused', clicks: 104221, conversions: 1102, revenue: 4120.00, roi: 112.5 },
-    { entity_name: 'SEA_Utility_Android_Push_Global', status: 'active', clicks: 892104, conversions: 24551, revenue: 52901.12, roi: 412.0 },
-    { entity_name: 'UK_Finance_Search_Lander_A', status: 'active', clicks: 54093, conversions: 3012, revenue: 8290.00, roi: 189.4 },
-  ];
+  const summary: SummaryData = {
+    total_clicks: reportData?.summary?.clicks || 0,
+    total_conversions: reportData?.summary?.conversions || 0,
+    revenue: reportData?.summary?.revenue || 0,
+    roi: reportData?.summary?.roi || 0,
+  };
+
+  const rows: CampaignRow[] = (reportData?.rows || []).map((row: any) => ({
+    entity_name: row.dimensions.campaign_name || row.dimensions.campaign || 'Unknown',
+    status: 'active',
+    clicks: row.clicks,
+    conversions: row.conversions,
+    revenue: row.revenue,
+    roi: row.roi,
+  }));
 
   const chartData = [
     { name: '01 MAY', clicks: 4000, conversions: 2400, revenue: 2400, cost: 1200 },

@@ -2,7 +2,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Save, ArrowLeft, Layers } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { StreamEditor } from '@/components/campaigns/stream-editor';
 
 const campaignSchema = z.object({
@@ -15,26 +18,64 @@ const campaignSchema = z.object({
 type CampaignFormValues = z.infer<typeof campaignSchema>;
 
 export function CampaignEdit() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'general' | 'streams'>('general');
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { data: campaign, isLoading } = useQuery({
+    queryKey: ['campaign', id],
+    queryFn: async () => {
+      if (!id || id === 'new') return null;
+      const res = await api.get(`/campaigns/${id}`);
+      return res.data;
+    },
+    enabled: !!id && id !== 'new',
+  });
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(campaignSchema),
     defaultValues: { state: 'active', cost_type: 'cpa' }
   });
 
+  useEffect(() => {
+    if (campaign) {
+      reset({
+        name: campaign.name,
+        state: campaign.state,
+        cost_type: campaign.cost_type,
+        cost_value: campaign.cost_value,
+      });
+    }
+  }, [campaign, reset]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: CampaignFormValues) => {
+      if (id && id !== 'new') {
+        return api.put(`/campaigns/${id}`, data);
+      }
+      return api.post('/campaigns', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns-with-stats'] });
+      navigate('/campaigns');
+    },
+  });
+
   const onSubmit = (data: CampaignFormValues) => {
-    console.log('Save Campaign', data);
-    // API Call here
+    saveMutation.mutate(data);
   };
+
+  if (isLoading) return <div className="p-12 text-center">Loading campaign...</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors">
+          <button onClick={() => navigate('/campaigns')} className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Edit Campaign</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{id === 'new' ? 'Create' : 'Edit'} Campaign</h1>
         </div>
         <button onClick={handleSubmit(onSubmit)} className="flex items-center space-x-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-md hover:opacity-90 transition-opacity">
           <Save className="w-4 h-4" />

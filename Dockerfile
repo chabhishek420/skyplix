@@ -19,9 +19,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o zai-tds cmd/zai-tds/main.go
 # Stage 3: Final Production Image
 FROM alpine:3.20
 # Add CA certs for outbound HTTPS requests and TZ data for proper time handling
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata \
+    && addgroup -S skyplix && adduser -S skyplix -G skyplix
+
 WORKDIR /app
 COPY --from=go-builder /app/zai-tds .
 COPY config.yaml .
+
+# Ensure permissions
+RUN chown -R skyplix:skyplix /app
+
+USER skyplix
+
 EXPOSE 8080
 CMD ["./zai-tds"]
