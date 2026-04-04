@@ -46,7 +46,7 @@ func TestGeneratePostbackURL(t *testing.T) {
 func TestReplacePostback(t *testing.T) {
 	data := &macro.PostbackData{
 		ClickToken: "CT123",
-		Payout:     10.5,
+		Payout:     1050,
 		Status:     "sale",
 		ExternalID: "TX987",
 		CampaignID: "CAMP-UUID",

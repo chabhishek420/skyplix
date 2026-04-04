@@ -5,29 +5,29 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
 // OfferRepository handles SQL operations for the offers table.
 type OfferRepository struct {
-	db *pgxpool.Pool
+	db DB
 }
 
 // NewOfferRepository creates a new repository.
-func NewOfferRepository(db *pgxpool.Pool) *OfferRepository {
+func NewOfferRepository(db DB) *OfferRepository {
 	return &OfferRepository{db: db}
 }
 
-// List returns a paginated list of offers.
-func (r *OfferRepository) List(ctx context.Context, limit, offset int) ([]model.Offer, error) {
+// List returns a paginated list of offers for a specific workspace.
+func (r *OfferRepository) List(ctx context.Context, workspaceID uuid.UUID, limit, offset int) ([]model.Offer, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, name, url, affiliate_network_id, payout, state
+		SELECT id, workspace_id, name, url, affiliate_network_id, payout, daily_cap, state, notes, created_at, updated_at
 		FROM offers
+		WHERE workspace_id = $1
 		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`, limit, offset)
+		LIMIT $2 OFFSET $3
+	`, workspaceID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("query offers: %w", err)
 	}
@@ -36,7 +36,10 @@ func (r *OfferRepository) List(ctx context.Context, limit, offset int) ([]model.
 	var offers []model.Offer
 	for rows.Next() {
 		var o model.Offer
-		err := rows.Scan(&o.ID, &o.Name, &o.URL, &o.AffiliateNetworkID, &o.Payout, &o.State)
+		err := rows.Scan(
+			&o.ID, &o.WorkspaceID, &o.Name, &o.URL, &o.AffiliateNetworkID,
+			&o.Payout, &o.DailyCap, &o.State, &o.Notes, &o.CreatedAt, &o.UpdatedAt,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("scan offer: %w", err)
 		}
@@ -46,14 +49,17 @@ func (r *OfferRepository) List(ctx context.Context, limit, offset int) ([]model.
 	return offers, nil
 }
 
-// GetByID retrieves a single offer by uuid.
-func (r *OfferRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Offer, error) {
+// GetByID retrieves a single offer by uuid and workspace.
+func (r *OfferRepository) GetByID(ctx context.Context, id uuid.UUID, workspaceID uuid.UUID) (*model.Offer, error) {
 	var o model.Offer
 	err := r.db.QueryRow(ctx, `
-		SELECT id, name, url, affiliate_network_id, payout, state
+		SELECT id, workspace_id, name, url, affiliate_network_id, payout, daily_cap, state, notes, created_at, updated_at
 		FROM offers
-		WHERE id = $1
-	`, id).Scan(&o.ID, &o.Name, &o.URL, &o.AffiliateNetworkID, &o.Payout, &o.State)
+		WHERE id = $1 AND workspace_id = $2
+	`, id, workspaceID).Scan(
+		&o.ID, &o.WorkspaceID, &o.Name, &o.URL, &o.AffiliateNetworkID,
+		&o.Payout, &o.DailyCap, &o.State, &o.Notes, &o.CreatedAt, &o.UpdatedAt,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get offer: %w", err)
 	}
@@ -67,24 +73,24 @@ func (r *OfferRepository) Create(ctx context.Context, o *model.Offer) error {
 	}
 
 	return r.db.QueryRow(ctx, `
-		INSERT INTO offers (id, name, url, affiliate_network_id, payout, state)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO offers (id, workspace_id, name, url, affiliate_network_id, payout, daily_cap, state, notes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
-	`, o.ID, o.Name, o.URL, o.AffiliateNetworkID, o.Payout, o.State).Scan(&o.ID)
+	`, o.ID, o.WorkspaceID, o.Name, o.URL, o.AffiliateNetworkID, o.Payout, o.DailyCap, o.State, o.Notes).Scan(&o.ID)
 }
 
-// Update modifies an existing offer.
+// Update modifies an existing offer within a workspace.
 func (r *OfferRepository) Update(ctx context.Context, o *model.Offer) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE offers
-		SET name = $2, url = $3, affiliate_network_id = $4, payout = $5, state = $6, updated_at = NOW()
-		WHERE id = $1
-	`, o.ID, o.Name, o.URL, o.AffiliateNetworkID, o.Payout, o.State)
+		SET name = $3, url = $4, affiliate_network_id = $5, payout = $6, daily_cap = $7, state = $8, notes = $9, updated_at = NOW()
+		WHERE id = $1 AND workspace_id = $2
+	`, o.ID, o.WorkspaceID, o.Name, o.URL, o.AffiliateNetworkID, o.Payout, o.DailyCap, o.State, o.Notes)
 	return err
 }
 
-// Delete archives or deletes an offer.
-func (r *OfferRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, "DELETE FROM offers WHERE id = $1", id)
+// Delete archives or deletes an offer within a workspace.
+func (r *OfferRepository) Delete(ctx context.Context, id uuid.UUID, workspaceID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, "DELETE FROM offers WHERE id = $1 AND workspace_id = $2", id, workspaceID)
 	return err
 }

@@ -58,8 +58,8 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 		"{extra_param_8}", url.QueryEscape(click.ExtraParam8),
 		"{extra_param_9}", url.QueryEscape(click.ExtraParam9),
 		"{extra_param_10}", url.QueryEscape(click.ExtraParam10),
-		"{cost}", fmt.Sprintf("%.4f", click.Cost),
-		"{payout}", fmt.Sprintf("%.4f", click.Payout),
+		"{cost}", fmt.Sprintf("%.4f", float64(click.Cost)/100.0),
+		"{payout}", fmt.Sprintf("%.4f", float64(click.Payout)/100.0),
 		"{timestamp}", fmt.Sprintf("%d", time.Now().Unix()),
 		"{random}", randomHex(8),
 	}

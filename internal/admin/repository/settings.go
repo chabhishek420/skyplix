@@ -5,16 +5,15 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // SettingsRepository handles SQL operations for the settings table.
 type SettingsRepository struct {
-	db *pgxpool.Pool
+	db DB
 }
 
 // NewSettingsRepository creates a new repository.
-func NewSettingsRepository(db *pgxpool.Pool) *SettingsRepository {
+func NewSettingsRepository(db DB) *SettingsRepository {
 	return &SettingsRepository{db: db}
 }
 

@@ -81,7 +81,7 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	if costStr := q.Get("cost"); costStr != "" {
 		var cost float64
 		if _, err := parseFloat(costStr, &cost); err == nil {
-			rc.Cost = cost
+			rc.Cost = int64(cost * 100)
 		}
 	}
 

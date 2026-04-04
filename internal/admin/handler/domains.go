@@ -14,8 +14,9 @@ import (
 // HandleListDomains returns a paginated list of domains.
 func (h *Handler) HandleListDomains(w http.ResponseWriter, r *http.Request) {
 	limit, offset := h.parsePagination(r)
+	wsID := h.getWorkspaceID(r)
 
-	domains, err := h.domains.List(r.Context(), limit, offset)
+	domains, err := h.domains.List(r.Context(), wsID, limit, offset)
 	if err != nil {
 		h.logger.Error("list domains failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list domains")
@@ -32,8 +33,9 @@ func (h *Handler) HandleGetDomain(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid domain id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	d, err := h.domains.GetByID(r.Context(), id)
+	d, err := h.domains.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get domain failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "domain not found")
@@ -55,6 +57,7 @@ func (h *Handler) HandleCreateDomain(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "domain name is required")
 		return
 	}
+	d.WorkspaceID = h.getWorkspaceID(r)
 
 	if err := h.domains.Create(r.Context(), &d); err != nil {
 		h.logger.Error("create domain failed", zap.Error(err))
@@ -73,6 +76,7 @@ func (h *Handler) HandleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid domain id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var d model.Domain
 	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
@@ -80,6 +84,7 @@ func (h *Handler) HandleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.ID = id
+	d.WorkspaceID = wsID
 
 	if err := h.domains.Update(r.Context(), &d); err != nil {
 		h.logger.Error("update domain failed", zap.String("id", id.String()), zap.Error(err))
@@ -98,8 +103,9 @@ func (h *Handler) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid domain id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.domains.Delete(r.Context(), id); err != nil {
+	if err := h.domains.Delete(r.Context(), id, wsID); err != nil {
 		h.logger.Error("delete domain failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to delete domain")
 		return
@@ -112,8 +118,9 @@ func (h *Handler) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 // HandleListDeletedDomains returns a paginated list of archived domains.
 func (h *Handler) HandleListDeletedDomains(w http.ResponseWriter, r *http.Request) {
 	limit, offset := h.parsePagination(r)
+	wsID := h.getWorkspaceID(r)
 
-	domains, err := h.domains.ListDeleted(r.Context(), limit, offset)
+	domains, err := h.domains.ListDeleted(r.Context(), wsID, limit, offset)
 	if err != nil {
 		h.logger.Error("list deleted domains failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list deleted domains")
@@ -130,8 +137,9 @@ func (h *Handler) HandleRestoreDomain(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid domain id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.domains.Restore(r.Context(), id); err != nil {
+	if err := h.domains.Restore(r.Context(), id, wsID); err != nil {
 		h.logger.Error("restore domain failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to restore domain")
 		return
@@ -148,8 +156,9 @@ func (h *Handler) HandleCloneDomain(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid domain id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	d, err := h.domains.GetByID(r.Context(), id)
+	d, err := h.domains.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get domain failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "domain not found")

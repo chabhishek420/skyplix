@@ -150,8 +150,8 @@ func TestFromRawClick_Conversion(t *testing.T) {
 		IsUniqueGlobal: true,
 		SubID1:         "sub1",
 		SubID2:         "sub2",
-		Cost:           0.05,
-		Payout:         0.10,
+		Cost:           5,
+		Payout:         10,
 		ActionType:     "click",
 		ClickToken:     "abc123def456",
 	}

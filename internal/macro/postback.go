@@ -64,7 +64,7 @@ func ReplacePostback(template string, data *PostbackData) string {
 	replacements := []string{
 		"{click_id}", data.ClickToken,
 		"{subid}", data.ClickToken,
-		"{payout}", fmt.Sprintf("%.4f", data.Payout),
+		"{payout}", fmt.Sprintf("%.4f", float64(data.Payout)/100.0),
 		"{status}", url.QueryEscape(data.Status),
 		"{external_id}", url.QueryEscape(data.ExternalID),
 		"{campaign_id}", url.QueryEscape(data.CampaignID),

@@ -15,8 +15,9 @@ import (
 // HandleListNetworks returns a paginated list of affiliate networks.
 func (h *Handler) HandleListNetworks(w http.ResponseWriter, r *http.Request) {
 	limit, offset := h.parsePagination(r)
+	wsID := h.getWorkspaceID(r)
 
-	networks, err := h.networks.List(r.Context(), limit, offset)
+	networks, err := h.networks.List(r.Context(), wsID, limit, offset)
 	if err != nil {
 		h.logger.Error("list networks failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list networks")
@@ -33,8 +34,9 @@ func (h *Handler) HandleGetNetwork(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid network id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	n, err := h.networks.GetByID(r.Context(), id)
+	n, err := h.networks.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get network failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "network not found")
@@ -56,6 +58,7 @@ func (h *Handler) HandleCreateNetwork(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	n.WorkspaceID = h.getWorkspaceID(r)
 
 	if err := h.networks.Create(r.Context(), &n); err != nil {
 		h.logger.Error("create network failed", zap.Error(err))
@@ -74,6 +77,7 @@ func (h *Handler) HandleUpdateNetwork(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid network id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var n model.AffiliateNetwork
 	if err := json.NewDecoder(r.Body).Decode(&n); err != nil {
@@ -81,6 +85,7 @@ func (h *Handler) HandleUpdateNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n.ID = id
+	n.WorkspaceID = wsID
 
 	if err := h.networks.Update(r.Context(), &n); err != nil {
 		h.logger.Error("update network failed", zap.String("id", id.String()), zap.Error(err))
@@ -99,8 +104,9 @@ func (h *Handler) HandleGeneratePostbackURL(w http.ResponseWriter, r *http.Reque
 		h.respondError(w, http.StatusBadRequest, "invalid network id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	n, err := h.networks.GetByID(r.Context(), id)
+	n, err := h.networks.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get network failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "network not found")
@@ -143,8 +149,9 @@ func (h *Handler) HandleDeleteNetwork(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid network id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.networks.Delete(r.Context(), id); err != nil {
+	if err := h.networks.Delete(r.Context(), id, wsID); err != nil {
 		h.logger.Error("delete network failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to delete network")
 		return

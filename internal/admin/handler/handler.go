@@ -22,10 +22,12 @@ type Handler struct {
 	landings  *repository.LandingRepository
 	networks  *repository.NetworkRepository
 	sources   *repository.SourceRepository
-	domains   *repository.DomainRepository
-	users     *repository.UserRepository
-	settings  *repository.SettingsRepository
-	botDB     interface {
+	domains     *repository.DomainRepository
+	users       *repository.UserRepository
+	workspaces  *repository.WorkspaceRepository
+	groups      *repository.CampaignGroupRepository
+	settings    *repository.SettingsRepository
+	botDB       interface {
 		Add(string) error
 		Exclude(string) error
 		Replace(string) error
@@ -57,8 +59,10 @@ func NewHandler(db *pgxpool.Pool, cache *cache.Cache, botDB *botdb.ValkeyStore, 
 		landings:  repository.NewLandingRepository(db),
 		networks:  repository.NewNetworkRepository(db),
 		sources:   repository.NewSourceRepository(db),
-		domains:   repository.NewDomainRepository(db),
-		users:     repository.NewUserRepository(db),
-		settings:  repository.NewSettingsRepository(db),
+		domains:    repository.NewDomainRepository(db),
+		users:      repository.NewUserRepository(db),
+		workspaces: repository.NewWorkspaceRepository(db),
+		groups:     repository.NewCampaignGroupRepository(db),
+		settings:   repository.NewSettingsRepository(db),
 	}
 }

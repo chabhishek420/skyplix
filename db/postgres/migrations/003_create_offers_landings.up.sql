@@ -12,7 +12,7 @@ CREATE TABLE offers (
   name                 VARCHAR(255)   NOT NULL,
   url                  TEXT           NOT NULL,
   affiliate_network_id UUID,
-  payout               DECIMAL(10,4)  NOT NULL DEFAULT 0,
+  payout               BIGINT         NOT NULL DEFAULT 0,
   state                VARCHAR(50)    NOT NULL DEFAULT 'active',
   created_at           TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ    NOT NULL DEFAULT NOW()

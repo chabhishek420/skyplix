@@ -13,8 +13,9 @@ import (
 // HandleListOffers returns a paginated list of offers.
 func (h *Handler) HandleListOffers(w http.ResponseWriter, r *http.Request) {
 	limit, offset := h.parsePagination(r)
+	wsID := h.getWorkspaceID(r)
 
-	offers, err := h.offers.List(r.Context(), limit, offset)
+	offers, err := h.offers.List(r.Context(), wsID, limit, offset)
 	if err != nil {
 		h.logger.Error("list offers failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list offers")
@@ -31,8 +32,9 @@ func (h *Handler) HandleGetOffer(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid offer id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	o, err := h.offers.GetByID(r.Context(), id)
+	o, err := h.offers.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get offer failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "offer not found")
@@ -54,6 +56,7 @@ func (h *Handler) HandleCreateOffer(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "name and url are required")
 		return
 	}
+	o.WorkspaceID = h.getWorkspaceID(r)
 
 	if err := h.offers.Create(r.Context(), &o); err != nil {
 		h.logger.Error("create offer failed", zap.Error(err))
@@ -72,6 +75,7 @@ func (h *Handler) HandleUpdateOffer(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid offer id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var o model.Offer
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
@@ -79,6 +83,7 @@ func (h *Handler) HandleUpdateOffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	o.ID = id
+	o.WorkspaceID = wsID
 
 	if err := h.offers.Update(r.Context(), &o); err != nil {
 		h.logger.Error("update offer failed", zap.String("id", id.String()), zap.Error(err))
@@ -97,8 +102,9 @@ func (h *Handler) HandleDeleteOffer(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid offer id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.offers.Delete(r.Context(), id); err != nil {
+	if err := h.offers.Delete(r.Context(), id, wsID); err != nil {
 		h.logger.Error("delete offer failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to delete offer")
 		return

@@ -32,7 +32,7 @@ func TestReplaceMacros(t *testing.T) {
 		Source:         "google",
 		ExtraParam1:    "ep1",
 		ExtraParam10:   "ep10",
-		Cost:           1.5,
+		Cost:           150,
 	}
 
 	targetURL := "https://example.com/?vc={visitor_code}&ct={connection_type}&brand={brand}&model={model}&bot={is_bot}&unique={is_unique}&kw={keyword}&kw8={keyword_utf8}&ext={external_id}&src={source}&e1={extra_param_1}&e10={extra_param_10}&cost={cost}"

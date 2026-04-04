@@ -140,8 +140,8 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		SourceID:           attr.SourceID.String(),
 		CountryCode:        attr.CountryCode,
 		Status:             status,
-		Payout:             payout,
-		Revenue:            revenue,
+		Payout:             int64(payout * 100),
+		Revenue:            int64(revenue * 100),
 		ExternalID:         externalID,
 	}
 

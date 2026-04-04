@@ -15,8 +15,9 @@ import (
 // HandleListCampaigns returns a paginated list of campaigns.
 func (h *Handler) HandleListCampaigns(w http.ResponseWriter, r *http.Request) {
 	limit, offset := h.parsePagination(r)
+	wsID := h.getWorkspaceID(r)
 
-	campaigns, err := h.campaigns.List(r.Context(), limit, offset)
+	campaigns, err := h.campaigns.List(r.Context(), wsID, limit, offset)
 	if err != nil {
 		h.logger.Error("list campaigns failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list campaigns")
@@ -33,8 +34,9 @@ func (h *Handler) HandleGetCampaign(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid campaign id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	c, err := h.campaigns.GetByID(r.Context(), id)
+	c, err := h.campaigns.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get campaign failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "campaign not found")
@@ -56,6 +58,7 @@ func (h *Handler) HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "alias and name are required")
 		return
 	}
+	c.WorkspaceID = h.getWorkspaceID(r)
 
 	if err := h.campaigns.Create(r.Context(), &c); err != nil {
 		h.logger.Error("create campaign failed", zap.Error(err))
@@ -74,6 +77,7 @@ func (h *Handler) HandleUpdateCampaign(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid campaign id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var c model.Campaign
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
@@ -81,6 +85,7 @@ func (h *Handler) HandleUpdateCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.ID = id
+	c.WorkspaceID = wsID
 
 	if err := h.campaigns.Update(r.Context(), &c); err != nil {
 		h.logger.Error("update campaign failed", zap.String("id", id.String()), zap.Error(err))
@@ -99,8 +104,9 @@ func (h *Handler) HandleDeleteCampaign(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid campaign id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.campaigns.Delete(r.Context(), id); err != nil {
+	if err := h.campaigns.Delete(r.Context(), id, wsID); err != nil {
 		h.logger.Error("delete campaign failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to delete campaign")
 		return
@@ -131,8 +137,10 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 	txCampaigns := repository.NewCampaignRepository(tx)
 	txStreams := repository.NewStreamRepository(tx)
 
+	wsID := h.getWorkspaceID(r)
+
 	// 1. Get Source Campaign (for naming)
-	source, err := h.campaigns.GetByID(ctx, id)
+	source, err := h.campaigns.GetByID(ctx, id, wsID)
 	if err != nil {
 		h.respondError(w, http.StatusNotFound, "source campaign not found")
 		return
@@ -143,7 +151,7 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 	newName := source.Name + " (Copy)"
 	newAlias := source.Alias + "_copy"
 
-	newCampaign, err := txCampaigns.Clone(ctx, id, newCampaignID, newName, newAlias)
+	newCampaign, err := txCampaigns.Clone(ctx, id, wsID, newCampaignID, newName, newAlias)
 	if err != nil {
 		h.logger.Error("clone campaign repo call failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to clone campaign")
@@ -151,7 +159,7 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Clone Streams
-	streams, err := h.streams.ListByCampaign(ctx, id)
+	streams, err := h.streams.ListByCampaign(ctx, id, wsID)
 	if err != nil {
 		h.logger.Error("clone campaign list streams failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list source streams")
@@ -159,7 +167,7 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, s := range streams {
-		if _, err := txStreams.Clone(ctx, s.ID, uuid.New(), newCampaign.ID, s.Name, s.Position); err != nil {
+		if _, err := txStreams.Clone(ctx, s.ID, wsID, uuid.New(), newCampaign.ID, s.Name, s.Position); err != nil {
 			h.logger.Error("clone stream repo call failed", zap.Error(err))
 			h.respondError(w, http.StatusInternalServerError, "failed to clone campaign streams")
 			return

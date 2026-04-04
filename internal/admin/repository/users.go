@@ -5,25 +5,24 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
 // UserRepository handles SQL operations for the users table.
 type UserRepository struct {
-	db *pgxpool.Pool
+	db DB
 }
 
 // NewUserRepository creates a new repository.
-func NewUserRepository(db *pgxpool.Pool) *UserRepository {
+func NewUserRepository(db DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
 // List returns a paginated list of users.
 func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]model.User, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, login, role, state, api_key
+		SELECT id, login, role, state, api_key, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -36,7 +35,7 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]model.U
 	var users []model.User
 	for rows.Next() {
 		var u model.User
-		err := rows.Scan(&u.ID, &u.Login, &u.Role, &u.State, &u.ApiKey)
+		err := rows.Scan(&u.ID, &u.Login, &u.Role, &u.State, &u.ApiKey, &u.CreatedAt, &u.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
@@ -50,10 +49,10 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]model.U
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	var u model.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, login, role, state, api_key
+		SELECT id, login, role, state, api_key, created_at, updated_at
 		FROM users
 		WHERE id = $1
-	`, id).Scan(&u.ID, &u.Login, &u.Role, &u.State, &u.ApiKey)
+	`, id).Scan(&u.ID, &u.Login, &u.Role, &u.State, &u.ApiKey, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}

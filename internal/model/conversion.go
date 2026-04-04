@@ -20,8 +20,8 @@ type Conversion struct {
 	SourceID           uuid.UUID `json:"source_id"`
 	CountryCode        string    `json:"country_code"`
 	Status             string    `json:"status"` // lead, sale, rejected, hold
-	Payout             float64   `json:"payout"`
-	Revenue            float64   `json:"revenue"`
+	Payout             int64     `json:"payout"`
+	Revenue            int64     `json:"revenue"`
 	ExternalID         string    `json:"external_id"` // Transaction ID from affiliate network
 }
 

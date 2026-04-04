@@ -19,8 +19,9 @@ func (h *Handler) HandleListStreams(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid campaign id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	streams, err := h.streams.ListByCampaign(r.Context(), campaignID)
+	streams, err := h.streams.ListByCampaign(r.Context(), campaignID, wsID)
 	if err != nil {
 		h.logger.Error("list streams failed", zap.String("campaign_id", campaignID.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list streams")
@@ -37,8 +38,9 @@ func (h *Handler) HandleGetStream(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	s, err := h.streams.GetByID(r.Context(), id)
+	s, err := h.streams.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get stream failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "stream not found")
@@ -70,6 +72,7 @@ func (h *Handler) HandleCreateStream(w http.ResponseWriter, r *http.Request) {
 	if s.ActionType == "" {
 		s.ActionType = "HttpRedirect"
 	}
+	s.WorkspaceID = h.getWorkspaceID(r)
 
 	if err := h.streams.Create(r.Context(), &s); err != nil {
 		h.logger.Error("create stream failed", zap.Error(err))
@@ -88,6 +91,7 @@ func (h *Handler) HandleUpdateStream(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var s model.Stream
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
@@ -95,6 +99,7 @@ func (h *Handler) HandleUpdateStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.ID = id
+	s.WorkspaceID = wsID
 
 	if s.ActionPayload == nil {
 		s.ActionPayload = make(map[string]interface{})
@@ -123,8 +128,9 @@ func (h *Handler) HandleDeleteStream(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.streams.Delete(r.Context(), id); err != nil {
+	if err := h.streams.Delete(r.Context(), id, wsID); err != nil {
 		h.logger.Error("delete stream failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to delete stream")
 		return
@@ -141,8 +147,9 @@ func (h *Handler) HandleGetStreamOffers(w http.ResponseWriter, r *http.Request) 
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	offers, err := h.streams.GetOffers(r.Context(), id)
+	offers, err := h.streams.GetOffers(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get stream offers failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to get stream offers")
@@ -159,6 +166,7 @@ func (h *Handler) HandleSyncStreamOffers(w http.ResponseWriter, r *http.Request)
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var offers []model.WeightedOffer
 	if err := json.NewDecoder(r.Body).Decode(&offers); err != nil {
@@ -166,7 +174,7 @@ func (h *Handler) HandleSyncStreamOffers(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.streams.SyncOffers(r.Context(), id, offers); err != nil {
+	if err := h.streams.SyncOffers(r.Context(), id, wsID, offers); err != nil {
 		h.logger.Error("sync stream offers failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to sync stream offers")
 		return
@@ -183,8 +191,9 @@ func (h *Handler) HandleGetStreamLandings(w http.ResponseWriter, r *http.Request
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	landings, err := h.streams.GetLandings(r.Context(), id)
+	landings, err := h.streams.GetLandings(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get stream landings failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to get stream landings")
@@ -201,6 +210,7 @@ func (h *Handler) HandleSyncStreamLandings(w http.ResponseWriter, r *http.Reques
 		h.respondError(w, http.StatusBadRequest, "invalid stream id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var landings []model.WeightedLanding
 	if err := json.NewDecoder(r.Body).Decode(&landings); err != nil {
@@ -208,7 +218,7 @@ func (h *Handler) HandleSyncStreamLandings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.streams.SyncLandings(r.Context(), id, landings); err != nil {
+	if err := h.streams.SyncLandings(r.Context(), id, wsID, landings); err != nil {
 		h.logger.Error("sync stream landings failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to sync stream landings")
 		return
@@ -238,8 +248,10 @@ func (h *Handler) HandleCloneStream(w http.ResponseWriter, r *http.Request) {
 	// Create temporary repository bound to the transaction
 	txStreams := repository.NewStreamRepository(tx)
 
+	wsID := h.getWorkspaceID(r)
+
 	// 1. Get Source Stream (for naming/position)
-	source, err := h.streams.GetByID(ctx, id)
+	source, err := h.streams.GetByID(ctx, id, wsID)
 	if err != nil {
 		h.respondError(w, http.StatusNotFound, "source stream not found")
 		return
@@ -248,7 +260,7 @@ func (h *Handler) HandleCloneStream(w http.ResponseWriter, r *http.Request) {
 	// 2. Clone Stream
 	newName := source.Name + " (Copy)"
 	newPosition := source.Position + 1
-	newStream, err := txStreams.Clone(ctx, id, uuid.New(), source.CampaignID, newName, newPosition)
+	newStream, err := txStreams.Clone(ctx, id, wsID, uuid.New(), source.CampaignID, newName, newPosition)
 	if err != nil {
 		h.logger.Error("clone stream repo call failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to clone stream")

@@ -8,7 +8,6 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/metrics"
@@ -45,8 +44,8 @@ type ClickRecord struct {
 	SubID3           string
 	SubID4           string
 	SubID5           string
-	Cost             float64
-	Payout           float64
+	Cost             int64
+	Payout           int64
 	ActionType       string
 	ClickToken       string
 	JA3              string
@@ -68,8 +67,8 @@ type ConversionRecord struct {
 	SourceID           string
 	CountryCode        string
 	Status             string
-	Payout             float64
-	Revenue            float64
+	Payout             int64
+	Revenue            int64
 	ExternalID         string
 }
 
@@ -333,8 +332,8 @@ func (w *Writer) flushClicks(records []ClickRecord) {
 			r.SubID3,
 			r.SubID4,
 			r.SubID5,
-			decimal.NewFromFloat(r.Cost),
-			decimal.NewFromFloat(r.Payout),
+			r.Cost,
+			r.Payout,
 			r.ActionType,
 			r.ClickToken,
 			r.JA3,
@@ -401,8 +400,8 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 			srcID,
 			cc,
 			r.Status,
-			decimal.NewFromFloat(r.Payout),
-			decimal.NewFromFloat(r.Revenue),
+			r.Payout,
+			r.Revenue,
 			r.ExternalID,
 		); err != nil {
 			w.Logger.Error("conversions batch append failed", zap.Error(err), zap.String("token", r.ClickToken))

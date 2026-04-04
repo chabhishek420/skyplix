@@ -14,8 +14,9 @@ import (
 // HandleListSources returns a paginated list of traffic sources.
 func (h *Handler) HandleListSources(w http.ResponseWriter, r *http.Request) {
 	limit, offset := h.parsePagination(r)
+	wsID := h.getWorkspaceID(r)
 
-	sources, err := h.sources.List(r.Context(), limit, offset)
+	sources, err := h.sources.List(r.Context(), wsID, limit, offset)
 	if err != nil {
 		h.logger.Error("list traffic sources failed", zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to list traffic sources")
@@ -32,8 +33,9 @@ func (h *Handler) HandleGetSource(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid source id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	s, err := h.sources.GetByID(r.Context(), id)
+	s, err := h.sources.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get traffic source failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "traffic source not found")
@@ -55,6 +57,7 @@ func (h *Handler) HandleCreateSource(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	s.WorkspaceID = h.getWorkspaceID(r)
 
 	if err := h.sources.Create(r.Context(), &s); err != nil {
 		h.logger.Error("create traffic source failed", zap.Error(err))
@@ -73,6 +76,7 @@ func (h *Handler) HandleUpdateSource(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid source id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
 	var s model.TrafficSource
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
@@ -80,6 +84,7 @@ func (h *Handler) HandleUpdateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.ID = id
+	s.WorkspaceID = wsID
 
 	if err := h.sources.Update(r.Context(), &s); err != nil {
 		h.logger.Error("update traffic source failed", zap.String("id", id.String()), zap.Error(err))
@@ -98,8 +103,9 @@ func (h *Handler) HandleDeleteSource(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid source id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	if err := h.sources.Delete(r.Context(), id); err != nil {
+	if err := h.sources.Delete(r.Context(), id, wsID); err != nil {
 		h.logger.Error("delete traffic source failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusInternalServerError, "failed to delete traffic source")
 		return
@@ -116,8 +122,9 @@ func (h *Handler) HandleCloneSource(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "invalid source id")
 		return
 	}
+	wsID := h.getWorkspaceID(r)
 
-	s, err := h.sources.GetByID(r.Context(), id)
+	s, err := h.sources.GetByID(r.Context(), id, wsID)
 	if err != nil {
 		h.logger.Error("get traffic source failed", zap.String("id", id.String()), zap.Error(err))
 		h.respondError(w, http.StatusNotFound, "traffic source not found")

@@ -84,8 +84,8 @@ type RawClick struct {
 	ExtraParam10   string
 
 	// --- Cost model ---
-	Cost   float64
-	Payout float64
+	Cost   int64
+	Payout int64
 
 	// --- Phase 9: TLS Fingerprinting ---
 	JA3      string
@@ -99,20 +99,48 @@ type RawClick struct {
 	CreatedAt time.Time
 }
 
+// Workspace represents a tenant/team isolation unit.
+type Workspace struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	State     string    `json:"state"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// CampaignGroup represents a folder or grouping for campaigns.
+type CampaignGroup struct {
+	ID          uuid.UUID `json:"id"`
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+	Name        string    `json:"name"`
+	Notes       *string   `json:"notes"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // Campaign represents a traffic campaign entity.
 // Mirrors Keitaro's Campaign model including 3-tier stream selection fields.
 type Campaign struct {
-	ID                     uuid.UUID
-	Alias                  string
-	Name                   string
-	Type                   CampaignType // POSITION or WEIGHT
-	BindVisitors           bool
-	IsOptimizationEnabled  bool
-	OptimizationMetric     string // 'CR' or 'EPC'
-	OptimizationPeriodHours uint
-	State                  string
-	TrafficSourceID        *uuid.UUID
-	DefaultStreamID        *uuid.UUID
+	ID                     uuid.UUID      `json:"id"`
+	WorkspaceID            uuid.UUID      `json:"workspace_id"`
+	GroupID                *uuid.UUID     `json:"group_id"`
+	Alias                  string         `json:"alias"`
+	Name                   string         `json:"name"`
+	Type                   CampaignType   `json:"type"` // POSITION or WEIGHT
+	BindVisitors           bool           `json:"bind_visitors"`
+	IsOptimizationEnabled  bool           `json:"is_optimization_enabled"`
+	OptimizationMetric     string         `json:"optimization_metric"` // 'CR' or 'EPC'
+	OptimizationPeriodHours uint           `json:"optimization_period_hours"`
+	CostModel              string         `json:"cost_model"` // CPC, CPM, CPA, RevShare
+	CostValue              int64          `json:"cost_value"`
+	State                  string         `json:"state"`
+	TrafficSourceID        *uuid.UUID     `json:"traffic_source_id"`
+	DefaultStreamID        *uuid.UUID     `json:"default_stream_id"`
+	Notes                  *string        `json:"notes"`
+	Tags                   []string       `json:"tags"`
+	CreatedAt              time.Time      `json:"created_at"`
+	UpdatedAt              time.Time      `json:"updated_at"`
 }
 
 // CampaignType controls stream selection mode (POSITION = sequential, WEIGHT = weighted random).
@@ -126,9 +154,10 @@ const (
 // Stream represents a routing stream within a campaign.
 // Type determines its role in 3-tier selection (FORCED → REGULAR → DEFAULT).
 type Stream struct {
-	ID            uuid.UUID
-	CampaignID    uuid.UUID
-	Name          string
+	ID            uuid.UUID      `json:"id"`
+	WorkspaceID    uuid.UUID      `json:"workspace_id"`
+	CampaignID    uuid.UUID      `json:"campaign_id"`
+	Name          string         `json:"name"`
 	Type          StreamType
 	Position      int
 	Weight        int
@@ -160,12 +189,17 @@ const (
 
 // Offer represents a target affiliate offer.
 type Offer struct {
-	ID                uuid.UUID
-	Name              string
-	URL               string
-	AffiliateNetworkID *uuid.UUID
-	Payout            float64
-	State             string
+	ID                 uuid.UUID  `json:"id"`
+	WorkspaceID        uuid.UUID  `json:"workspace_id"`
+	Name               string     `json:"name"`
+	URL                string     `json:"url"`
+	AffiliateNetworkID *uuid.UUID `json:"affiliate_network_id"`
+	Payout             int64      `json:"payout"`
+	DailyCap           int        `json:"daily_cap"`
+	State              string     `json:"state"`
+	Notes              *string    `json:"notes"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 func (o Offer) GetWeight() int    { return 100 }
@@ -173,10 +207,14 @@ func (o Offer) GetID() uuid.UUID { return o.ID }
 
 // Landing represents a landing page for Level 1 → Level 2 click linking.
 type Landing struct {
-	ID    uuid.UUID
-	Name  string
-	URL   string
-	State string
+	ID          uuid.UUID `json:"id"`
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+	Name        string    `json:"name"`
+	URL         string    `json:"url"`
+	State       string    `json:"state"`
+	Notes       *string   `json:"notes"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (l Landing) GetID() uuid.UUID { return l.ID }
@@ -202,34 +240,44 @@ func (wl WeightedLanding) GetID() uuid.UUID { return wl.Landing.ID }
 
 // AffiliateNetwork represents an affiliate network entity.
 type AffiliateNetwork struct {
-	ID          uuid.UUID
-	Name        string
-	PostbackURL string
-	State       string
+	ID          uuid.UUID `json:"id"`
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+	Name        string    `json:"name"`
+	PostbackURL string    `json:"postback_url"`
+	State       string    `json:"state"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // TrafficSource represents a traffic source entity.
 type TrafficSource struct {
-	ID          uuid.UUID
-	Name        string
-	PostbackURL string
-	Params      map[string]string
-	State       string
+	ID          uuid.UUID         `json:"id"`
+	WorkspaceID uuid.UUID         `json:"workspace_id"`
+	Name        string            `json:"name"`
+	PostbackURL string            `json:"postback_url"`
+	Params      map[string]string `json:"params"`
+	State       string            `json:"state"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // Domain represents a campaign-to-domain binding.
 type Domain struct {
-	ID         uuid.UUID
-	Domain     string
-	CampaignID *uuid.UUID
-	State      string
+	ID          uuid.UUID  `json:"id"`
+	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	Domain      string     `json:"domain"`
+	CampaignID  *uuid.UUID `json:"campaign_id"`
+	State       string     `json:"state"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 // User represents an administrative user.
 type User struct {
-	ID       uuid.UUID
-	Login    string
-	Role     string
-	State    string
-	ApiKey   string // Added in migration 005
+	ID        uuid.UUID `json:"id"`
+	Login     string    `json:"login"`
+	Role      string    `json:"role"`
+	State     string    `json:"state"`
+	ApiKey    string    `json:"api_key"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

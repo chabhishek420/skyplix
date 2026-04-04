@@ -5,30 +5,29 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
 
 // DomainRepository handles SQL operations for the domains table.
 type DomainRepository struct {
-	db *pgxpool.Pool
+	db DB
 }
 
 // NewDomainRepository creates a new repository.
-func NewDomainRepository(db *pgxpool.Pool) *DomainRepository {
+func NewDomainRepository(db DB) *DomainRepository {
 	return &DomainRepository{db: db}
 }
 
-// List returns a paginated list of domains.
-func (r *DomainRepository) List(ctx context.Context, limit, offset int) ([]model.Domain, error) {
+// List returns a paginated list of domains for a specific workspace.
+func (r *DomainRepository) List(ctx context.Context, workspaceID uuid.UUID, limit, offset int) ([]model.Domain, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, domain, campaign_id, state
+		SELECT id, workspace_id, domain, campaign_id, state, created_at
 		FROM domains
-		WHERE state != 'archived'
+		WHERE workspace_id = $1 AND state != 'archived'
 		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`, limit, offset)
+		LIMIT $2 OFFSET $3
+	`, workspaceID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("query domains: %w", err)
 	}
@@ -37,7 +36,7 @@ func (r *DomainRepository) List(ctx context.Context, limit, offset int) ([]model
 	var domains []model.Domain
 	for rows.Next() {
 		var d model.Domain
-		err := rows.Scan(&d.ID, &d.Domain, &d.CampaignID, &d.State)
+		err := rows.Scan(&d.ID, &d.WorkspaceID, &d.Domain, &d.CampaignID, &d.State, &d.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scan domain: %w", err)
 		}
@@ -47,14 +46,14 @@ func (r *DomainRepository) List(ctx context.Context, limit, offset int) ([]model
 	return domains, nil
 }
 
-// GetByID retrieves a single domain by uuid.
-func (r *DomainRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Domain, error) {
+// GetByID retrieves a single domain by uuid and workspace.
+func (r *DomainRepository) GetByID(ctx context.Context, id uuid.UUID, workspaceID uuid.UUID) (*model.Domain, error) {
 	var d model.Domain
 	err := r.db.QueryRow(ctx, `
-		SELECT id, domain, campaign_id, state
+		SELECT id, workspace_id, domain, campaign_id, state, created_at
 		FROM domains
-		WHERE id = $1
-	`, id).Scan(&d.ID, &d.Domain, &d.CampaignID, &d.State)
+		WHERE id = $1 AND workspace_id = $2
+	`, id, workspaceID).Scan(&d.ID, &d.WorkspaceID, &d.Domain, &d.CampaignID, &d.State, &d.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get domain: %w", err)
 	}
@@ -68,43 +67,43 @@ func (r *DomainRepository) Create(ctx context.Context, d *model.Domain) error {
 	}
 
 	return r.db.QueryRow(ctx, `
-		INSERT INTO domains (id, domain, campaign_id, state)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO domains (id, workspace_id, domain, campaign_id, state)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
-	`, d.ID, d.Domain, d.CampaignID, d.State).Scan(&d.ID)
+	`, d.ID, d.WorkspaceID, d.Domain, d.CampaignID, d.State).Scan(&d.ID)
 }
 
-// Update modifies an existing domain.
+// Update modifies an existing domain within a workspace.
 func (r *DomainRepository) Update(ctx context.Context, d *model.Domain) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE domains
-		SET domain = $2, campaign_id = $3, state = $4
-		WHERE id = $1
-	`, d.ID, d.Domain, d.CampaignID, d.State)
+		SET domain = $3, campaign_id = $4, state = $5
+		WHERE id = $1 AND workspace_id = $2
+	`, d.ID, d.WorkspaceID, d.Domain, d.CampaignID, d.State)
 	return err
 }
 
-// Delete archives a domain instead of hard deleting.
-func (r *DomainRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, "UPDATE domains SET state = 'archived' WHERE id = $1", id)
+// Delete archives a domain within a workspace.
+func (r *DomainRepository) Delete(ctx context.Context, id uuid.UUID, workspaceID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, "UPDATE domains SET state = 'archived' WHERE id = $1 AND workspace_id = $2", id, workspaceID)
 	return err
 }
 
-// Restore unarchives a domain.
-func (r *DomainRepository) Restore(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, "UPDATE domains SET state = 'active' WHERE id = $1", id)
+// Restore unarchives a domain within a workspace.
+func (r *DomainRepository) Restore(ctx context.Context, id uuid.UUID, workspaceID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, "UPDATE domains SET state = 'active' WHERE id = $1 AND workspace_id = $2", id, workspaceID)
 	return err
 }
 
-// ListDeleted returns a paginated list of archived domains.
-func (r *DomainRepository) ListDeleted(ctx context.Context, limit, offset int) ([]model.Domain, error) {
+// ListDeleted returns a paginated list of archived domains for a specific workspace.
+func (r *DomainRepository) ListDeleted(ctx context.Context, workspaceID uuid.UUID, limit, offset int) ([]model.Domain, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, domain, campaign_id, state
+		SELECT id, workspace_id, domain, campaign_id, state, created_at
 		FROM domains
-		WHERE state = 'archived'
+		WHERE workspace_id = $1 AND state = 'archived'
 		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`, limit, offset)
+		LIMIT $2 OFFSET $3
+	`, workspaceID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("query deleted domains: %w", err)
 	}
@@ -113,7 +112,7 @@ func (r *DomainRepository) ListDeleted(ctx context.Context, limit, offset int) (
 	var domains []model.Domain
 	for rows.Next() {
 		var d model.Domain
-		err := rows.Scan(&d.ID, &d.Domain, &d.CampaignID, &d.State)
+		err := rows.Scan(&d.ID, &d.WorkspaceID, &d.Domain, &d.CampaignID, &d.State, &d.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scan deleted domain: %w", err)
 		}

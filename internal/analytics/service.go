@@ -77,11 +77,14 @@ func (s *Service) GenerateReport(ctx context.Context, q *ReportQuery) (*ReportRe
 				var val any
 				dest = append(dest, &val)
 			}
-			dest = append(dest, &row.Clicks, &row.UniqueClicks, &row.Bots, &row.Cost, &row.CPC) // click_payout as CPC temporarily
+			var costCents, payoutCents int64
+			dest = append(dest, &row.Clicks, &row.UniqueClicks, &row.Bots, &costCents, &payoutCents)
 
 			if err := rows.Scan(dest...); err != nil {
 				return fmt.Errorf("scan click stats row: %w", err)
 			}
+			row.Cost = float64(costCents) / 100.0
+			row.CPC = float64(payoutCents) / 100.0 // click_payout as CPC temporarily
 
 			// Map dimensions back from any to string
 			idx := 0
@@ -115,11 +118,14 @@ func (s *Service) GenerateReport(ctx context.Context, q *ReportQuery) (*ReportRe
 				var val any
 				dest = append(dest, &val)
 			}
-			dest = append(dest, &row.Conversions, &row.Revenue, &row.ROI) // payout as ROI temporarily
+			var revenueCents, payoutCents int64
+			dest = append(dest, &row.Conversions, &revenueCents, &payoutCents)
 
 			if err := rows.Scan(dest...); err != nil {
 				return fmt.Errorf("scan conv stats row: %w", err)
 			}
+			row.Revenue = float64(revenueCents) / 100.0
+			row.ROI = float64(payoutCents) / 100.0 // payout as ROI temporarily
 
 			idx := 0
 			for _, dim := range q.GroupBy {
