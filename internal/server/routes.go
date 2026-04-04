@@ -258,6 +258,7 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 	metrics.HTTPRequestDuration.WithLabelValues("GET", r.URL.Path).Observe(elapsed.Seconds())
 
 	if payload.RawClick != nil && payload.Campaign != nil {
+		metrics.ClickLatency.Observe(elapsed.Seconds())
 		l.Info("click processed",
 			zap.String("token", payload.RawClick.ClickToken),
 			zap.Bool("is_bot", payload.RawClick.IsBot),
@@ -296,6 +297,7 @@ func (s *Server) handleClickL2(w http.ResponseWriter, r *http.Request) {
 	metrics.HTTPRequestDuration.WithLabelValues("GET", r.URL.Path).Observe(elapsed.Seconds())
 
 	if payload.RawClick != nil {
+		metrics.ClickLatency.Observe(elapsed.Seconds())
 		s.logger.Info("L2 click processed",
 			zap.String("token", payload.RawClick.ClickToken),
 			zap.Duration("latency", elapsed),

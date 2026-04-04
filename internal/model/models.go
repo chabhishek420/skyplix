@@ -227,9 +227,9 @@ type Domain struct {
 
 // User represents an administrative user.
 type User struct {
-	ID       uuid.UUID
-	Login    string
-	Role     string
-	State    string
-	ApiKey   string // Added in migration 005
+	ID       uuid.UUID `json:"id"`
+	Login    string    `json:"login"`
+	Role     string    `json:"role"`
+	State    string    `json:"state"`
+	ApiKey   string    `json:"api_key"` // Added in migration 005
 }

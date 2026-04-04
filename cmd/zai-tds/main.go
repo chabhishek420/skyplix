@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/config"
+	"github.com/skyplix/zai-tds/internal/migrate"
 	"github.com/skyplix/zai-tds/internal/server"
 )
 
@@ -104,8 +105,16 @@ func runServer(cmd *cobra.Command, args []string) {
 }
 
 func runKeitaroMigration(cmd *cobra.Command, args []string) {
-	fmt.Println("Keitaro migration not fully implemented in this binary yet.")
-	fmt.Println("Please use 'go run scripts/migrate_keitaro.go' for now.")
+	if mysqlDSN == "" || pgDSN == "" {
+		fmt.Println("Error: --mysql and --postgres flags are required")
+		cmd.Usage()
+		os.Exit(1)
+	}
+
+	if err := migrate.RunKeitaro(mysqlDSN, pgDSN); err != nil {
+		fmt.Fprintf(os.Stderr, "Migration failed: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func newLogger(debug bool) (*zap.Logger, error) {

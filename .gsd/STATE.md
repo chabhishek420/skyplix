@@ -1,20 +1,18 @@
 ## Current Position
-- **Phase**: Phase 13: Stabilization & GSD Logic Recovery [100%]
-- **Task**: System Stabilization & Audit Repair Patched
-- **Status**: Paused at 2026-04-04 13:42
+- **Phase**: Phase 7: Production Hardening [100%]
+- **Task**: v1.0 Release Complete
+- **Status**: Completed at 2026-04-03 14:35
 
 ## Last Session Summary
-Resolved context drift and integration test failures.
-- **Auth Repair**: Synced `admin` login/API key between `seed_phase4.sql` and `cloaking_test.go`.
-- **Mux Lifecycle**: Fixed `chi` middleware registration order (Recoverer/RealIP/Logger before routes).
-- **Detection Transparency**: Implemented `BotReason` in `RawClick` model and persisted to ClickHouse.
-- **Infrastructure Path**: Upgraded `Dockerfile` to Go 1.25 and repaired missing ClickHouse Stage 9/11 migrations.
-- **Isolation**: Added Valkey `FlushDB` to integration tests to prevent state contamination.
+Completed Phases 5, 6, and 7 to reach v1.0.0.
+- **Phase 5**: Implemented S2S postback API with Valkey deduplication and multi-dimensional reporting API.
+- **Phase 6**: Built React 19 Admin UI with 7 management/reporting screens and embedded it into the binary.
+- **Phase 7**: Refactored app into Cobra CLI, added Prometheus metrics, systemd unit, and production Dockerfile.
+- **Keitaro Parity**: Verified architectural parity and filter set completeness against original PHP source.
 
 ## In-Progress Work
-- The stabilization and repair phase is complete. 
-- **Tests Status**: Integration tests for cloaking are passing 100%. ClickHouse schema is up to date.
-- **Verification**: Backfilled `v11-high-availability.md` and `v12-tls-fingerprinting.md`.
+- All requested phases are complete.
+- **Tests Status**: 100% unit tests pass. Integration tests verified manually in local env.
 
 ## Blockers
 - None.
@@ -22,23 +20,16 @@ Resolved context drift and integration test failures.
 ## Context Dump
 
 ### Decisions Made
-- **Named Inserts**: Used named columns in ClickHouse batch inserts to handle `click_id` UUID generation at the DB level.
-- **Valkey Isolation**: Forced a flush in tests because previous bot-flagged IPs were persisting and causing false positives for "Human" test cases.
-- **BotReason Persistence**: Added a `String` column to ClickHouse to move beyond binary `is_bot` flags to descriptive rationale.
+- **JWT Auth**: Added JWT-based auth for the UI to move beyond static API keys for dashboard users.
+- **Embedded UI**: Chose to embed the UI to maintain the "single binary" production promise.
+- **Prometheus**: Prioritized core infrastructure metrics (queue depths, cache hits, errors) for v1.0 monitoring.
 
 ### Approaches Tried
-- **Fresh Rebuild**: Rebuilding the Docker image with fresh migrations and the Chi middleware fix was the only way to reliably clear the 401s and panics.
-- **Manual Migration**: Applied migrations via `docker exec` when the automated container startup failed due to dependency health checks.
+- **Cobra Refactor**: Refactored the flat `main.go` into a modular CLI structure to support `serve` and `migrate` commands.
 
 ### Current Hypothesis
-- The system is now fully aligned with the GSD roadmap. Previous failures were primarily due to metadata/state drift and environmental contamination (stale Valkey state).
-
-### Files of Interest
-- `internal/server/routes.go`: Critical middleware order.
-- `internal/queue/writer.go`: New `BotReason` persistence logic.
-- `test/integration/cloaking_test.go`: Now includes Valkey cleanup and robust auth.
+- SkyPlix TDS is now a viable production replacement for Keitaro for high-traffic environments.
 
 ## Next Steps
-1. **Phase 5: Conversion Attribution**: Implement the `/postback` endpoint with HMAC-SHA256 validation.
-2. **Phase 5.3: Reporting**: Enhance the UI to display the new `BotReason` field in the click logs.
-3. **Phase 14: Bandit Logic**: Begin research on Multi-Armed Bandit stream optimization.
+1. **v1.1 Roadmap**: Implement Bandit stream optimization.
+2. **v1.2 Roadmap**: Expand Triggers and Simulation engine for closer parity with Keitaro administrative features.

@@ -45,7 +45,7 @@ var (
 
 	ClicksTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "skyplix_clicks_total",
+			Name: "skyplix_click_requests_total",
 			Help: "Total number of clicks processed.",
 		},
 	)
@@ -54,6 +54,14 @@ var (
 		prometheus.CounterOpts{
 			Name: "skyplix_clicks_bot_total",
 			Help: "Total number of bot clicks detected.",
+		},
+	)
+
+	ClickLatency = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "skyplix_click_latency_p99",
+			Help:    "Latency of click processing (histogram for p99 calculation).",
+			Buckets: []float64{0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5},
 		},
 	)
 
