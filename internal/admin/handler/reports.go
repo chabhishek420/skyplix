@@ -47,6 +47,44 @@ func (h *ReportsHandler) HandleReport(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, http.StatusOK, report)
 }
 
+// HandleClicksLog handles the raw clicks log request.
+// GET /api/v1/logs/clicks
+func (h *ReportsHandler) HandleClicksLog(w http.ResponseWriter, r *http.Request) {
+	query, err := h.parseQuery(r)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	logs, err := h.analytics.GetClicksLog(r.Context(), query)
+	if err != nil {
+		h.logger.Error("failed to get clicks log", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to get clicks log")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, logs)
+}
+
+// HandleConversionsLog handles the raw conversions log request.
+// GET /api/v1/logs/conversions
+func (h *ReportsHandler) HandleConversionsLog(w http.ResponseWriter, r *http.Request) {
+	query, err := h.parseQuery(r)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	logs, err := h.analytics.GetConversionsLog(r.Context(), query)
+	if err != nil {
+		h.logger.Error("failed to get conversions log", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "failed to get conversions log")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, logs)
+}
+
 func (h *ReportsHandler) parseQuery(r *http.Request) (*analytics.ReportQuery, error) {
 	q := r.URL.Query()
 

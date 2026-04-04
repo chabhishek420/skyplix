@@ -8,56 +8,92 @@ import {
   Activity, 
   MonitorOff, 
   FileBox, 
-  Globe
+  Globe,
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
-const MENU_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/campaigns', label: 'Campaigns', icon: Megaphone },
-  { path: '/offers', label: 'Offers', icon: Target },
-  { path: '/landings', label: 'Landings', icon: FileBox },
-  { path: '/networks', label: 'Networks', icon: Network },
-  { path: '/sources', label: 'Traffic Sources', icon: Activity },
-  { path: '/domains', label: 'Domains', icon: Globe },
-  { path: '/logs/clicks', label: 'Clicks Log', icon: MousePointerClick },
-  { path: '/logs/conversions', label: 'Postbacks', icon: MonitorOff },
+const MENU_GROUPS = [
+  {
+    label: 'Main',
+    items: [
+      { path: '/', label: 'Overview', icon: LayoutDashboard },
+      { path: '/campaigns', label: 'Campaigns', icon: Megaphone },
+    ]
+  },
+  {
+    label: 'Landers & Offers',
+    items: [
+      { path: '/offers', label: 'Offers', icon: Target },
+      { path: '/landings', label: 'Landings', icon: FileBox },
+      { path: '/networks', label: 'Networks', icon: Network },
+    ]
+  },
+  {
+    label: 'Settings',
+    items: [
+      { path: '/sources', label: 'Sources', icon: Activity },
+      { path: '/domains', label: 'Domains', icon: Globe },
+    ]
+  },
+  {
+    label: 'Analysis',
+    items: [
+      { path: '/logs/clicks', label: 'Clicks Log', icon: MousePointerClick },
+      { path: '/logs/conversions', label: 'Conversions', icon: MonitorOff },
+    ]
+  }
 ];
 
 export function Sidebar() {
   return (
-    <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-md flex flex-col transition-all h-screen sticky top-0">
-      <div className="p-6 flex items-center space-x-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center font-bold text-primary-foreground">
-          S
+    <aside className="w-64 border-r border-border bg-card/60 backdrop-blur-xl flex flex-col transition-all h-screen sticky top-0 overflow-hidden select-none">
+      <div className="p-8 flex items-center space-x-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+          <ShieldCheck className="w-6 h-6 text-primary-foreground" />
         </div>
-        <span className="font-bold text-xl tracking-tight text-foreground">SkyPlix TDS</span>
+        <div>
+          <span className="font-extrabold text-xl tracking-tight text-foreground block leading-none">SkyPlix</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold text-primary/80">TDS Core</span>
+        </div>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
-        {MENU_ITEMS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group ${
-                isActive
-                  ? 'bg-primary/10 text-primary shadow-sm'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <item.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-primary' : ''}`} />
-                <span>{item.label}</span>
-              </>
-            )}
-          </NavLink>
+      <nav className="flex-1 px-4 space-y-8 overflow-y-auto pb-8 scrollbar-hide">
+        {MENU_GROUPS.map((group) => (
+          <div key={group.label}>
+            <h3 className="px-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{group.label}</h3>
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                      isActive
+                        ? 'bg-primary/10 text-primary font-semibold ring-1 ring-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.05)]'
+                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon className={`w-4.5 h-4.5 transition-transform group-hover:scale-110 group-active:scale-95 duration-200 ${isActive ? 'text-primary' : 'opacity-70'}`} />
+                      <span>{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
       
-      <div className="p-4 border-t border-border bg-card/30">
-        <div className="text-xs text-center text-muted-foreground">Version 1.0.0</div>
+      <div className="p-6 border-t border-border/50 bg-muted/20 flex flex-col items-center gap-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Settings className="w-3 h-3" />
+          <span>System Settings</span>
+        </div>
+        <div className="text-[10px] text-muted-foreground/40 font-mono">v1.2.0-STABLE</div>
       </div>
     </aside>
   );

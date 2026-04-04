@@ -121,3 +121,11 @@ func (s *ReportSummary) CalculateDerived() {
 		s.ROI = 0
 	}
 }
+
+// LogResponse is for raw logs (clicks/conversions)
+type LogResponse struct {
+	Rows  []map[string]any `json:"rows"`
+	Total int              `json:"total"`
+	Limit int              `json:"limit"`
+	Offset int             `json:"offset"`
+}

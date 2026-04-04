@@ -8,6 +8,8 @@ import { Landings } from './pages/landings';
 import { Networks } from './pages/networks';
 import { Sources } from './pages/sources';
 import { Domains } from './pages/domains';
+import { ClicksLog } from './pages/logs/clicks';
+import { ConversionsLog } from './pages/logs/conversions';
 
 function App() {
   return (
@@ -25,8 +27,10 @@ function App() {
           <Route path="networks" element={<Networks />} />
           <Route path="sources" element={<Sources />} />
           <Route path="domains" element={<Domains />} />
-          <Route path="logs/clicks" element={<div className="p-8">Clicks Log UI soon...</div>} />
-          <Route path="logs/conversions" element={<div className="p-8">Postbacks UI soon...</div>} />
+          <Route path="logs">
+            <Route path="clicks" element={<ClicksLog />} />
+            <Route path="conversions" element={<ConversionsLog />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

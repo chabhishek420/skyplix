@@ -141,6 +141,10 @@ func (s *Server) routes() http.Handler {
 
 		if s.reportsHandler != nil {
 			r.Get("/reports", s.reportsHandler.HandleReport)
+			r.Route("/logs", func(r chi.Router) {
+				r.Get("/clicks", s.reportsHandler.HandleClicksLog)
+				r.Get("/conversions", s.reportsHandler.HandleConversionsLog)
+			})
 		}
 	})
 

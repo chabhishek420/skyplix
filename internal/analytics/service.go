@@ -348,3 +348,137 @@ func (s *Service) enrichEntityNames(ctx context.Context, rows []ReportRow, group
 		}
 	}
 }
+
+// GetClicksLog returns raw click logs with pagination.
+func (s *Service) GetClicksLog(ctx context.Context, q *ReportQuery) (*LogResponse, error) {
+	// 1. Build Query
+	var whereParts []string
+	var args []any
+
+	whereParts = append(whereParts, "created_at >= ?")
+	args = append(args, q.DateFrom)
+	whereParts = append(whereParts, "created_at < ?")
+	args = append(args, q.DateTo)
+
+	for dim, values := range q.Filters {
+		def, ok := dimensionRegistry[dim]
+		if !ok || def.Tables == "convs_only" {
+			continue
+		}
+		if len(values) == 1 {
+			whereParts = append(whereParts, fmt.Sprintf("%s = ?", def.Column))
+			args = append(args, values[0])
+		} else if len(values) > 1 {
+			placeholders := strings.Repeat("?, ", len(values)-1) + "?"
+			whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", def.Column, placeholders))
+			for _, v := range values {
+				args = append(args, v)
+			}
+		}
+	}
+
+	query := fmt.Sprintf("SELECT * FROM clicks WHERE %s ORDER BY created_at DESC LIMIT %d OFFSET %d",
+		strings.Join(whereParts, " AND "), q.Limit, q.Offset)
+
+	// 2. Execute
+	rows, err := s.ch.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("execute clicks log query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []map[string]any
+	columns := rows.ColumnTypes()
+
+	for rows.Next() {
+		row := make(map[string]any)
+		dest := make([]any, len(columns))
+		for i := range dest {
+			var val any
+			dest[i] = &val
+		}
+
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("scan click log row: %w", err)
+		}
+
+		for i, col := range columns {
+			val := *(dest[i].(*any))
+			row[col.Name()] = val
+		}
+		result = append(result, row)
+	}
+
+	return &LogResponse{
+		Rows:   result,
+		Limit:  q.Limit,
+		Offset: q.Offset,
+		Total:  0, // Total count omitted for performance in ClickHouse raw query
+	}, nil
+}
+
+// GetConversionsLog returns raw conversion logs with pagination.
+func (s *Service) GetConversionsLog(ctx context.Context, q *ReportQuery) (*LogResponse, error) {
+	var whereParts []string
+	var args []any
+
+	whereParts = append(whereParts, "created_at >= ?")
+	args = append(args, q.DateFrom)
+	whereParts = append(whereParts, "created_at < ?")
+	args = append(args, q.DateTo)
+
+	for dim, values := range q.Filters {
+		def, ok := dimensionRegistry[dim]
+		if !ok || def.Tables == "clicks_only" {
+			continue
+		}
+		if len(values) == 1 {
+			whereParts = append(whereParts, fmt.Sprintf("%s = ?", def.Column))
+			args = append(args, values[0])
+		} else if len(values) > 1 {
+			placeholders := strings.Repeat("?, ", len(values)-1) + "?"
+			whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", def.Column, placeholders))
+			for _, v := range values {
+				args = append(args, v)
+			}
+		}
+	}
+
+	query := fmt.Sprintf("SELECT * FROM conversions WHERE %s ORDER BY created_at DESC LIMIT %d OFFSET %d",
+		strings.Join(whereParts, " AND "), q.Limit, q.Offset)
+
+	rows, err := s.ch.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("execute conversions log query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []map[string]any
+	columns := rows.ColumnTypes()
+
+	for rows.Next() {
+		row := make(map[string]any)
+		dest := make([]any, len(columns))
+		for i := range dest {
+			var val any
+			dest[i] = &val
+		}
+
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("scan conversion log row: %w", err)
+		}
+
+		for i, col := range columns {
+			val := *(dest[i].(*any))
+			row[col.Name()] = val
+		}
+		result = append(result, row)
+	}
+
+	return &LogResponse{
+		Rows:   result,
+		Limit:  q.Limit,
+		Offset: q.Offset,
+		Total:  0,
+	}, nil
+}
