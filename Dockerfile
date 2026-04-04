@@ -15,13 +15,19 @@ COPY . .
 # Copy the built UI from Stage 1 into the Go expected static directory
 COPY --from=ui-builder /app/admin-ui/dist ./admin-ui/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -o zai-tds cmd/zai-tds/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o migrate-ch cmd/migrate-ch/main.go
 
 # Stage 3: Final Production Image
 FROM alpine:3.20
 # Add CA certs for outbound HTTPS requests and TZ data for proper time handling
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata \
+    && addgroup -S skyplix && adduser -S skyplix -G skyplix
 WORKDIR /app
 COPY --from=go-builder /app/zai-tds .
+COPY --from=go-builder /app/migrate-ch .
+COPY db/clickhouse/migrations/ ./db/clickhouse/migrations/
 COPY config.yaml .
+RUN chown -R skyplix:skyplix /app
+USER skyplix
 EXPOSE 8080
 CMD ["./zai-tds"]

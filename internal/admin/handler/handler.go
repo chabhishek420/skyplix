@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -61,4 +63,20 @@ func NewHandler(db *pgxpool.Pool, cache *cache.Cache, botDB *botdb.ValkeyStore, 
 		users:     repository.NewUserRepository(db),
 		settings:  repository.NewSettingsRepository(db),
 	}
+}
+
+// ListClusterNodes returns a list of active TDS nodes in the cluster.
+// GET /api/v1/cluster/nodes
+func (h *Handler) ListClusterNodes(w http.ResponseWriter, r *http.Request) {
+	// Simple static implementation for now (Phase 10 placeholder)
+	nodes := []map[string]interface{}{
+		{
+			"id":        "node-1",
+			"host":      r.Host,
+			"version":   "v1.0.0",
+			"status":    "online",
+			"last_seen": time.Now().Format(time.RFC3339),
+		},
+	}
+	h.respondJSON(w, http.StatusOK, nodes)
 }

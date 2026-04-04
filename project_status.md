@@ -6,10 +6,10 @@
 
 | Milestone | v1.0 — Production TDS |
 |-----------|----------------------|
-| Phases Complete | 6 of 9 (1, 1.5, 2, 3, 4, 4.9.4) |
-| Current Phase | 5 — Conversion Tracking & Analytics |
-| Current Sub-phase | 5.1 Task 3 complete, 5.2 not started |
-| Overall Estimate | ~67% |
+| Phases Complete | 8 of 9 (1, 1.5, 2, 3, 4, 4.9.4, 5, 7) |
+| Current Phase | 6 — Admin Dashboard UI |
+| Current Sub-phase | Redesign Analytics Dashboard [100%] |
+| Overall Estimate | ~92% |
 | Health | `gsd:health` → **Healthy** (0 errors, 0 warnings) |
 
 ## Phase Completion Matrix
@@ -22,9 +22,9 @@
 | 3 | Admin API — CRUD for All Entities | ✅ Complete | VERIFICATION.md + RESEARCH present |
 | 4 | Advanced Cloaking & Bot Detection | ✅ Complete | VERIFICATION.md + 5 SUMMARYs, 8/8 test cases GREEN |
 | 4.9.4 | Gap Closure & Uniqueness Hardening | ✅ Complete | p99 latency: 2.06ms |
-| 5 | Conversion Tracking & Analytics | 🔄 In Progress | Plan 5.1 tasks 1-3 done, Plans 5.2/5.3 not started |
-| 6 | Admin Dashboard UI | ⬜ Not Started | Directory created, no plans executed |
-| 7 | Production Hardening | ⬜ Not Started | Directory created, no plans executed |
+| 5 | Conversion Tracking & Analytics | ✅ Complete | SUMMARY present |
+| 6 | Admin Dashboard UI | 🔄 In Progress | Redesign Analytics Dashboard [100%] |
+| 7 | Production Hardening | ✅ Complete | SUMMARY present |
 
 ## Current Implementation State
 
