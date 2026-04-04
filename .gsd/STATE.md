@@ -1,18 +1,22 @@
 # GSD State
 
-**Status**: Milestone Complete ✅
+**Status**: Milestone Planned 📝
 
 ## Current Position
-- **Phase**: v1.0 — Production TDS (Finalized)
-- **Status**: ✅ Complete and verified
+- **Milestone**: v2.0 — Smart Optimizer & Scaling
+- **Phase**: Phase 8: Smart Optimization Engine (MAB)
+- **Status**: Not started
 
-## Milestone v1.0 Statistics
-| Metric | Value |
-|--------|-------|
-| Phases | 9 |
-| p99 Latency | 2.06ms |
-| Verification | 100% PASS |
+## Milestone v2.0 Must-Haves
+| Requirement | Status |
+|-------------|--------|
+| MAB Auto-Optimization | ⬜ Not Started |
+| Advanced TLS Fingerprinting | ⬜ Not Started |
+| Cluster Execution Consistency | ⬜ Not Started |
+| Postback v2 & Macro Engine | ⬜ Not Started |
+
+## Decisions Made
+- **Strategy**: Focus on automated ROI optimization first to provide immediate value over v1.0's static models.
 
 ## Next Steps
-1. /new-project — Initialize next roadmap or Phase 8
-2. /audit-milestone v1.0-FINAL — Review v1.0 legacy structure
+1. /plan 8 — Create execution plan for Multi-Armed Bandit optimization.
