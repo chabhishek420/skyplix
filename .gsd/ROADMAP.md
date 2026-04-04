@@ -130,6 +130,6 @@
 - [x] Campaign/Stream/Offer CRUD — **Admin API verified, 3/3 PASS**
 - [x] Bot detection + cloaking — **8/8 cloaking tests PASS**
 - [x] Postback conversion tracking — **Attribution + CH writer verified**
-- [ ] Real-time analytics dashboard — **Backend done; Phase 6 (UI) pending**
-- [ ] Single binary deployment — **Phase 6 (embed) + Phase 7 (hardening) pending**
+- [x] Real-time analytics dashboard — **UI + Backend verified**
+- [x] Single binary deployment — **Admin UI embedded**
 
