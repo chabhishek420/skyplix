@@ -192,6 +192,7 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		Payout:             payout,
 		Revenue:            revenue,
 		ExternalID:         externalID,
+			ConversionType:     "postback",
 	}
 
 	select {
@@ -203,6 +204,73 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		h.respondError(w, http.StatusServiceUnavailable, "error: queue_full")
 		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 	}
+}
+
+// HandlePixel serves a 1x1 transparent GIF and records a conversion.
+// This is used for client-side tracking where a postback is not possible.
+func (h *PostbackHandler) HandlePixel(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.serveTransparentGif(w)
+		return
+	}
+
+	token := firstNonEmpty(
+		r.Form.Get("sub_id"),
+		r.Form.Get("subid"),
+		r.Form.Get("click_token"),
+		r.Form.Get("clickid"),
+		r.Form.Get("click_id"),
+	)
+
+	if token == "" {
+		h.serveTransparentGif(w)
+		return
+	}
+
+	attr, err := h.getAttribution(r.Context(), token)
+	if err != nil || attr == nil || attr.CampaignID == uuid.Nil {
+		h.serveTransparentGif(w)
+		return
+	}
+
+	if h.convChan != nil {
+		payout := parseFloat(r.Form.Get("payout"))
+		status := strings.ToLower(firstNonEmpty(r.Form.Get("status"), "lead"))
+
+		record := queue.ConversionRecord{
+			ID:                 uuid.New().String(),
+			CreatedAt:          time.Now().UTC(),
+			ClickToken:         token,
+			CampaignID:         attr.CampaignID.String(),
+			StreamID:           attr.StreamID.String(),
+			OfferID:            attr.OfferID.String(),
+			LandingID:          attr.LandingID.String(),
+			AffiliateNetworkID: attr.AffiliateNetworkID.String(),
+			SourceID:           attr.SourceID.String(),
+			CountryCode:        attr.CountryCode,
+			Status:             status,
+			Payout:             payout,
+			ConversionType:     "pixel",
+		}
+
+		select {
+		case h.convChan <- record:
+			metrics.PostbackProcessedTotal.WithLabelValues("pixel_success").Inc()
+		default:
+			h.logger.Warn("conversion queue full (pixel) - dropping", zap.String("token", token))
+		}
+	}
+
+	h.serveTransparentGif(w)
+}
+
+func (h *PostbackHandler) serveTransparentGif(w http.ResponseWriter) {
+	// 1x1 transparent GIF
+	const pixel = "\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b"
+	w.Header().Set("Content-Type", "image/gif")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(pixel))
 }
 
 func (h *PostbackHandler) respondJSON(w http.ResponseWriter, status int, data interface{}) {

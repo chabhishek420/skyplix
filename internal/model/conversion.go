@@ -23,6 +23,7 @@ type Conversion struct {
 	Payout             float64   `json:"payout"`
 	Revenue            float64   `json:"revenue"`
 	ExternalID         string    `json:"external_id"` // Transaction ID from affiliate network
+	ConversionType     string    `json:"conversion_type"` // postback, pixel
 }
 
 // AttributionData is the subset of click metadata cached in Valkey for attribution.

@@ -154,4 +154,49 @@ func TestPostbackHandler_HandlePostback(t *testing.T) {
 			t.Errorf("second tx: expected 409, got %d", w2.Code)
 		}
 	})
+
+	t.Run("HandlePixel", func(t *testing.T) {
+		// Drain channel
+		for len(convChan) > 0 {
+			<-convChan
+		}
+
+		token := uuid.New().String()
+		campID := uuid.New()
+
+		// Seed attribution
+		attrData := fmt.Sprintf(`{"campaign_id":"%s","country_code":"US"}`, campID)
+		vk.Set(context.Background(), "attr:"+token, attrData, 0)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/pixel.gif?subid="+token+"&payout=5.25&status=sale", nil)
+
+		h.HandlePixel(w, r)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", w.Code)
+		}
+
+		if ct := w.Header().Get("Content-Type"); ct != "image/gif" {
+			t.Errorf("expected image/gif, got %s", ct)
+		}
+
+		select {
+		case record := <-convChan:
+			if record.ClickToken != token {
+				t.Errorf("expected token %s, got %s", token, record.ClickToken)
+			}
+			if record.Payout != 5.25 {
+				t.Errorf("expected payout 5.25, got %v", record.Payout)
+			}
+			if record.Status != "sale" {
+				t.Errorf("expected status sale, got %s", record.Status)
+			}
+			if record.ConversionType != "pixel" {
+				t.Errorf("expected conversion type pixel, got %s", record.ConversionType)
+			}
+		default:
+			t.Error("expected record in convChan")
+		}
+	})
 }

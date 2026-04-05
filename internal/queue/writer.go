@@ -71,6 +71,7 @@ type ConversionRecord struct {
 	Payout             float64
 	Revenue            float64
 	ExternalID         string
+	ConversionType     string
 }
 
 // FromRawClick converts a RawClick to a ClickRecord for ClickHouse insertion.
@@ -150,6 +151,7 @@ func FromConversion(c *model.Conversion) ConversionRecord {
 		Payout:             c.Payout,
 		Revenue:            c.Revenue,
 		ExternalID:         c.ExternalID,
+		ConversionType:     c.ConversionType,
 	}
 }
 
@@ -370,7 +372,7 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 
 	b, err := w.conn.PrepareBatch(ctx, `INSERT INTO conversions
 		(id, created_at, click_token, campaign_id, stream_id, offer_id, landing_id,
-		 affiliate_network_id, source_id, country_code, status, payout, revenue, external_id)`)
+		 affiliate_network_id, source_id, country_code, status, payout, revenue, external_id, conversion_type)`)
 	if err != nil {
 		w.Logger.Error("clickhouse prepare conversions batch failed", zap.Error(err))
 		metrics.ClickHouseFlushesTotal.WithLabelValues("conversions", "error").Inc()
@@ -404,6 +406,7 @@ func (w *Writer) flushConversions(records []ConversionRecord) {
 			decimal.NewFromFloat(r.Payout),
 			decimal.NewFromFloat(r.Revenue),
 			r.ExternalID,
+			r.ConversionType,
 		); err != nil {
 			w.Logger.Error("conversions batch append failed", zap.Error(err), zap.String("token", r.ClickToken))
 		}

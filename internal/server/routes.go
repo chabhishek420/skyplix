@@ -30,9 +30,10 @@ func (s *Server) routes() http.Handler {
 	r.Get("/api/v1/health", s.handleHealth)
 	r.Get("/api/v1/ready", s.handleReady)
 
-	// Public postback endpoint (Phase 5.2)
+	// Public postback and pixel endpoints (Phase 5.2)
 	r.Get("/postback/{key}", s.postbackHandler.HandlePostback)
 	r.Post("/postback/{key}", s.postbackHandler.HandlePostback)
+	r.Get("/pixel.gif", s.postbackHandler.HandlePixel)
 
 	// Login endpoint (Phase 6)
 	r.Post("/api/v1/auth/login", s.handleLogin)
