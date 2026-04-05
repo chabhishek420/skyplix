@@ -13,6 +13,9 @@ const campaignSchema = z.object({
   state: z.enum(['active', 'disabled']),
   cost_type: z.enum(['cpa', 'cpc', 'revshare']),
   cost_value: z.coerce.number().min(0).optional(),
+  bind_visitors: z.boolean().default(false),
+  is_optimization_enabled: z.boolean().default(false),
+  optimization_metric: z.enum(['CR', 'EPC']).default('CR'),
 });
 
 type CampaignFormValues = z.infer<typeof campaignSchema>;
@@ -45,6 +48,9 @@ export function CampaignEdit() {
         state: campaign.state,
         cost_type: campaign.cost_type,
         cost_value: campaign.cost_value,
+        bind_visitors: campaign.bind_visitors,
+        is_optimization_enabled: campaign.is_optimization_enabled,
+        optimization_metric: campaign.optimization_metric || 'CR',
       });
     }
   }, [campaign, reset]);
@@ -139,6 +145,34 @@ export function CampaignEdit() {
                 {...register('cost_value')}
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
+            </div>
+
+            <div className="pt-4 space-y-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-semibold text-foreground">Visitor Binding</label>
+                  <p className="text-xs text-muted-foreground">Keep visitors locked to the same stream/offer for 24h.</p>
+                </div>
+                <input type="checkbox" {...register('bind_visitors')} className="w-5 h-5 rounded border-border text-primary focus:ring-primary" />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-semibold text-foreground">Auto-Optimization</label>
+                  <p className="text-xs text-muted-foreground">Automatically adjust stream weights based on performance.</p>
+                </div>
+                <input type="checkbox" {...register('is_optimization_enabled')} className="w-5 h-5 rounded border-border text-primary focus:ring-primary" />
+              </div>
+
+              {campaign?.is_optimization_enabled && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-sm font-medium text-foreground">Optimization Metric</label>
+                  <select {...register('optimization_metric')} className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                    <option value="CR">Conversion Rate (CR)</option>
+                    <option value="EPC">Earnings Per Click (EPC)</option>
+                  </select>
+                </div>
+              )}
             </div>
           </form>
         </div>
