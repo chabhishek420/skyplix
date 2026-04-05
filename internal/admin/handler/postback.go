@@ -2,7 +2,10 @@ package handler
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"math"
 	"net/http"
 	"strconv"
@@ -122,6 +125,32 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 	if attr == nil || attr.CampaignID == uuid.Nil {
 		h.writeText(w, http.StatusNotFound, "error: attribution_not_found")
 		return
+	}
+
+	// 4. HMAC Validation (Phase 5.2) - Optional for compatibility, but recommended.
+	// Construction: sig=hmac_sha256(expectedKey, click_token + status + payout_str)
+	if sig := r.Form.Get("sig"); sig != "" {
+		payoutStr := firstNonEmpty(r.Form.Get("payout"), r.Form.Get("amount"), r.Form.Get("sum"), "0")
+		mac := hmac.New(sha256.New, []byte(expectedKey))
+		mac.Write([]byte(token + status + payoutStr))
+		expectedSig := hex.EncodeToString(mac.Sum(nil))
+		if !hmac.Equal([]byte(sig), []byte(expectedSig)) {
+			h.logger.Warn("postback signature mismatch", zap.String("token", token), zap.String("got", sig), zap.String("want", expectedSig))
+			h.writeText(w, http.StatusUnauthorized, "error: invalid_signature")
+			return
+		}
+	}
+
+	// 5. Transaction Deduplication (Phase 5.1)
+	if externalID != "" {
+		dup, err := h.attribution.CheckDuplicateTransaction(r.Context(), attr.WorkspaceID, externalID)
+		if err != nil {
+			h.logger.Error("deduplication check failed", zap.Error(err))
+		}
+		if dup {
+			h.writeText(w, http.StatusConflict, "error: duplicate_transaction")
+			return
+		}
 	}
 
 	if h.convChan == nil {
@@ -251,4 +280,78 @@ func parseFloat(s string) float64 {
 		return 0
 	}
 	return v
+}
+
+// HandlePixel serves a 1x1 transparent GIF and records a conversion.
+// GET /pixel.gif?sub_id={sub_id}&status={status}&payout={payout}
+func (h *PostbackHandler) HandlePixel(w http.ResponseWriter, r *http.Request) {
+	// 1. Process conversion logic (shared with Postback)
+	// For Pixels, we don't usually require the postback key in the URL path,
+	// but we might check it in params or just rely on the click token.
+
+	if err := r.ParseForm(); err != nil {
+		h.writePixel(w)
+		return
+	}
+
+	token := firstNonEmpty(r.Form.Get("sub_id"), r.Form.Get("subid"), r.Form.Get("click_id"))
+	if token == "" {
+		h.writePixel(w)
+		return
+	}
+
+	// Pixels are often fired from safe pages or landings,
+	// so we try to find the attribution.
+	attr, err := h.getAttribution(r.Context(), token)
+	if err != nil || attr == nil {
+		h.writePixel(w)
+		return
+	}
+
+	status := strings.ToLower(firstNonEmpty(r.Form.Get("status"), "lead"))
+	payout := parseFloat(firstNonEmpty(r.Form.Get("payout"), "0"))
+
+	if h.convChan != nil {
+		record := queue.ConversionRecord{
+			ID:                 uuid.New().String(),
+			WorkspaceID:        attr.WorkspaceID.String(),
+			CreatedAt:          time.Now().UTC(),
+			ClickToken:         token,
+			CampaignID:         attr.CampaignID.String(),
+			StreamID:           attr.StreamID.String(),
+			OfferID:            attr.OfferID.String(),
+			LandingID:          attr.LandingID.String(),
+			AffiliateNetworkID: attr.AffiliateNetworkID.String(),
+			SourceID:           attr.SourceID.String(),
+			CountryCode:        attr.CountryCode,
+			Status:             status,
+			ConversionType:     "pixel",
+			Payout:             int64(math.Round(payout * 100)),
+			Revenue:            int64(math.Round(payout * 100)), // For pixels, revenue usually equals payout
+		}
+
+		select {
+		case h.convChan <- record:
+		default:
+			h.logger.Warn("pixel conversion dropped - queue full", zap.String("token", token))
+		}
+	}
+
+	h.writePixel(w)
+}
+
+var transparentGif = []byte{
+	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
+	0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x21, 0xF9, 0x04, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+	0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3B,
+}
+
+func (h *PostbackHandler) writePixel(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "image/gif")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(transparentGif)
 }

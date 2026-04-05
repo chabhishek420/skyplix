@@ -67,34 +67,36 @@ func (s *Service) GenerateReport(ctx context.Context, q *ReportQuery) (*ReportRe
 		}
 		defer rows.Close()
 
+		columns := rows.ColumnTypes()
 		for rows.Next() {
 			row := ReportRow{Dimensions: make(map[string]string)}
-			var dest []any
-			for _, dim := range q.GroupBy {
-				if dimensionRegistry[dim].Tables == "convs_only" {
-					continue
-				}
+			dest := make([]any, len(columns))
+			for i := range dest {
 				var val any
-				dest = append(dest, &val)
+				dest[i] = &val
 			}
-			var costCents, payoutCents int64
-			dest = append(dest, &row.Clicks, &row.UniqueClicks, &row.Bots, &costCents, &payoutCents)
 
 			if err := rows.Scan(dest...); err != nil {
 				return fmt.Errorf("scan click stats row: %w", err)
 			}
-			row.Cost = float64(costCents) / 100.0
-			row.CPC = float64(payoutCents) / 100.0 // click_payout as CPC temporarily
 
-			// Map dimensions back from any to string
-			idx := 0
-			for _, dim := range q.GroupBy {
-				if dimensionRegistry[dim].Tables == "convs_only" {
-					continue
+			// Map by column name for robustness
+			for i, col := range columns {
+				val := *(dest[i].(*any))
+				switch col.Name() {
+				case "clicks":
+					row.Clicks = val.(uint64)
+				case "unique_clicks":
+					row.UniqueClicks = val.(uint64)
+				case "bots":
+					row.Bots = val.(uint64)
+				case "cost":
+					row.Cost = float64(val.(int64)) / 100.0
+				case "click_payout":
+					row.CPC = float64(val.(int64)) / 100.0
+				default:
+					row.Dimensions[col.Name()] = fmt.Sprintf("%v", val)
 				}
-				val := *(dest[idx].(*any))
-				row.Dimensions[dim] = fmt.Sprintf("%v", val)
-				idx++
 			}
 			clickRows = append(clickRows, row)
 		}
@@ -108,33 +110,31 @@ func (s *Service) GenerateReport(ctx context.Context, q *ReportQuery) (*ReportRe
 		}
 		defer rows.Close()
 
+		columns := rows.ColumnTypes()
 		for rows.Next() {
 			row := ReportRow{Dimensions: make(map[string]string)}
-			var dest []any
-			for _, dim := range q.GroupBy {
-				if dimensionRegistry[dim].Tables == "clicks_only" {
-					continue
-				}
+			dest := make([]any, len(columns))
+			for i := range dest {
 				var val any
-				dest = append(dest, &val)
+				dest[i] = &val
 			}
-			var revenueCents, payoutCents int64
-			dest = append(dest, &row.Conversions, &revenueCents, &payoutCents)
 
 			if err := rows.Scan(dest...); err != nil {
 				return fmt.Errorf("scan conv stats row: %w", err)
 			}
-			row.Revenue = float64(revenueCents) / 100.0
-			row.ROI = float64(payoutCents) / 100.0 // payout as ROI temporarily
 
-			idx := 0
-			for _, dim := range q.GroupBy {
-				if dimensionRegistry[dim].Tables == "clicks_only" {
-					continue
+			for i, col := range columns {
+				val := *(dest[i].(*any))
+				switch col.Name() {
+				case "conversions":
+					row.Conversions = val.(uint64)
+				case "revenue":
+					row.Revenue = float64(val.(int64)) / 100.0
+				case "payout":
+					row.ROI = float64(val.(int64)) / 100.0 // Temporarily mapped to ROI field for data carry
+				default:
+					row.Dimensions[col.Name()] = fmt.Sprintf("%v", val)
 				}
-				val := *(dest[idx].(*any))
-				row.Dimensions[dim] = fmt.Sprintf("%v", val)
-				idx++
 			}
 			convRows = append(convRows, row)
 		}

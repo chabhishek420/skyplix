@@ -32,9 +32,10 @@ func (s *Server) routes() http.Handler {
 	r.Get("/api/v1/health", s.handleHealth)
 	r.Get("/api/v1/ready", s.handleReady)
 
-	// Public postback endpoint (Phase 5.2)
+	// Public conversion endpoints (Phase 5)
 	r.Get("/postback/{key}", s.postbackHandler.HandlePostback)
 	r.Post("/postback/{key}", s.postbackHandler.HandlePostback)
+	r.Get("/pixel.gif", s.postbackHandler.HandlePixel)
 
 	// Protected Admin API routes
 	r.Route("/api/v1", func(r chi.Router) {

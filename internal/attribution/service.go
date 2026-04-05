@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
@@ -44,6 +45,23 @@ func (s *Service) SaveClickAttribution(ctx context.Context, token string, data m
 	}
 
 	return nil
+}
+
+// CheckDuplicateTransaction checks if a transaction ID has already been processed for a specific workspace.
+// Returns true if duplicate.
+func (s *Service) CheckDuplicateTransaction(ctx context.Context, workspaceID uuid.UUID, externalID string) (bool, error) {
+	if externalID == "" {
+		return false, nil
+	}
+
+	key := fmt.Sprintf("conv:tx:%s:%s", workspaceID, externalID)
+	// SETNX returns true if the key was set (new transaction), false if it exists (duplicate)
+	isNew, err := s.vk.SetNX(ctx, key, "1", 30*24*time.Hour).Result()
+	if err != nil {
+		return false, fmt.Errorf("check transaction deduplication: %w", err)
+	}
+
+	return !isNew, nil
 }
 
 // GetClickAttribution retrieves cached click metadata for a token.

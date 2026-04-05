@@ -18,17 +18,20 @@ type DimensionDef struct {
 
 // dimensionRegistry is a whitelist of allowed dimensions.
 var dimensionRegistry = map[string]DimensionDef{
-	"campaign": {Column: "campaign_id", Tables: "all"},
-	"stream":   {Column: "stream_id", Tables: "all"},
-	"offer":    {Column: "offer_id", Tables: "all"},
-	"landing":  {Column: "landing_id", Tables: "clicks_only"},
-	"country":  {Column: "country_code", Tables: "all"},
-	"device":   {Column: "device_type", Tables: "clicks_only"},
-	"os":       {Column: "os", Tables: "clicks_only"},
-	"browser":  {Column: "browser", Tables: "clicks_only"},
-	"day":      {Column: "toDate(hour)", Tables: "all", DailyColumn: "day"},
-	"hour":     {Column: "hour", Tables: "all", DailyColumn: ""},
-	"status":   {Column: "status", Tables: "convs_only"},
+	"workspace":  {Column: "workspace_id", Tables: "all"},
+	"campaign":   {Column: "campaign_id", Tables: "all"},
+	"stream":     {Column: "stream_id", Tables: "all"},
+	"offer":      {Column: "offer_id", Tables: "all"},
+	"landing":    {Column: "landing_id", Tables: "clicks_only"},
+	"country":    {Column: "country_code", Tables: "all"},
+	"device":     {Column: "device_type", Tables: "clicks_only"},
+	"os":         {Column: "os", Tables: "clicks_only"},
+	"browser":    {Column: "browser", Tables: "clicks_only"},
+	"day":        {Column: "toDate(hour)", Tables: "all", DailyColumn: "day"},
+	"hour":       {Column: "hour", Tables: "all", DailyColumn: ""},
+	"status":     {Column: "status", Tables: "convs_only"},
+	"is_bot":     {Column: "is_bot", Tables: "clicks_only"},
+	"bot_reason": {Column: "bot_reason", Tables: "clicks_only"},
 }
 
 // QueryBuilder generates safe ClickHouse SQL for reports.
