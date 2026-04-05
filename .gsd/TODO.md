@@ -26,6 +26,12 @@
 - [x] Implement ClickHouse Materialized Views for real-time stats aggregation
 - [x] Define postback URL template macros (12 Keitaro-compatible macros)
 
+## Milestone v2.0 Scaling & Automation
+- [x] Implement Phase 8: MAB Auto-Optimization (Epsilon-Greedy)
+- [ ] Implement Phase 9: JA3/JA4 Next-Gen Anti-Bot
+- [ ] Implement Phase 10: High-Availability & Cluster Mode
+- [ ] Implement Phase 11: Enterprise Dashboard & Multi-User
+
 ## Deferred to Later Phases
 - [ ] Research Grafana dashboard templates for TDS metrics (Phase 7)
 - [ ] Evaluate Kubernetes Helm chart for production deployment (Phase 7)
