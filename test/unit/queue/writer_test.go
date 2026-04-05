@@ -183,3 +183,25 @@ func TestFromRawClick_Conversion(t *testing.T) {
 		t.Errorf("ClickToken: expected 'abc123def456', got %s", record.ClickToken)
 	}
 }
+
+func TestFromRawClick_NewFields(t *testing.T) {
+	wsID := uuid.New()
+	rc := &model.RawClick{
+		WorkspaceID:   wsID,
+		RequestID:     "req-123",
+		BehaviorScore: 85,
+		ClickToken:    "token-xyz",
+	}
+
+	record := queue.FromRawClick(rc)
+
+	if record.WorkspaceID != wsID.String() {
+		t.Errorf("WorkspaceID: expected %s, got %s", wsID.String(), record.WorkspaceID)
+	}
+	if record.RequestID != "req-123" {
+		t.Errorf("RequestID: expected req-123, got %s", record.RequestID)
+	}
+	if record.BehaviorScore != 85 {
+		t.Errorf("BehaviorScore: expected 85, got %d", record.BehaviorScore)
+	}
+}

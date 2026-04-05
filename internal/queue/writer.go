@@ -82,6 +82,8 @@ type ConversionRecord struct {
 func FromRawClick(rc *model.RawClick) ClickRecord {
 	r := ClickRecord{
 		CreatedAt:      rc.CreatedAt,
+		WorkspaceID:    rc.WorkspaceID.String(),
+		RequestID:      rc.RequestID,
 		CampaignAlias:  rc.CampaignAlias,
 		CountryCode:    rc.CountryCode,
 		City:           rc.City,
@@ -107,6 +109,7 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 		JA4:            rc.JA4,
 		TLSHost:        rc.TLSHost,
 		BotReason:      rc.BotReason,
+		BehaviorScore:  rc.BehaviorScore,
 	}
 
 	if rc.IsBot {
@@ -142,8 +145,10 @@ func FromRawClick(rc *model.RawClick) ClickRecord {
 func FromConversion(c *model.Conversion) ConversionRecord {
 	return ConversionRecord{
 		ID:                 c.ID.String(),
+		WorkspaceID:        c.WorkspaceID.String(),
 		CreatedAt:          c.CreatedAt,
 		ClickToken:         c.ClickToken,
+		VisitorCode:        c.VisitorCode,
 		CampaignID:         c.CampaignID.String(),
 		StreamID:           c.StreamID.String(),
 		OfferID:            c.OfferID.String(),
@@ -152,6 +157,7 @@ func FromConversion(c *model.Conversion) ConversionRecord {
 		SourceID:           c.SourceID.String(),
 		CountryCode:        c.CountryCode,
 		Status:             c.Status,
+		ConversionType:     c.ConversionType,
 		Payout:             c.Payout,
 		Revenue:            c.Revenue,
 		ExternalID:         c.ExternalID,
