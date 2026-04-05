@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import { Activity, LayoutGrid, Trash2, Copy } from 'lucide-react';
+import { Activity, LayoutGrid, Trash2, Edit3 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 
@@ -14,6 +15,43 @@ type TrafficSource = {
 };
 
 const columnHelper = createColumnHelper<TrafficSource>();
+
+function ActionsCell({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/traffic_sources/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sources'] }),
+  });
+
+  return (
+    <div className="flex justify-end space-x-1">
+      <button
+        onClick={() => navigate(`/sources/${id}`)}
+        className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Edit"
+      >
+        <Edit3 className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => navigate(`/sources/${id}`)}
+        className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Configure Params"
+      >
+        <LayoutGrid className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => {
+          if (confirm('Are you sure you want to delete this traffic source?')) {
+            deleteMutation.mutate();
+          }
+        }}
+        className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
 const columns: ColumnDef<TrafficSource, any>[] = [
   columnHelper.accessor('name', {
@@ -32,6 +70,9 @@ const columns: ColumnDef<TrafficSource, any>[] = [
         {Object.keys(info.getValue() || {}).length > 3 && (
           <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground">+{Object.keys(info.getValue()).length - 3} more</span>
         )}
+        {Object.keys(info.getValue() || {}).length === 0 && (
+          <span className="text-[10px] text-slate-400 italic">No custom params</span>
+        )}
       </div>
     ),
   }),
@@ -46,28 +87,17 @@ const columns: ColumnDef<TrafficSource, any>[] = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: '',
-    cell: () => (
-      <div className="flex justify-end space-x-1">
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Configure Params">
-          <LayoutGrid className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy Pixel">
-          <Copy className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    ),
+    cell: info => <ActionsCell id={info.getValue()} />,
   }),
 ];
 
 export function Sources() {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['sources'],
     queryFn: async () => {
-      const res = await api.get('/sources');
-      return res.data;
+      const res = await api.get('/traffic_sources');
+      return res.data || [];
     }
   });
 
@@ -77,7 +107,7 @@ export function Sources() {
         title="Traffic Sources"
         description="Configure dynamic parameters and postback links for incoming traffic."
         icon={Activity}
-        onAdd={() => console.log('Add Traffic Source')}
+        onAdd={() => navigate('/sources/new')}
         addLabel="Add Source"
       />
       

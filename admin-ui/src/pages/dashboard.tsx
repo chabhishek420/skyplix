@@ -64,14 +64,16 @@ export function Dashboard() {
     roi: row.roi,
   }));
 
-  const chartData = [
-    { name: '01 MAY', clicks: 4000, conversions: 2400, revenue: 2400, cost: 1200 },
-    { name: '03 MAY', clicks: 3000, conversions: 1398, revenue: 3200, cost: 1800 },
-    { name: '05 MAY', clicks: 2000, conversions: 9800, revenue: 2800, cost: 1500 },
-    { name: '07 MAY', clicks: 2780, conversions: 3908, revenue: 4500, cost: 2100 },
-    { name: '09 MAY', clicks: 1890, conversions: 4800, revenue: 3900, cost: 1700 },
-    { name: '11 MAY', clicks: 2390, conversions: 3800, revenue: 4200, cost: 1900 },
-    { name: '13 MAY', clicks: 3490, conversions: 4300, revenue: 5100, cost: 2300 },
+  const chartData = (reportData?.rows || []).filter((r: any) => r.dimensions.day).map((r: any) => ({
+    name: r.dimensions.day,
+    clicks: r.clicks,
+    conversions: r.conversions,
+    revenue: r.revenue,
+    cost: r.cost,
+  })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+  const finalChartData = chartData.length > 0 ? chartData : [
+    { name: 'No Data', clicks: 0, conversions: 0, revenue: 0, cost: 0 },
   ];
 
   const stats = [
@@ -125,7 +127,7 @@ export function Dashboard() {
           </div>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart data={finalChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563eb" stopOpacity={0.08}/>
@@ -166,7 +168,7 @@ export function Dashboard() {
           </div>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={finalChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
