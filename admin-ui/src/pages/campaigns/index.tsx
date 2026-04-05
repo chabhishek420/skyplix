@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { 
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { Megaphone, Plus, Link as LinkIcon, Trash2, Copy, Filter, ArrowUpDown } from 'lucide-react';
+import { Megaphone, Plus, Link as LinkIcon, Trash2, Copy, Filter, ArrowUpDown, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 type Campaign = {
@@ -48,23 +49,46 @@ const columns = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: () => <div className="text-center">Actions</div>,
-    cell: () => (
-      <div className="flex justify-center space-x-1">
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL">
-          <LinkIcon className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
-          <Copy className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    ),
+    cell: ({ row }) => <CampaignActions campaign={row.original} />,
   }),
 ];
 
+function CampaignActions({ campaign }: { campaign: Campaign }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/campaigns/${campaign.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+
+  return (
+    <div className="flex justify-center space-x-1">
+      <button
+        onClick={() => navigate(`/campaigns/${campaign.id}`)}
+        className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded"
+        title="Edit"
+      >
+        <LinkIcon className="w-3.5 h-3.5" />
+      </button>
+      <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
+        <Copy className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => {
+          if (confirm('Delete campaign?')) deleteMutation.mutate();
+        }}
+        disabled={deleteMutation.isPending}
+        className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded disabled:opacity-50"
+        title="Delete"
+      >
+        {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  );
+}
+
 export function Campaigns() {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['campaigns'],
     queryFn: async () => {
@@ -93,7 +117,10 @@ export function Campaigns() {
             <Filter className="w-3.5 h-3.5" />
             <span>Filter</span>
           </button>
-          <button className="flex items-center space-x-2 bg-[#2563eb] text-white px-4 py-1.5 rounded text-[12px] font-bold shadow-sm shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95">
+          <button
+            onClick={() => navigate('/campaigns/new')}
+            className="flex items-center space-x-2 bg-[#2563eb] text-white px-4 py-1.5 rounded text-[12px] font-bold shadow-sm shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
+          >
             <Plus className="w-3.5 h-3.5" />
             <span>Create Campaign</span>
           </button>

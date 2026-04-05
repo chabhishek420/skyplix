@@ -62,10 +62,10 @@ export function Dashboard() {
   ];
 
   const stats = [
-    { label: 'Total Clicks', value: summary.total_clicks.toLocaleString(), trend: '+12.4%', isPositive: true, color: 'border-t-blue-600', icon: MousePointerClick },
-    { label: 'Conversions', value: summary.total_conversions.toLocaleString(), trend: '+5.2%', isPositive: true, color: 'border-t-emerald-500', icon: Target },
-    { label: 'Revenue', value: `$${summary.revenue.toLocaleString()}`, trend: '+8.1%', isPositive: true, color: 'border-t-emerald-600', icon: DollarSign },
-    { label: 'Avg ROI', value: `${summary.roi}%`, trend: '-1.4%', isPositive: false, color: 'border-t-slate-800', icon: Activity },
+    { label: 'Total Clicks', value: summary.total_clicks.toLocaleString(), trend: 'Live', isPositive: true, color: 'border-t-blue-600', icon: MousePointerClick },
+    { label: 'Conversions', value: summary.total_conversions.toLocaleString(), trend: 'Live', isPositive: true, color: 'border-t-emerald-500', icon: Target },
+    { label: 'Revenue', value: `$${summary.revenue.toLocaleString()}`, trend: 'Live', isPositive: true, color: 'border-t-emerald-600', icon: DollarSign },
+    { label: 'Avg ROI', value: `${summary.roi.toFixed(1)}%`, trend: 'Live', isPositive: true, color: 'border-t-slate-800', icon: Activity },
   ];
 
   return (
