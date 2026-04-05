@@ -195,10 +195,15 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	}
 
 	// Workers (AUDIT FIX #5)
+	var analyticsSvc *analytics.Service
+	if s.chReader != nil {
+		analyticsSvc = analytics.New(s.chReader, s.db, logger)
+	}
 
 	s.workers = worker.NewManager(logger,
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
 		worker.NewSessionJanitorWorker(logger),
+		worker.NewOptimizerWorker(s.db, s.valkey, analyticsSvc, logger),
 	)
 
 	// Warmup cache
@@ -231,7 +236,14 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.CheckParamAliasesStage{Cache: s.cache, Logger: logger},
 		&stage.UpdateGlobalUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.UpdateCampaignUniquenessStage{Session: s.sessionSvc, Logger: logger},
-		&stage.ChooseStreamStage{Cache: s.cache, Filter: s.filterEngine, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
+		&stage.ChooseStreamStage{
+			Cache:   s.cache,
+			Filter:  s.filterEngine,
+			Rotator: s.rotator,
+			Binding: s.bindingSvc,
+			Valkey:  s.valkey,
+			Logger:  logger,
+		},
 		&stage.UpdateStreamUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.ChooseLandingStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},

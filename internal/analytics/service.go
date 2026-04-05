@@ -482,3 +482,83 @@ func (s *Service) GetConversionsLog(ctx context.Context, q *ReportQuery) (*LogRe
 		Total:  0,
 	}, nil
 }
+
+// StreamPerformance holds raw metrics used for optimization.
+type StreamPerformance struct {
+	StreamID    string
+	Clicks      uint64
+	Conversions uint64
+	Revenue     float64
+	EPC         float64
+	CR          float64
+}
+
+// GetStreamPerformance returns performance metrics for all streams of a campaign in a time window.
+func (s *Service) GetStreamPerformance(ctx context.Context, campaignID string, window time.Duration) (map[string]StreamPerformance, error) {
+	dateFrom := time.Now().Add(-window)
+
+	// Query stats_hourly for efficiency
+	query := `
+		SELECT
+			toString(stream_id),
+			sum(clicks) as clicks,
+			sum(unique_clicks) as unique_clicks
+		FROM stats_hourly
+		WHERE campaign_id = ? AND hour >= ?
+		GROUP BY stream_id
+	`
+	rows, err := s.ch.Query(ctx, query, campaignID, dateFrom)
+	if err != nil {
+		return nil, fmt.Errorf("query stream clicks: %w", err)
+	}
+	defer rows.Close()
+
+	perfMap := make(map[string]StreamPerformance)
+	for rows.Next() {
+		var id string
+		var clicks, unique uint64
+		if err := rows.Scan(&id, &clicks, &unique); err != nil {
+			return nil, err
+		}
+		perfMap[id] = StreamPerformance{
+			StreamID: id,
+			Clicks:   clicks,
+		}
+	}
+
+	// Query conversions
+	convQuery := `
+		SELECT
+			toString(stream_id),
+			count() as conversions,
+			sum(revenue) as revenue
+		FROM conv_stats_hourly
+		WHERE campaign_id = ? AND hour >= ?
+		GROUP BY stream_id
+	`
+	crows, err := s.ch.Query(ctx, convQuery, campaignID, dateFrom)
+	if err != nil {
+		return nil, fmt.Errorf("query stream convs: %w", err)
+	}
+	defer crows.Close()
+
+	for crows.Next() {
+		var id string
+		var convs uint64
+		var rev float64
+		if err := crows.Scan(&id, &convs, &rev); err != nil {
+			return nil, err
+		}
+		p := perfMap[id]
+		p.Conversions = convs
+		p.Revenue = rev
+
+		if p.Clicks > 0 {
+			p.EPC = rev / float64(p.Clicks)
+			p.CR = float64(convs) / float64(p.Clicks) * 100
+		}
+		perfMap[id] = p
+	}
+
+	return perfMap, nil
+}

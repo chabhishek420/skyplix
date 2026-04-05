@@ -6,6 +6,8 @@
 package stage
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/cache"
 	"github.com/skyplix/zai-tds/internal/filter"
 	"github.com/skyplix/zai-tds/internal/model"
+	"github.com/redis/go-redis/v9"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 	"github.com/skyplix/zai-tds/internal/rotator"
 )
@@ -26,6 +29,7 @@ type ChooseStreamStage struct {
 	Filter  *filter.Engine
 	Rotator *rotator.Rotator
 	Binding *binding.Service
+	Valkey  *redis.Client
 	Logger  *zap.Logger
 }
 
@@ -101,12 +105,43 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 			}
 		} else if p.Campaign.Type == model.CampaignTypeWeight {
 			var matching []interface{}
+			var matchingIdx []int
 			for _, idx := range regularIdx {
 				if s.Filter.MatchAll(p.RawClick, streams[idx].Filters) {
 					matching = append(matching, &streams[idx])
+					matchingIdx = append(matchingIdx, idx)
 				}
 			}
+
 			if len(matching) > 0 {
+				// MAB Optimization check (Phase 8)
+				if p.Campaign.IsOptimizationEnabled && s.Valkey != nil {
+					key := fmt.Sprintf("optimized_weights:%s", p.Campaign.ID)
+					val, err := s.Valkey.Get(p.Ctx, key).Result()
+					if err == nil && val != "" {
+						var optWeights map[string]int
+						if err := json.Unmarshal([]byte(val), &optWeights); err == nil {
+							// Build weighted list based on MAB results
+							weights := make([]int, len(matching))
+							total := 0
+							for i, idx := range matchingIdx {
+								w, ok := optWeights[streams[idx].ID.String()]
+								if !ok || w <= 0 {
+									w = 1 // Exploration fallback
+								}
+								weights[i] = w
+								total += w
+							}
+
+							selIdx := rotator.PickIndex(weights, total)
+							selected := matching[selIdx].(*model.Stream)
+							s.selectAndBind(p, selected)
+							return nil
+						}
+					}
+				}
+
+				// Standard weighted rotation fallback
 				selected := s.Rotator.Pick(matching).(*model.Stream)
 				s.selectAndBind(p, selected)
 				return nil

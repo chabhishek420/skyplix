@@ -8,6 +8,7 @@ import { StreamEditor } from '@/components/campaigns/stream-editor';
 const campaignSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   state: z.enum(['active', 'disabled']),
+  is_optimization_enabled: z.boolean().default(false),
   cost_type: z.enum(['cpa', 'cpc', 'revshare']),
   cost_value: z.coerce.number().min(0).optional(),
 });
@@ -98,6 +99,19 @@ export function CampaignEdit() {
                 {...register('cost_value')}
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
+            </div>
+
+            <div className="flex items-center space-x-2 pt-4">
+              <input
+                type="checkbox"
+                id="is_optimization_enabled"
+                {...register('is_optimization_enabled')}
+                className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+              />
+              <label htmlFor="is_optimization_enabled" className="text-sm font-semibold text-foreground">
+                Enable MAB Auto-Optimization
+              </label>
+              <span className="text-[11px] text-muted-foreground italic">(Automatic weight adjustment based on CR/EPC)</span>
             </div>
           </form>
         </div>

@@ -22,7 +22,7 @@ func NewCampaignRepository(db DB) *CampaignRepository {
 // List returns a paginated list of campaigns.
 func (r *CampaignRepository) List(ctx context.Context, limit, offset int) ([]model.Campaign, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+		SELECT id, alias, name, type, bind_visitors, is_optimization_enabled, state, traffic_source_id, default_stream_id
 		FROM campaigns
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -37,7 +37,7 @@ func (r *CampaignRepository) List(ctx context.Context, limit, offset int) ([]mod
 		var c model.Campaign
 		err := rows.Scan(
 			&c.ID, &c.Alias, &c.Name, &c.Type,
-			&c.BindVisitors, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
+			&c.BindVisitors, &c.IsOptimizationEnabled, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan campaign: %w", err)
@@ -52,12 +52,12 @@ func (r *CampaignRepository) List(ctx context.Context, limit, offset int) ([]mod
 func (r *CampaignRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Campaign, error) {
 	var c model.Campaign
 	err := r.db.QueryRow(ctx, `
-		SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+		SELECT id, alias, name, type, bind_visitors, is_optimization_enabled, state, traffic_source_id, default_stream_id
 		FROM campaigns
 		WHERE id = $1
 	`, id).Scan(
 		&c.ID, &c.Alias, &c.Name, &c.Type,
-		&c.BindVisitors, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
+		&c.BindVisitors, &c.IsOptimizationEnabled, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get campaign: %w", err)
@@ -72,20 +72,20 @@ func (r *CampaignRepository) Create(ctx context.Context, c *model.Campaign) erro
 	}
 
 	return r.db.QueryRow(ctx, `
-		INSERT INTO campaigns (id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO campaigns (id, alias, name, type, bind_visitors, is_optimization_enabled, state, traffic_source_id, default_stream_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
-	`, c.ID, c.Alias, c.Name, c.Type, c.BindVisitors, c.State, c.TrafficSourceID, c.DefaultStreamID).Scan(&c.ID)
+	`, c.ID, c.Alias, c.Name, c.Type, c.BindVisitors, c.IsOptimizationEnabled, c.State, c.TrafficSourceID, c.DefaultStreamID).Scan(&c.ID)
 }
 
 // Update modifies an existing campaign.
 func (r *CampaignRepository) Update(ctx context.Context, c *model.Campaign) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE campaigns
-		SET alias = $2, name = $3, type = $4, bind_visitors = $5, state = $6, 
-		    traffic_source_id = $7, default_stream_id = $8, updated_at = NOW()
+		SET alias = $2, name = $3, type = $4, bind_visitors = $5, is_optimization_enabled = $6, state = $7,
+		    traffic_source_id = $8, default_stream_id = $9, updated_at = NOW()
 		WHERE id = $1
-	`, c.ID, c.Alias, c.Name, c.Type, c.BindVisitors, c.State, c.TrafficSourceID, c.DefaultStreamID)
+	`, c.ID, c.Alias, c.Name, c.Type, c.BindVisitors, c.IsOptimizationEnabled, c.State, c.TrafficSourceID, c.DefaultStreamID)
 	return err
 }
 
@@ -99,14 +99,14 @@ func (r *CampaignRepository) Delete(ctx context.Context, id uuid.UUID) error {
 func (r *CampaignRepository) Clone(ctx context.Context, id uuid.UUID, newID uuid.UUID, newName, newAlias string) (*model.Campaign, error) {
 	var c model.Campaign
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO campaigns (id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id)
-		SELECT $2, $3, $4, type, bind_visitors, state, traffic_source_id, default_stream_id
+		INSERT INTO campaigns (id, alias, name, type, bind_visitors, is_optimization_enabled, state, traffic_source_id, default_stream_id)
+		SELECT $2, $3, $4, type, bind_visitors, is_optimization_enabled, state, traffic_source_id, default_stream_id
 		FROM campaigns
 		WHERE id = $1
-		RETURNING id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+		RETURNING id, alias, name, type, bind_visitors, is_optimization_enabled, state, traffic_source_id, default_stream_id
 	`, id, newID, newAlias, newName).Scan(
 		&c.ID, &c.Alias, &c.Name, &c.Type,
-		&c.BindVisitors, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
+		&c.BindVisitors, &c.IsOptimizationEnabled, &c.State, &c.TrafficSourceID, &c.DefaultStreamID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("clone campaign: %w", err)
