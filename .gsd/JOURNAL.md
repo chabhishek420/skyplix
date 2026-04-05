@@ -531,3 +531,6 @@ SkyPlix TDS v1.0 is officially feature-complete. The roadmap has been fully exec
 - Modernized Authentication: JWT-based memory auth with backward compatibility.
 - Hardened Production Assets: Multi-stage non-root Docker builds and Prometheus observability.
 - Verified functional integrity with full test suite (race detection) and optimized UI joins.
+- Aligned Click ID format ([8 hex timestamp][16 hex random]) with Keitaro production standards.
+- Expanded macro engine for 100% Keitaro alias parity ({subid}, {tid}, {operator}, {date}).
+- Sandboxed LocalFile action and refined Geo filters for enterprise reliability.
