@@ -24,8 +24,14 @@ type RawClick struct {
 	OfferID       uuid.UUID
 	LandingID     uuid.UUID
 
+	// --- Request identification ---
+	RequestID string
+
 	// --- Click token (generated in stage 13) ---
 	ClickToken string
+
+	// --- Multi-tenancy ---
+	WorkspaceID uuid.UUID
 
 	// --- Geo (populated in stage 6 via GeoIP) ---
 	CountryCode  string
@@ -48,9 +54,10 @@ type RawClick struct {
 	Language string
 
 	// --- Bot detection (populated in stage 3) ---
-	IsBot     bool
-	BotReason string
-	IsProxy   bool
+	IsBot         bool
+	BotReason     string
+	IsProxy       bool
+	BehaviorScore uint8
 
 	// --- Uniqueness flags (populated in stages 8+10) ---
 	IsUniqueGlobal   bool

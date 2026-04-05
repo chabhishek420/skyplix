@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -130,6 +131,7 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 
 	record := queue.ConversionRecord{
 		ID:                 uuid.New().String(),
+		WorkspaceID:        attr.WorkspaceID.String(),
 		CreatedAt:          time.Now().UTC(),
 		ClickToken:         token,
 		CampaignID:         attr.CampaignID.String(),
@@ -140,8 +142,8 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		SourceID:           attr.SourceID.String(),
 		CountryCode:        attr.CountryCode,
 		Status:             status,
-		Payout:             int64(payout * 100),
-		Revenue:            int64(revenue * 100),
+		Payout:             int64(math.Round(payout * 100)),
+		Revenue:            int64(math.Round(revenue * 100)),
 		ExternalID:         externalID,
 	}
 

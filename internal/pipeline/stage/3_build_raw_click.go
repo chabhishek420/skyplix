@@ -8,6 +8,7 @@ package stage
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"strings"
@@ -81,31 +82,34 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	if costStr := q.Get("cost"); costStr != "" {
 		var cost float64
 		if _, err := parseFloat(costStr, &cost); err == nil {
-			rc.Cost = int64(cost * 100)
+			rc.Cost = int64(math.Round(cost * 100))
 		}
 	}
 
 	// --- Inline Bot Detection (ADR-008) ---
-	isBot, reason := s.detectBot(rc.IP, rc.UserAgent)
+	isBot, reason, score := s.detectBot(rc.IP, rc.UserAgent)
 	rc.IsBot = isBot
 	rc.BotReason = reason
+	rc.BehaviorScore = score
 
 	return nil
 }
 
 // detectBot runs the basic bot detection checks inline.
-// Returns (true, reason) if any check triggers.
-func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
+// Returns (isBot, reason, score).
+func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string, uint8) {
+	var score uint8 = 0
+
 	// 1. Empty User-Agent
 	if strings.TrimSpace(ua) == "" {
-		return true, "empty_ua"
+		return true, "empty_ua", 100
 	}
 
 	// 2. Known bot UA patterns (case-insensitive substring match)
 	uaLower := strings.ToLower(ua)
 	for _, pattern := range botUAPatterns {
 		if strings.Contains(uaLower, pattern) {
-			return true, fmt.Sprintf("ua_pattern:%s", pattern)
+			return true, fmt.Sprintf("ua_pattern:%s", pattern), 90
 		}
 	}
 
@@ -113,7 +117,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	if ip != nil {
 		for _, prefix := range botIPPrefixes {
 			if prefix.Contains(ip) {
-				return true, fmt.Sprintf("ip_prefix:%s", prefix.String())
+				return true, fmt.Sprintf("ip_prefix:%s", prefix.String()), 95
 			}
 		}
 	}
@@ -122,7 +126,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	if s.CIDRFilter != nil && ip != nil {
 		if addr, ok := netip.AddrFromSlice(ip); ok {
 			if s.CIDRFilter.ContainsIP(addr.Unmap()) {
-				return true, "cidr_blocklist"
+				return true, "cidr_blocklist", 95
 			}
 		}
 	}
@@ -130,7 +134,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	// 4. Advanced bot IP database (Phase 4 upgrade)
 	if s.BotDB != nil && ip != nil {
 		if s.BotDB.Contains(ip) {
-			return true, "bot_db_ip"
+			return true, "bot_db_ip", 100
 		}
 	}
 
@@ -139,7 +143,7 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 		customPatterns := s.CustomUA.Patterns()
 		for _, pattern := range customPatterns {
 			if strings.Contains(uaLower, pattern) {
-				return true, fmt.Sprintf("custom_ua:%s", pattern)
+				return true, fmt.Sprintf("custom_ua:%s", pattern), 90
 			}
 		}
 	}
@@ -147,7 +151,10 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	// 6. Datacenter/VPN heuristic check (Phase 4 upgrade)
 	if s.Geo != nil && ip != nil {
 		if s.Geo.IsDatacenter(ip) {
-			return true, "datacenter_asn"
+			score += 40
+			if score >= 80 {
+				return true, "datacenter_asn", score
+			}
 		}
 	}
 
@@ -166,17 +173,23 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
-		allowed, _, err := s.RateLimiter.CheckIPLimit(ctx, ip, limit, window)
-		if err != nil {
-			// Fail open on rate limiting error
-			return false, ""
-		}
-		if !allowed {
-			return true, "rate_limited"
+		allowed, count, err := s.RateLimiter.CheckIPLimit(ctx, ip, limit, window)
+		if err == nil {
+			if !allowed {
+				return true, "rate_limited", 100
+			}
+			// Progressive score for high velocity even if not yet limited
+			if count > int64(limit/2) {
+				score += 20
+			}
 		}
 	}
 
-	return false, ""
+	if score >= 80 {
+		return true, "high_behavior_score", score
+	}
+
+	return false, "", score
 }
 
 // parseFloat parses a string to float64 and stores result in dest.

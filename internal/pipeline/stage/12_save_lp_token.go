@@ -8,6 +8,7 @@ package stage
 import (
 	"github.com/skyplix/zai-tds/internal/lptoken"
 	"github.com/skyplix/zai-tds/internal/pipeline"
+	"github.com/skyplix/zai-tds/internal/session"
 )
 
 // SaveLPTokenStage — Pipeline Stage 12.5
@@ -15,6 +16,7 @@ import (
 // This is required for Landings to resolve the Offer on the second click.
 type SaveLPTokenStage struct {
 	LPToken *lptoken.Service
+	Session *session.Service
 }
 
 func (s *SaveLPTokenStage) Name() string    { return "SaveLPToken" }
@@ -25,6 +27,7 @@ func (s *SaveLPTokenStage) Process(p *pipeline.Payload) error {
 		return nil
 	}
 
+	// 1. Save LP context for L2 resolution
 	ctx := &lptoken.LPContext{
 		CampaignID:  p.Campaign.ID,
 		StreamID:    p.Stream.ID,
@@ -36,5 +39,14 @@ func (s *SaveLPTokenStage) Process(p *pipeline.Payload) error {
 		SubID5:      p.RawClick.SubID5,
 	}
 
-	return s.LPToken.Save(p.Ctx, p.RawClick.ClickToken, ctx)
+	if err := s.LPToken.Save(p.Ctx, p.RawClick.ClickToken, ctx); err != nil {
+		return err
+	}
+
+	// 2. Save full click snapshot for behavioral continuity/persistence
+	if s.Session != nil {
+		return s.Session.SaveClickSnapshot(p.Ctx, p.RawClick.ClickToken, p.RawClick)
+	}
+
+	return nil
 }

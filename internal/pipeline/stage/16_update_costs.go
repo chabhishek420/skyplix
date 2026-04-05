@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"math"
 	"strconv"
 
 	"github.com/skyplix/zai-tds/internal/pipeline"
@@ -23,7 +24,7 @@ func (s *UpdateCostsStage) Process(p *pipeline.Payload) error {
 
 	if costStr != "" {
 		if val, err := strconv.ParseFloat(costStr, 64); err == nil {
-			p.RawClick.Cost = int64(val * 100)
+			p.RawClick.Cost = int64(math.Round(val * 100))
 		}
 	}
 

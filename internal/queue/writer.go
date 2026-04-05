@@ -18,6 +18,7 @@ import (
 // UUID fields are stored as strings and converted to [16]byte at flush time.
 type ClickRecord struct {
 	CreatedAt        time.Time
+	WorkspaceID      string
 	CampaignID       string
 	CampaignAlias    string
 	StreamID         string
@@ -48,17 +49,21 @@ type ClickRecord struct {
 	Payout           int64
 	ActionType       string
 	ClickToken       string
+	RequestID        string
 	JA3              string
 	JA4              string
 	TLSHost          string
 	BotReason        string
+	BehaviorScore    uint8
 }
 
 // ConversionRecord is the serialized form of a Conversion, ready for ClickHouse batch INSERT.
 type ConversionRecord struct {
 	ID                 string
+	WorkspaceID        string
 	CreatedAt          time.Time
 	ClickToken         string
+	VisitorCode        string
 	CampaignID         string
 	StreamID           string
 	OfferID            string
@@ -67,6 +72,7 @@ type ConversionRecord struct {
 	SourceID           string
 	CountryCode        string
 	Status             string
+	ConversionType     string
 	Payout             int64
 	Revenue            int64
 	ExternalID         string

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
@@ -201,7 +202,7 @@ func (r *StreamRepository) GetLandings(ctx context.Context, streamID uuid.UUID, 
 	return landings, nil
 }
 
-// SyncOffers replaces all offers for a stream within a workspace context.
+// SyncOffers replaces all offers for a stream within a workspace context using a batch.
 func (r *StreamRepository) SyncOffers(ctx context.Context, streamID uuid.UUID, workspaceID uuid.UUID, offers []model.WeightedOffer) error {
 	// Verify stream ownership via workspace
 	_, err := r.db.Exec(ctx, `
@@ -215,17 +216,20 @@ func (r *StreamRepository) SyncOffers(ctx context.Context, streamID uuid.UUID, w
 		return err
 	}
 
-	for _, wo := range offers {
-		_, err = r.db.Exec(ctx, "INSERT INTO stream_offers (stream_id, offer_id, weight) VALUES ($1, $2, $3)", streamID, wo.Offer.ID, wo.Weight)
-		if err != nil {
-			return err
-		}
+	if len(offers) == 0 {
+		return nil
 	}
 
-	return nil
+	batch := &pgx.Batch{}
+	for _, wo := range offers {
+		batch.Queue("INSERT INTO stream_offers (stream_id, offer_id, weight) VALUES ($1, $2, $3)", streamID, wo.Offer.ID, wo.Weight)
+	}
+
+	br := r.db.SendBatch(ctx, batch)
+	return br.Close()
 }
 
-// SyncLandings replaces all landings for a stream within a workspace context.
+// SyncLandings replaces all landings for a stream within a workspace context using a batch.
 func (r *StreamRepository) SyncLandings(ctx context.Context, streamID uuid.UUID, workspaceID uuid.UUID, landings []model.WeightedLanding) error {
 	// Verify stream ownership via workspace
 	_, err := r.db.Exec(ctx, `
@@ -239,12 +243,15 @@ func (r *StreamRepository) SyncLandings(ctx context.Context, streamID uuid.UUID,
 		return err
 	}
 
-	for _, wl := range landings {
-		_, err = r.db.Exec(ctx, "INSERT INTO stream_landings (stream_id, landing_id, weight) VALUES ($1, $2, $3)", streamID, wl.Landing.ID, wl.Weight)
-		if err != nil {
-			return err
-		}
+	if len(landings) == 0 {
+		return nil
 	}
 
-	return nil
+	batch := &pgx.Batch{}
+	for _, wl := range landings {
+		batch.Queue("INSERT INTO stream_landings (stream_id, landing_id, weight) VALUES ($1, $2, $3)", streamID, wl.Landing.ID, wl.Weight)
+	}
+
+	br := r.db.SendBatch(ctx, batch)
+	return br.Close()
 }

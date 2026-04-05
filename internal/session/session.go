@@ -2,10 +2,12 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/skyplix/zai-tds/internal/model"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
@@ -72,6 +74,37 @@ func (s *Service) SaveSession(ctx context.Context, visitorCode string, data map[
 		return fmt.Errorf("save session hash: %w", err)
 	}
 	return s.vk.Expire(ctx, key, 24*time.Hour).Err()
+}
+
+// SaveClickSnapshot stores the full RawClick state for L2 redirection matching.
+// Key: click:snap:{click_token} — TTL 24h
+func (s *Service) SaveClickSnapshot(ctx context.Context, token string, click *model.RawClick) error {
+	if token == "" || click == nil {
+		return nil
+	}
+	key := fmt.Sprintf("click:snap:%s", token)
+	data, err := json.Marshal(click)
+	if err != nil {
+		return err
+	}
+	return s.vk.Set(ctx, key, data, 24*time.Hour).Err()
+}
+
+// GetClickSnapshot retrieves a previously stored click state.
+func (s *Service) GetClickSnapshot(ctx context.Context, token string) (*model.RawClick, error) {
+	key := fmt.Sprintf("click:snap:%s", token)
+	val, err := s.vk.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var click model.RawClick
+	if err := json.Unmarshal([]byte(val), &click); err != nil {
+		return nil, err
+	}
+	return &click, nil
 }
 
 // GetSession retrieves the full session hash for a visitor.

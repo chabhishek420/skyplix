@@ -30,6 +30,7 @@ func (s *FindCampaignStage) Process(payload *pipeline.Payload) error {
 			payload.Campaign = campaign
 			payload.RawClick.CampaignID = campaign.ID
 			payload.RawClick.CampaignAlias = campaign.Alias
+			payload.RawClick.WorkspaceID = campaign.WorkspaceID
 			return nil
 		}
 		payload.Abort = true
@@ -54,5 +55,6 @@ func (s *FindCampaignStage) Process(payload *pipeline.Payload) error {
 
 	payload.Campaign = campaign
 	payload.RawClick.CampaignID = campaign.ID
+	payload.RawClick.WorkspaceID = campaign.WorkspaceID
 	return nil
 }

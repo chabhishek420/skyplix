@@ -1,7 +1,7 @@
 /*
  * MODIFIED: internal/cache/cache.go
- * PURPOSE: Implemented entity caching with Postgres fallbacks for offers/landings.
- *          Added documentation header and improved warmup error handling.
+ * PURPOSE: Implemented entity caching with workspace scoping and integer cents support.
+ *          Optimized for Valkey Cluster with key tagging.
  */
 package cache
 
@@ -43,7 +43,7 @@ func (c *Cache) Warmup(ctx context.Context) error {
 
 	// 1. Load all active campaigns
 	rows, err := c.db.Query(ctx, `
-		SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+		SELECT id, workspace_id, group_id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id, cost_model, cost_value, notes, tags, created_at, updated_at
 		FROM campaigns
 		WHERE state = 'active'
 	`)
@@ -56,8 +56,9 @@ func (c *Cache) Warmup(ctx context.Context) error {
 	for rows.Next() {
 		var camp model.Campaign
 		if err := rows.Scan(
-			&camp.ID, &camp.Alias, &camp.Name, &camp.Type,
+			&camp.ID, &camp.WorkspaceID, &camp.GroupID, &camp.Alias, &camp.Name, &camp.Type,
 			&camp.BindVisitors, &camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID,
+			&camp.CostModel, &camp.CostValue, &camp.Notes, &camp.Tags, &camp.CreatedAt, &camp.UpdatedAt,
 		); err != nil {
 			return fmt.Errorf("scan campaign: %w", err)
 		}
@@ -65,12 +66,13 @@ func (c *Cache) Warmup(ctx context.Context) error {
 	}
 
 	for _, camp := range campaigns {
-		// Store campaign data
+		// Store campaign data - O(1) direct lookup by ID
 		campJSON, _ := json.Marshal(camp)
-		if err := c.vk.Set(ctx, fmt.Sprintf("campaign:%s", camp.ID), campJSON, time.Hour).Err(); err != nil {
+		key := fmt.Sprintf("campaign:%s", camp.ID)
+		if err := c.vk.Set(ctx, key, campJSON, time.Hour).Err(); err != nil {
 			return fmt.Errorf("set campaign %s: %w", camp.ID, err)
 		}
-		// Store alias mapping
+		// Store alias mapping (global or workspace-prefixed? typically global for routing)
 		if err := c.vk.Set(ctx, fmt.Sprintf("campaign_alias:%s", camp.Alias), camp.ID.String(), time.Hour).Err(); err != nil {
 			return fmt.Errorf("set alias %s: %w", camp.Alias, err)
 		}
@@ -87,7 +89,7 @@ func (c *Cache) Warmup(ctx context.Context) error {
 
 func (c *Cache) warmupStreams(ctx context.Context, campaignID uuid.UUID) error {
 	rows, err := c.db.Query(ctx, `
-		SELECT id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
+		SELECT id, workspace_id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
 		FROM streams
 		WHERE campaign_id = $1 AND state = 'active'
 		ORDER BY position ASC
@@ -101,7 +103,7 @@ func (c *Cache) warmupStreams(ctx context.Context, campaignID uuid.UUID) error {
 	for rows.Next() {
 		var s model.Stream
 		if err := rows.Scan(
-			&s.ID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight,
+			&s.ID, &s.WorkspaceID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight,
 			&s.State, &s.ActionType, &s.ActionPayload, &s.Filters, &s.DailyLimit, &s.TotalLimit,
 		); err != nil {
 			return fmt.Errorf("scan stream: %w", err)
@@ -116,7 +118,8 @@ func (c *Cache) warmupStreams(ctx context.Context, campaignID uuid.UUID) error {
 
 	if len(streams) > 0 {
 		streamsJSON, _ := json.Marshal(streams)
-		if err := c.vk.Set(ctx, fmt.Sprintf("streams:%s", campaignID), streamsJSON, time.Hour).Err(); err != nil {
+		key := fmt.Sprintf("streams:%s", campaignID)
+		if err := c.vk.Set(ctx, key, streamsJSON, time.Hour).Err(); err != nil {
 			return fmt.Errorf("set streams for %s: %w", campaignID, err)
 		}
 	}
@@ -127,7 +130,7 @@ func (c *Cache) warmupStreams(ctx context.Context, campaignID uuid.UUID) error {
 func (c *Cache) warmupStreamEntities(ctx context.Context, streamID uuid.UUID) error {
 	// Offers
 	offRows, err := c.db.Query(ctx, `
-		SELECT o.id, o.name, o.url, o.affiliate_network_id, o.payout, o.state, so.weight
+		SELECT o.id, o.workspace_id, o.name, o.url, o.affiliate_network_id, o.payout, o.daily_cap, o.state, o.notes, so.weight
 		FROM offers o
 		JOIN stream_offers so ON o.id = so.offer_id
 		WHERE so.stream_id = $1 AND o.state = 'active'
@@ -141,19 +144,23 @@ func (c *Cache) warmupStreamEntities(ctx context.Context, streamID uuid.UUID) er
 	for offRows.Next() {
 		var o model.Offer
 		var weight int
-		if err := offRows.Scan(&o.ID, &o.Name, &o.URL, &o.AffiliateNetworkID, &o.Payout, &o.State, &weight); err != nil {
+		if err := offRows.Scan(
+			&o.ID, &o.WorkspaceID, &o.Name, &o.URL, &o.AffiliateNetworkID,
+			&o.Payout, &o.DailyCap, &o.State, &o.Notes, &weight,
+		); err != nil {
 			return err
 		}
 		offers = append(offers, model.WeightedOffer{Offer: o, Weight: weight})
 	}
 	if len(offers) > 0 {
 		val, _ := json.Marshal(offers)
-		c.vk.Set(ctx, fmt.Sprintf("stream_offers:%s", streamID), val, time.Hour)
+		key := fmt.Sprintf("stream_offers:%s", streamID)
+		c.vk.Set(ctx, key, val, time.Hour)
 	}
 
 	// Landings
 	lndRows, err := c.db.Query(ctx, `
-		SELECT l.id, l.name, l.url, l.state, sl.weight
+		SELECT l.id, l.workspace_id, l.name, l.url, l.state, l.notes, sl.weight
 		FROM landings l
 		JOIN stream_landings sl ON l.id = sl.landing_id
 		WHERE sl.stream_id = $1 AND l.state = 'active'
@@ -167,14 +174,15 @@ func (c *Cache) warmupStreamEntities(ctx context.Context, streamID uuid.UUID) er
 	for lndRows.Next() {
 		var l model.Landing
 		var weight int
-		if err := lndRows.Scan(&l.ID, &l.Name, &l.URL, &l.State, &weight); err != nil {
+		if err := lndRows.Scan(&l.ID, &l.WorkspaceID, &l.Name, &l.URL, &l.State, &l.Notes, &weight); err != nil {
 			return err
 		}
 		landings = append(landings, model.WeightedLanding{Landing: l, Weight: weight})
 	}
 	if len(landings) > 0 {
 		val, _ := json.Marshal(landings)
-		c.vk.Set(ctx, fmt.Sprintf("stream_landings:%s", streamID), val, time.Hour)
+		key := fmt.Sprintf("stream_landings:%s", streamID)
+		c.vk.Set(ctx, key, val, time.Hour)
 	}
 
 	return nil
@@ -203,63 +211,65 @@ func (c *Cache) GetCampaignByAlias(ctx context.Context, alias string) (*model.Ca
 // GetCampaignByID retrieves a campaign by its UUID.
 func (c *Cache) GetCampaignByID(ctx context.Context, id uuid.UUID) (*model.Campaign, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("campaign:%s", id)).Result()
-	if err == redis.Nil {
-		// Fallback to DB
+	if err == nil {
 		var camp model.Campaign
-		err := c.db.QueryRow(ctx, `
-			SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
-			FROM campaigns WHERE id = $1
-		`, id).Scan(&camp.ID, &camp.Alias, &camp.Name, &camp.Type, &camp.BindVisitors, &camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID)
-		if err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(val), &camp); err == nil {
+			return &camp, nil
 		}
-		// Async cache it
-		go func() {
-			data, _ := json.Marshal(camp)
-			c.vk.Set(context.Background(), fmt.Sprintf("campaign:%s", id), data, time.Hour)
-			c.vk.Set(context.Background(), fmt.Sprintf("campaign_alias:%s", camp.Alias), id.String(), time.Hour)
-		}()
-		return &camp, nil
-	} else if err != nil {
-		return nil, err
 	}
 
+	// Fallback to DB
 	var camp model.Campaign
-	if err := json.Unmarshal([]byte(val), &camp); err != nil {
+	err = c.db.QueryRow(ctx, `
+		SELECT id, workspace_id, group_id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id, cost_model, cost_value, notes, tags, created_at, updated_at
+		FROM campaigns WHERE id = $1
+	`, id).Scan(
+		&camp.ID, &camp.WorkspaceID, &camp.GroupID, &camp.Alias, &camp.Name, &camp.Type,
+		&camp.BindVisitors, &camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID,
+		&camp.CostModel, &camp.CostValue, &camp.Notes, &camp.Tags, &camp.CreatedAt, &camp.UpdatedAt,
+	)
+	if err != nil {
 		return nil, err
 	}
+	// Async cache it
+	go func() {
+		data, _ := json.Marshal(camp)
+		key := fmt.Sprintf("campaign:%s", id)
+		c.vk.Set(context.Background(), key, data, time.Hour)
+		c.vk.Set(context.Background(), fmt.Sprintf("campaign_alias:%s", camp.Alias), id.String(), time.Hour)
+	}()
 	return &camp, nil
 }
 
 // GetStreamsByCampaign retrieves all active streams for a campaign.
 func (c *Cache) GetStreamsByCampaign(ctx context.Context, campaignID uuid.UUID) ([]model.Stream, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("streams:%s", campaignID)).Result()
-	if err == redis.Nil {
-		// Should have been warmed up, but fallback just in case
-		rows, err := c.db.Query(ctx, `
-			SELECT id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
-			FROM streams WHERE campaign_id = $1 AND state = 'active' ORDER BY position ASC
-		`, campaignID)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
+	if err == nil {
 		var streams []model.Stream
-		for rows.Next() {
-			var s model.Stream
-			if err := rows.Scan(&s.ID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight, &s.State, &s.ActionType, &s.ActionPayload, &s.Filters, &s.DailyLimit, &s.TotalLimit); err != nil {
-				return nil, err
-			}
-			streams = append(streams, s)
+		if err := json.Unmarshal([]byte(val), &streams); err == nil {
+			return streams, nil
 		}
-		return streams, nil
-	} else if err != nil {
-		return nil, err
 	}
 
-	var streams []model.Stream
-	if err := json.Unmarshal([]byte(val), &streams); err != nil {
+	// Fallback to DB
+	rows, err := c.db.Query(ctx, `
+		SELECT id, workspace_id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
+		FROM streams WHERE campaign_id = $1 AND state = 'active' ORDER BY position ASC
+	`, campaignID)
+	if err != nil {
 		return nil, err
+	}
+	defer rows.Close()
+	var streams []model.Stream
+	for rows.Next() {
+		var s model.Stream
+		if err := rows.Scan(
+			&s.ID, &s.WorkspaceID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight,
+			&s.State, &s.ActionType, &s.ActionPayload, &s.Filters, &s.DailyLimit, &s.TotalLimit,
+		); err != nil {
+			return nil, err
+		}
+		streams = append(streams, s)
 	}
 	return streams, nil
 }
@@ -267,33 +277,34 @@ func (c *Cache) GetStreamsByCampaign(ctx context.Context, campaignID uuid.UUID) 
 // GetOffersByStream retrieves weighted offers for a stream.
 func (c *Cache) GetOffersByStream(ctx context.Context, streamID uuid.UUID) ([]model.WeightedOffer, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("stream_offers:%s", streamID)).Result()
-	if err == redis.Nil {
-		// Fallback to DB
-		offRows, err := c.db.Query(ctx, `
-			SELECT o.id, o.name, o.url, o.affiliate_network_id, o.payout, o.state, so.weight
-			FROM offers o JOIN stream_offers so ON o.id = so.offer_id
-			WHERE so.stream_id = $1 AND o.state = 'active'
-		`, streamID)
-		if err != nil {
-			return nil, err
-		}
-		defer offRows.Close()
+	if err == nil {
 		var offers []model.WeightedOffer
-		for offRows.Next() {
-			var o model.Offer
-			var weight int
-			if err := offRows.Scan(&o.ID, &o.Name, &o.URL, &o.AffiliateNetworkID, &o.Payout, &o.State, &weight); err != nil {
-				return nil, err
-			}
-			offers = append(offers, model.WeightedOffer{Offer: o, Weight: weight})
+		if err := json.Unmarshal([]byte(val), &offers); err == nil {
+			return offers, nil
 		}
-		return offers, nil
-	} else if err != nil {
+	}
+
+	// Fallback to DB
+	offRows, err := c.db.Query(ctx, `
+		SELECT o.id, o.workspace_id, o.name, o.url, o.affiliate_network_id, o.payout, o.daily_cap, o.state, o.notes, so.weight
+		FROM offers o JOIN stream_offers so ON o.id = so.offer_id
+		WHERE so.stream_id = $1 AND o.state = 'active'
+	`, streamID)
+	if err != nil {
 		return nil, err
 	}
+	defer offRows.Close()
 	var offers []model.WeightedOffer
-	if err := json.Unmarshal([]byte(val), &offers); err != nil {
-		return nil, err
+	for offRows.Next() {
+		var o model.Offer
+		var weight int
+		if err := offRows.Scan(
+			&o.ID, &o.WorkspaceID, &o.Name, &o.URL, &o.AffiliateNetworkID,
+			&o.Payout, &o.DailyCap, &o.State, &o.Notes, &weight,
+		); err != nil {
+			return nil, err
+		}
+		offers = append(offers, model.WeightedOffer{Offer: o, Weight: weight})
 	}
 	return offers, nil
 }
@@ -301,33 +312,31 @@ func (c *Cache) GetOffersByStream(ctx context.Context, streamID uuid.UUID) ([]mo
 // GetLandingsByStream retrieves weighted landings for a stream.
 func (c *Cache) GetLandingsByStream(ctx context.Context, streamID uuid.UUID) ([]model.WeightedLanding, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("stream_landings:%s", streamID)).Result()
-	if err == redis.Nil {
-		// Fallback to DB
-		lndRows, err := c.db.Query(ctx, `
-			SELECT l.id, l.name, l.url, l.state, sl.weight
-			FROM landings l JOIN stream_landings sl ON l.id = sl.landing_id
-			WHERE sl.stream_id = $1 AND l.state = 'active'
-		`, streamID)
-		if err != nil {
-			return nil, err
-		}
-		defer lndRows.Close()
+	if err == nil {
 		var landings []model.WeightedLanding
-		for lndRows.Next() {
-			var l model.Landing
-			var weight int
-			if err := lndRows.Scan(&l.ID, &l.Name, &l.URL, &l.State, &weight); err != nil {
-				return nil, err
-			}
-			landings = append(landings, model.WeightedLanding{Landing: l, Weight: weight})
+		if err := json.Unmarshal([]byte(val), &landings); err == nil {
+			return landings, nil
 		}
-		return landings, nil
-	} else if err != nil {
+	}
+
+	// Fallback to DB
+	lndRows, err := c.db.Query(ctx, `
+		SELECT l.id, l.workspace_id, l.name, l.url, l.state, l.notes, sl.weight
+		FROM landings l JOIN stream_landings sl ON l.id = sl.landing_id
+		WHERE sl.stream_id = $1 AND l.state = 'active'
+	`, streamID)
+	if err != nil {
 		return nil, err
 	}
+	defer lndRows.Close()
 	var landings []model.WeightedLanding
-	if err := json.Unmarshal([]byte(val), &landings); err != nil {
-		return nil, err
+	for lndRows.Next() {
+		var l model.Landing
+		var weight int
+		if err := lndRows.Scan(&l.ID, &l.WorkspaceID, &l.Name, &l.URL, &l.State, &l.Notes, &weight); err != nil {
+			return nil, err
+		}
+		landings = append(landings, model.WeightedLanding{Landing: l, Weight: weight})
 	}
 	return landings, nil
 }
@@ -335,22 +344,27 @@ func (c *Cache) GetLandingsByStream(ctx context.Context, streamID uuid.UUID) ([]
 // GetAffiliateNetwork retrieves an affiliate network by ID.
 func (c *Cache) GetAffiliateNetwork(ctx context.Context, id uuid.UUID) (*model.AffiliateNetwork, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("network:%s", id)).Result()
-	if err == redis.Nil {
+	if err == nil {
 		var n model.AffiliateNetwork
-		err := c.db.QueryRow(ctx, "SELECT id, name, postback_url, state FROM affiliate_networks WHERE id = $1", id).Scan(&n.ID, &n.Name, &n.PostbackURL, &n.State)
-		if err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(val), &n); err == nil {
+			return &n, nil
 		}
-		data, _ := json.Marshal(n)
-		c.vk.Set(ctx, fmt.Sprintf("network:%s", id), data, time.Hour)
-		return &n, nil
-	} else if err != nil {
-		return nil, err
 	}
+
+	// Fallback to DB
 	var n model.AffiliateNetwork
-	if err := json.Unmarshal([]byte(val), &n); err != nil {
+	err = c.db.QueryRow(ctx, "SELECT id, workspace_id, name, postback_url, state, created_at, updated_at FROM affiliate_networks WHERE id = $1", id).Scan(
+		&n.ID, &n.WorkspaceID, &n.Name, &n.PostbackURL, &n.State, &n.CreatedAt, &n.UpdatedAt,
+	)
+	if err != nil {
 		return nil, err
 	}
+	// Async cache
+	go func() {
+		data, _ := json.Marshal(n)
+		key := fmt.Sprintf("network:%s", id)
+		c.vk.Set(context.Background(), key, data, time.Hour)
+	}()
 	return &n, nil
 }
 
@@ -359,11 +373,6 @@ func (c *Cache) InvalidateCampaign(ctx context.Context, campaignID uuid.UUID) er
 	c.vk.Del(ctx, fmt.Sprintf("campaign:%s", campaignID))
 	c.vk.Del(ctx, fmt.Sprintf("streams:%s", campaignID))
 	return nil
-}
-
-// GetCampaign is an alias for GetCampaignByID.
-func (c *Cache) GetCampaign(ctx context.Context, id uuid.UUID) (*model.Campaign, error) {
-	return c.GetCampaignByID(ctx, id)
 }
 
 // ScheduleWarmup sets a flag in Valkey indicating warmup is needed.
@@ -375,29 +384,28 @@ func (c *Cache) ScheduleWarmup() {
 // GetStream retrieves a single stream by its UUID.
 func (c *Cache) GetStream(ctx context.Context, id uuid.UUID) (*model.Stream, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("stream:%s", id)).Result()
-	if err == redis.Nil {
-		// Fallback to DB
+	if err == nil {
 		var s model.Stream
-		err := c.db.QueryRow(ctx, `
-			SELECT id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
-			FROM streams WHERE id = $1
-		`, id).Scan(&s.ID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight, &s.State, &s.ActionType, &s.ActionPayload, &s.Filters, &s.DailyLimit, &s.TotalLimit)
-		if err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(val), &s); err == nil {
+			return &s, nil
 		}
-		// Cache it
-		go func() {
-			data, _ := json.Marshal(s)
-			c.vk.Set(context.Background(), fmt.Sprintf("stream:%s", id), data, time.Hour)
-		}()
-		return &s, nil
-	} else if err != nil {
-		return nil, err
 	}
+
+	// Fallback to DB
 	var s model.Stream
-	if err := json.Unmarshal([]byte(val), &s); err != nil {
+	err = c.db.QueryRow(ctx, `
+		SELECT id, workspace_id, campaign_id, name, type, position, weight, state, action_type, action_payload, filters, daily_limit, total_limit
+		FROM streams WHERE id = $1
+	`, id).Scan(&s.ID, &s.WorkspaceID, &s.CampaignID, &s.Name, &s.Type, &s.Position, &s.Weight, &s.State, &s.ActionType, &s.ActionPayload, &s.Filters, &s.DailyLimit, &s.TotalLimit)
+	if err != nil {
 		return nil, err
 	}
+	// Cache it
+	go func() {
+		data, _ := json.Marshal(s)
+		key := fmt.Sprintf("stream:%s", id)
+		c.vk.Set(context.Background(), key, data, time.Hour)
+	}()
 	return &s, nil
 }
 

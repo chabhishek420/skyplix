@@ -93,6 +93,7 @@ func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
 	if p.RawClick == nil {
 		p.RawClick = &model.RawClick{}
 	}
+	p.RawClick.WorkspaceID = camp.WorkspaceID
 	p.RawClick.ClickToken = token
 	p.VisitorCode = lpCtx.VisitorCode
 	p.RawClick.SubID1 = lpCtx.SubID1
