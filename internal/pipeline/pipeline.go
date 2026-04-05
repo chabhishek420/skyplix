@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/skyplix/zai-tds/internal/metrics"
@@ -62,6 +63,41 @@ type Payload struct {
 	// Re-dispatch control (for recursion like ToCampaign)
 	ReDispatch bool
 	Hops       int
+}
+
+// Pools for hot-path object reuse
+var (
+	PayloadPool = sync.Pool{
+		New: func() interface{} {
+			return &Payload{
+				RawClick: &model.RawClick{},
+			}
+		},
+	}
+)
+
+// Reset clears the payload for reuse.
+func (p *Payload) Reset() {
+	p.Ctx = nil
+	p.Request = nil
+	p.Writer = nil
+	p.VisitorCode = ""
+	p.Response = nil
+	p.Abort = false
+	p.AbortCode = 0
+	p.ReDispatch = false
+	p.Hops = 0
+	p.Campaign = nil
+	p.Stream = nil
+	p.Offer = nil
+	p.Landing = nil
+	p.AffiliateNetwork = nil
+
+	if p.RawClick != nil {
+		*p.RawClick = model.RawClick{} // Reset all fields to zero values
+	} else {
+		p.RawClick = &model.RawClick{}
+	}
 }
 
 // Pipeline runs an ordered slice of stages against a Payload.

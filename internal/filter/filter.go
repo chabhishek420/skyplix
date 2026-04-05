@@ -38,7 +38,7 @@ func NewEngine() *Engine {
 		// Device (device.go)
 		&DeviceTypeFilter{}, &DeviceModelFilter{}, &BrowserFilter{}, &BrowserVersionFilter{}, &OsFilter{}, &OsVersionFilter{},
 		// Network (network.go)
-		&IpFilter{}, &Ipv6Filter{}, &IspFilter{}, &OperatorFilter{}, &ConnectionTypeFilter{}, &ProxyFilter{}, &IspBlacklistFilter{},
+		&IpFilter{}, &Ipv6Filter{}, &IspFilter{}, &OperatorFilter{}, &ConnectionTypeFilter{}, &ProxyFilter{}, &IspBlacklistFilter{}, &TlsFingerprintFilter{},
 		// Traffic (traffic.go)
 		&ReferrerFilter{}, &EmptyReferrerFilter{}, &ReferrerStopwordFilter{}, &UrlTokenFilter{}, &LanguageFilter{}, &UserAgentFilter{},
 		// Tracking (tracking.go)
@@ -48,7 +48,7 @@ func NewEngine() *Engine {
 		// Schedule (schedule.go)
 		&ScheduleFilter{},
 		// Detection (detection.go)
-		&IsBotFilter{}, &HideClickDetectFilter{}, &ImkloDetectFilter{},
+		&IsBotFilter{}, &HideClickDetectFilter{}, &ImkloDetectFilter{}, &BehaviorScoreFilter{},
 	)
 
 	return e

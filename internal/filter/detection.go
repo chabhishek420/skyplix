@@ -29,3 +29,12 @@ func (f *ImkloDetectFilter) Type() string { return "ImkloDetect" }
 func (f *ImkloDetectFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
 	return true // Phase 4 external detection
 }
+
+type BehaviorScoreFilter struct{}
+func (f *BehaviorScoreFilter) Type() string { return "BehaviorScore" }
+func (f *BehaviorScoreFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	if minVal, ok := payload["min_score"].(float64); ok {
+		return float64(rc.BehaviorScore) >= minVal
+	}
+	return true
+}

@@ -67,6 +67,13 @@ func (f *IspBlacklistFilter) Match(rc *model.RawClick, payload map[string]interf
 	return true
 }
 
+type TlsFingerprintFilter struct{}
+
+func (f *TlsFingerprintFilter) Type() string { return "TlsFingerprint" }
+func (f *TlsFingerprintFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	return matchIncludeExclude(rc.JA3, payload) || matchIncludeExclude(rc.JA4, payload)
+}
+
 func matchIP(ip net.IP, payload map[string]interface{}) bool {
 	if ip == nil {
 		return false

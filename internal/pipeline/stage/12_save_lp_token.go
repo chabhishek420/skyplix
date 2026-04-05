@@ -45,7 +45,11 @@ func (s *SaveLPTokenStage) Process(p *pipeline.Payload) error {
 
 	// 2. Save full click snapshot for behavioral continuity/persistence
 	if s.Session != nil {
-		return s.Session.SaveClickSnapshot(p.Ctx, p.RawClick.ClickToken, p.RawClick)
+		err := s.Session.SaveClickSnapshot(p.Ctx, p.RawClick.ClickToken, p.RawClick)
+		if err != nil {
+			// Fail open - don't block the click if snapshotting fails
+			return nil
+		}
 	}
 
 	return nil

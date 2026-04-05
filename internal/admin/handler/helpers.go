@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/skyplix/zai-tds/internal/auth"
 )
 
 // respondJSON writes a JSON response with the given status.
@@ -28,17 +29,59 @@ func (h *Handler) parseUUID(s string) (uuid.UUID, error) {
 const SystemDefaultWorkspaceID = "00000000-0000-4000-a000-000000000001"
 
 // getWorkspaceID extracts the current workspace ID from the request context or headers.
-// For Phase 1, it returns a fixed default UUID or a header value if present.
+// It enforces that the authenticated user has access to the requested workspace.
 func (h *Handler) getWorkspaceID(r *http.Request) uuid.UUID {
-	// 1. Try X-Workspace-ID header
+	defaultID := uuid.MustParse(SystemDefaultWorkspaceID)
+
+	// 1. Get claims from context
+	claims, ok := r.Context().Value(auth.UserClaimsKey).(*auth.UserClaims)
+	if !ok {
+		// Fallback for public or unauthenticated (should be blocked by middleware usually)
+		return defaultID
+	}
+
+	// 2. Try X-Workspace-ID header
+	var requestedID uuid.UUID
 	if wsIDStr := r.Header.Get("X-Workspace-ID"); wsIDStr != "" {
 		if id, err := uuid.Parse(wsIDStr); err == nil {
-			return id
+			requestedID = id
 		}
 	}
 
-	// 2. Fallback to System Default
-	return uuid.MustParse(SystemDefaultWorkspaceID)
+	if requestedID == uuid.Nil {
+		// Default to system workspace if user has access, otherwise first available
+		if h.userHasWorkspace(claims, defaultID) {
+			return defaultID
+		}
+		if len(claims.WorkspaceIDs) > 0 {
+			return claims.WorkspaceIDs[0]
+		}
+		return defaultID
+	}
+
+	// 3. Enforce access control
+	if h.userHasWorkspace(claims, requestedID) {
+		return requestedID
+	}
+
+	// Fallback to first available on mismatch (or could return error in future)
+	if len(claims.WorkspaceIDs) > 0 {
+		return claims.WorkspaceIDs[0]
+	}
+
+	return defaultID
+}
+
+func (h *Handler) userHasWorkspace(claims *auth.UserClaims, wsID uuid.UUID) bool {
+	if claims.Role == "administrator" || claims.Role == "owner" || claims.Role == "admin" {
+		return true // Global access
+	}
+	for _, id := range claims.WorkspaceIDs {
+		if id == wsID {
+			return true
+		}
+	}
+	return false
 }
 
 // parsePagination extracts limit and offset from the request query.

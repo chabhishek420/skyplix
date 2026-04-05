@@ -230,13 +230,14 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	l := s.logger
 
-	// Using pre-compiled singleton pipeline for Level 1 clicks
+	// Use sync.Pool for zero-alloc hot path
+	payload := pipeline.PayloadPool.Get().(*pipeline.Payload)
+	payload.Reset()
+	payload.Ctx = r.Context()
+	payload.Request = r
+	payload.Writer = w
 
-	payload := &pipeline.Payload{
-		Ctx:     r.Context(),
-		Request: r,
-		Writer:  w,
-	}
+	defer pipeline.PayloadPool.Put(payload)
 
 	if err := s.pipelineL1.Run(payload); err != nil {
 		s.logger.Error("pipeline error", zap.Error(err))
@@ -274,11 +275,13 @@ func (s *Server) handleClickL2(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	s.logger.Debug("L2 click received", zap.String("url", r.URL.String()), zap.String("token_param", token))
 
-	payload := &pipeline.Payload{
-		Ctx:     r.Context(),
-		Request: r,
-		Writer:  w,
-	}
+	payload := pipeline.PayloadPool.Get().(*pipeline.Payload)
+	payload.Reset()
+	payload.Ctx = r.Context()
+	payload.Request = r
+	payload.Writer = w
+
+	defer pipeline.PayloadPool.Put(payload)
 
 	if err := s.pipelineL2.Run(payload); err != nil {
 		s.logger.Error("L2 pipeline error", zap.Error(err))
