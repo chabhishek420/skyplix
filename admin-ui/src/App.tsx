@@ -13,6 +13,7 @@ import { ClicksLog } from './pages/logs/clicks';
 import { ConversionsLog } from './pages/logs/conversions';
 import { Login } from './pages/login';
 import { Stats } from './pages/stats';
+import { Users } from './pages/users';
 import { getAuthToken } from './lib/api';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,7 @@ function App() {
           <Route path="networks" element={<Networks />} />
           <Route path="sources" element={<Sources />} />
           <Route path="domains" element={<Domains />} />
+          <Route path="users" element={<Users />} />
           <Route path="stats" element={<Stats />} />
           <Route path="logs">
             <Route path="clicks" element={<ClicksLog />} />

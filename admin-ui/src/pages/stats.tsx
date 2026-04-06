@@ -48,12 +48,13 @@ const getColumns = (dimKey: string): ColumnDef<StatRow, any>[] => [
 export function Stats() {
   const [activeTab, setActiveTab] = useState<'campaigns' | 'offers' | 'geo'>('campaigns');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['stats', activeTab],
     queryFn: async () => {
       const res = await api.get(`/stats/${activeTab}?preset=today`);
       return res.data?.rows || [];
-    }
+    },
+    retry: 1,
   });
 
   const tabs = [
@@ -77,6 +78,12 @@ export function Stats() {
         onAdd={() => {}}
         addLabel=""
       />
+
+      {isError && (
+        <div className="bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-lg text-sm font-medium">
+          Failed to load analytics data. Please check your connection.
+        </div>
+      )}
 
       <div className="flex space-x-1 bg-white p-1 rounded-xl border border-slate-200 whisper-shadow max-w-md">
         {tabs.map(tab => (

@@ -56,6 +56,12 @@ func main() {
 		Run:   runMigrateCH,
 	}
 
+	migratePGCmd := &cobra.Command{
+		Use:   "postgres",
+		Short: "Run PostgreSQL migrations",
+		Run:   runMigratePG,
+	}
+
 	migrateKeitaroCmd := &cobra.Command{
 		Use:   "keitaro",
 		Short: "Migrate data from Keitaro MySQL",
@@ -63,7 +69,7 @@ func main() {
 	}
 	migrateKeitaroCmd.Flags().String("mysql", "", "MySQL DSN for Keitaro (required)")
 
-	migrateCmd.AddCommand(migrateCHCmd, migrateKeitaroCmd)
+	migrateCmd.AddCommand(migrateCHCmd, migratePGCmd, migrateKeitaroCmd)
 
 	// Healthcheck command
 	healthCmd := &cobra.Command{
@@ -184,6 +190,62 @@ func runHealthcheck(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func runMigratePG(cmd *cobra.Command, args []string) {
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	ctx := context.Background()
+	pgPool, err := pgxpool.New(ctx, cfg.Postgres.DSN)
+	if err != nil {
+		log.Fatalf("postgres connect error: %v", err)
+	}
+	defer pgPool.Close()
+
+	// Create migrations table
+	_, err = pgPool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`)
+	if err != nil {
+		log.Fatalf("failed to create migrations table: %v", err)
+	}
+
+	var applied []uint32
+	rows, _ := pgPool.Query(ctx, "SELECT version FROM schema_migrations ORDER BY version")
+	for rows.Next() {
+		var v uint32
+		rows.Scan(&v)
+		applied = append(applied, v)
+	}
+	rows.Close()
+
+	appliedMap := make(map[uint32]bool)
+	for _, v := range applied {
+		appliedMap[v] = true
+	}
+
+	migrationDir := "db/postgres/migrations"
+	files, _ := os.ReadDir(migrationDir)
+	for _, f := range files {
+		if !strings.HasSuffix(f.Name(), ".up.sql") {
+			continue
+		}
+		var version uint32
+		fmt.Sscanf(f.Name(), "%d", &version)
+		if appliedMap[version] {
+			continue
+		}
+
+		log.Printf("Applying Postgres migration: %s", f.Name())
+		content, _ := os.ReadFile(filepath.Join(migrationDir, f.Name()))
+		_, err = pgPool.Exec(ctx, string(content))
+		if err != nil {
+			log.Fatalf("failed in %s: %v", f.Name(), err)
+		}
+		pgPool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version)
+	}
+	log.Println("Postgres migrations complete")
 }
 
 func runMigrateCH(cmd *cobra.Command, args []string) {

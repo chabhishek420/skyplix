@@ -52,7 +52,7 @@ services:
   zai-tds-migrate:
     build:
       context: .
-    command: ["./zai-tds", "migrate", "clickhouse"]
+    command: ["sh", "-c", "./zai-tds migrate postgres && ./zai-tds migrate clickhouse"]
     environment:
       - CLICKHOUSE_URL=clickhouse:9000
     depends_on:

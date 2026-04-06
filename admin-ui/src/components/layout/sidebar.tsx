@@ -10,7 +10,8 @@ import {
   FileBox, 
   Globe,
   ShieldCheck,
-  BarChart2
+  BarChart2,
+  Users
 } from 'lucide-react';
 
 const MENU_GROUPS = [
@@ -34,6 +35,7 @@ const MENU_GROUPS = [
     items: [
       { path: '/sources', label: 'Sources', icon: Activity },
       { path: '/domains', label: 'Domains', icon: Globe },
+      { path: '/users', label: 'Users', icon: Users },
     ]
   },
   {
