@@ -9,15 +9,25 @@ import (
 )
 
 // respondJSON writes a JSON response with the given status.
-func (h *Handler) respondJSON(w http.ResponseWriter, status int, data interface{}) {
+func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
 }
 
 // respondError writes a formatted JSON error response.
+func respondError(w http.ResponseWriter, status int, message string) {
+	respondJSON(w, status, map[string]string{"error": message})
+}
+
+// respondJSON writes a JSON response with the given status.
+func (h *Handler) respondJSON(w http.ResponseWriter, status int, data interface{}) {
+	respondJSON(w, status, data)
+}
+
+// respondError writes a formatted JSON error response.
 func (h *Handler) respondError(w http.ResponseWriter, status int, message string) {
-	h.respondJSON(w, status, map[string]string{"error": message})
+	respondError(w, status, message)
 }
 
 // parseUUID validates and returns a UUID from a string.

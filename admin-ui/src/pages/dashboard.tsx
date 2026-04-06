@@ -48,22 +48,32 @@ export function Dashboard() {
     );
   }
 
-  const summary: SummaryData = reportData?.summary || { total_clicks: 1284502, total_conversions: 42903, revenue: 184209, roi: 314.2 };
-  const rows: CampaignRow[] = reportData?.rows?.length > 0 ? reportData.rows : [
-    { entity_name: 'US_Tier1_Desktop_Native_v4', status: 'active', clicks: 412042, conversions: 8204, revenue: 12940.40, roi: 284.1 },
-    { entity_name: 'EU_Generic_Mobile_Inter_v1', status: 'paused', clicks: 104221, conversions: 1102, revenue: 4120.00, roi: 112.5 },
-    { entity_name: 'SEA_Utility_Android_Push_Global', status: 'active', clicks: 892104, conversions: 24551, revenue: 52901.12, roi: 412.0 },
-    { entity_name: 'UK_Finance_Search_Lander_A', status: 'active', clicks: 54093, conversions: 3012, revenue: 8290.00, roi: 189.4 },
-  ];
+  const summary: SummaryData = {
+    total_clicks: reportData?.summary?.clicks || 0,
+    total_conversions: reportData?.summary?.conversions || 0,
+    revenue: reportData?.summary?.revenue || 0,
+    roi: reportData?.summary?.roi || 0,
+  };
 
-  const chartData = [
-    { name: '01 MAY', clicks: 4000, conversions: 2400, revenue: 2400, cost: 1200 },
-    { name: '03 MAY', clicks: 3000, conversions: 1398, revenue: 3200, cost: 1800 },
-    { name: '05 MAY', clicks: 2000, conversions: 9800, revenue: 2800, cost: 1500 },
-    { name: '07 MAY', clicks: 2780, conversions: 3908, revenue: 4500, cost: 2100 },
-    { name: '09 MAY', clicks: 1890, conversions: 4800, revenue: 3900, cost: 1700 },
-    { name: '11 MAY', clicks: 2390, conversions: 3800, revenue: 4200, cost: 1900 },
-    { name: '13 MAY', clicks: 3490, conversions: 4300, revenue: 5100, cost: 2300 },
+  const rows: CampaignRow[] = (reportData?.rows || []).map((row: any) => ({
+    entity_name: row.dimensions.campaign_name || row.dimensions.campaign || 'Unknown',
+    status: 'active',
+    clicks: row.clicks,
+    conversions: row.conversions,
+    revenue: row.revenue,
+    roi: row.roi,
+  }));
+
+  const chartData = (reportData?.rows || []).filter((r: any) => r.dimensions.day).map((r: any) => ({
+    name: r.dimensions.day,
+    clicks: r.clicks,
+    conversions: r.conversions,
+    revenue: r.revenue,
+    cost: r.cost,
+  })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+  const finalChartData = chartData.length > 0 ? chartData : [
+    { name: 'No Data', clicks: 0, conversions: 0, revenue: 0, cost: 0 },
   ];
 
   const stats = [
@@ -117,7 +127,7 @@ export function Dashboard() {
           </div>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart data={finalChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563eb" stopOpacity={0.08}/>
@@ -158,7 +168,7 @@ export function Dashboard() {
           </div>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={finalChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />

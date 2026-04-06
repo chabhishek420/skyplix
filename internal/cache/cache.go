@@ -332,6 +332,28 @@ func (c *Cache) GetLandingsByStream(ctx context.Context, streamID uuid.UUID) ([]
 	return landings, nil
 }
 
+// GetTrafficSource retrieves a traffic source by ID.
+func (c *Cache) GetTrafficSource(ctx context.Context, id uuid.UUID) (*model.TrafficSource, error) {
+	val, err := c.vk.Get(ctx, fmt.Sprintf("source:%s", id)).Result()
+	if err == redis.Nil {
+		var s model.TrafficSource
+		err := c.db.QueryRow(ctx, "SELECT id, name, postback_url, params, state FROM traffic_sources WHERE id = $1", id).Scan(&s.ID, &s.Name, &s.PostbackURL, &s.Params, &s.State)
+		if err != nil {
+			return nil, err
+		}
+		data, _ := json.Marshal(s)
+		c.vk.Set(ctx, fmt.Sprintf("source:%s", id), data, time.Hour)
+		return &s, nil
+	} else if err != nil {
+		return nil, err
+	}
+	var s model.TrafficSource
+	if err := json.Unmarshal([]byte(val), &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 // GetAffiliateNetwork retrieves an affiliate network by ID.
 func (c *Cache) GetAffiliateNetwork(ctx context.Context, id uuid.UUID) (*model.AffiliateNetwork, error) {
 	val, err := c.vk.Get(ctx, fmt.Sprintf("network:%s", id)).Result()

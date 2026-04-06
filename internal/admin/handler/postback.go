@@ -2,7 +2,11 @@ package handler
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,13 +18,16 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/attribution"
+	"github.com/skyplix/zai-tds/internal/metrics"
 	"github.com/skyplix/zai-tds/internal/model"
 	"github.com/skyplix/zai-tds/internal/queue"
 )
 
-const postbackKeySetting = "tracker.postback_key"
+const (
+	postbackKeySetting  = "tracker.postback_key"
+	postbackSaltSetting = "tracker.postback_salt"
+)
 
 type postbackKeyCache struct {
 	mu       sync.Mutex
@@ -29,20 +36,26 @@ type postbackKeyCache struct {
 	cacheTTL time.Duration
 }
 
+// SettingsReader defines the interface for reading settings.
+type SettingsReader interface {
+	Get(ctx context.Context, key string) (string, error)
+}
+
 // PostbackHandler receives conversion postbacks and enqueues ConversionRecord writes.
 // It is a public handler secured by a global key (`/postback/{key}`) stored in settings.
 type PostbackHandler struct {
 	logger      *zap.Logger
-	settings    *repository.SettingsRepository
+	settings    SettingsReader
 	attribution *attribution.Service
 	clickhouse  driver.Conn
 	convChan    chan<- queue.ConversionRecord
 	keyCache    postbackKeyCache
+	saltCache   postbackKeyCache
 }
 
 func NewPostbackHandler(
 	logger *zap.Logger,
-	settings *repository.SettingsRepository,
+	settings SettingsReader,
 	attribution *attribution.Service,
 	clickhouse driver.Conn,
 	convChan chan<- queue.ConversionRecord,
@@ -56,6 +69,9 @@ func NewPostbackHandler(
 		keyCache: postbackKeyCache{
 			cacheTTL: 30 * time.Second,
 		},
+		saltCache: postbackKeyCache{
+			cacheTTL: 30 * time.Second,
+		},
 	}
 }
 
@@ -64,20 +80,24 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 	expectedKey, err := h.getPostbackKey(r.Context())
 	if err != nil {
 		h.logger.Error("postback key lookup failed", zap.Error(err))
-		h.writeText(w, http.StatusInternalServerError, "error: settings_lookup_failed")
+		h.respondError(w, http.StatusInternalServerError, "error: settings_lookup_failed")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 		return
 	}
 	if expectedKey == "" {
-		h.writeText(w, http.StatusInternalServerError, "error: postback_key_missing")
+		h.respondError(w, http.StatusInternalServerError, "error: postback_key_missing")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 		return
 	}
 	if key == "" || key != expectedKey {
-		h.writeText(w, http.StatusUnauthorized, "error: invalid_key")
+		h.respondError(w, http.StatusUnauthorized, "error: invalid_key")
+		metrics.PostbackProcessedTotal.WithLabelValues("invalid_key").Inc()
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		h.writeText(w, http.StatusBadRequest, "error: invalid_form")
+		h.respondError(w, http.StatusBadRequest, "error: invalid_form")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 		return
 	}
 
@@ -91,8 +111,22 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		r.Form.Get("subid1"),
 		r.Form.Get("sub1"),
 	)
+
+	// HMAC Validation (Optional: only if salt is configured)
+	signature := r.Form.Get("sig")
+	if signature != "" {
+		salt, _ := h.getPostbackSalt(r.Context())
+		if salt != "" {
+			if !h.verifySignature(r, signature, salt, token) {
+				h.respondError(w, http.StatusUnauthorized, "error: invalid_signature")
+				metrics.PostbackProcessedTotal.WithLabelValues("invalid_signature").Inc()
+				return
+			}
+		}
+	}
 	if token == "" {
-		h.writeText(w, http.StatusBadRequest, "error: missing_token")
+		h.respondError(w, http.StatusBadRequest, "error: missing_token")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 		return
 	}
 
@@ -112,19 +146,34 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		r.Form.Get("tid"),
 	)
 
+	// Valkey Deduplication
+	if externalID != "" && h.attribution != nil {
+		isDup, err := h.attribution.IsDuplicateExternalID(r.Context(), externalID)
+		if err != nil {
+			h.logger.Warn("deduplication check failed", zap.Error(err))
+		} else if isDup {
+			h.respondError(w, http.StatusConflict, "error: duplicate_transaction")
+			metrics.PostbackProcessedTotal.WithLabelValues("duplicate").Inc()
+			return
+		}
+	}
+
 	attr, err := h.getAttribution(r.Context(), token)
 	if err != nil {
 		h.logger.Error("postback attribution lookup failed", zap.Error(err), zap.String("token", token))
-		h.writeText(w, http.StatusInternalServerError, "error: attribution_lookup_failed")
+		h.respondError(w, http.StatusInternalServerError, "error: attribution_lookup_failed")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 		return
 	}
 	if attr == nil || attr.CampaignID == uuid.Nil {
-		h.writeText(w, http.StatusNotFound, "error: attribution_not_found")
+		h.respondError(w, http.StatusNotFound, "error: attribution_not_found")
+		metrics.PostbackProcessedTotal.WithLabelValues("not_found").Inc()
 		return
 	}
 
 	if h.convChan == nil {
-		h.writeText(w, http.StatusServiceUnavailable, "error: conversion_queue_unavailable")
+		h.respondError(w, http.StatusServiceUnavailable, "error: conversion_queue_unavailable")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 		return
 	}
 
@@ -143,21 +192,136 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		Payout:             payout,
 		Revenue:            revenue,
 		ExternalID:         externalID,
+			ConversionType:     "postback",
 	}
 
 	select {
 	case h.convChan <- record:
-		h.writeText(w, http.StatusOK, "ok")
+		h.respondText(w, http.StatusOK, "ok")
+		metrics.PostbackProcessedTotal.WithLabelValues("success").Inc()
 	default:
 		h.logger.Warn("conversion queue full - dropping", zap.String("token", token))
-		h.writeText(w, http.StatusServiceUnavailable, "error: queue_full")
+		h.respondError(w, http.StatusServiceUnavailable, "error: queue_full")
+		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
 	}
 }
 
-func (h *PostbackHandler) writeText(w http.ResponseWriter, status int, body string) {
+// HandlePixel serves a 1x1 transparent GIF and records a conversion.
+// This is used for client-side tracking where a postback is not possible.
+func (h *PostbackHandler) HandlePixel(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.serveTransparentGif(w)
+		return
+	}
+
+	token := firstNonEmpty(
+		r.Form.Get("sub_id"),
+		r.Form.Get("subid"),
+		r.Form.Get("click_token"),
+		r.Form.Get("clickid"),
+		r.Form.Get("click_id"),
+	)
+
+	if token == "" {
+		h.serveTransparentGif(w)
+		return
+	}
+
+	attr, err := h.getAttribution(r.Context(), token)
+	if err != nil || attr == nil || attr.CampaignID == uuid.Nil {
+		h.serveTransparentGif(w)
+		return
+	}
+
+	if h.convChan != nil {
+		payout := parseFloat(r.Form.Get("payout"))
+		status := strings.ToLower(firstNonEmpty(r.Form.Get("status"), "lead"))
+
+		record := queue.ConversionRecord{
+			ID:                 uuid.New().String(),
+			CreatedAt:          time.Now().UTC(),
+			ClickToken:         token,
+			CampaignID:         attr.CampaignID.String(),
+			StreamID:           attr.StreamID.String(),
+			OfferID:            attr.OfferID.String(),
+			LandingID:          attr.LandingID.String(),
+			AffiliateNetworkID: attr.AffiliateNetworkID.String(),
+			SourceID:           attr.SourceID.String(),
+			CountryCode:        attr.CountryCode,
+			Status:             status,
+			Payout:             payout,
+			ConversionType:     "pixel",
+		}
+
+		select {
+		case h.convChan <- record:
+			metrics.PostbackProcessedTotal.WithLabelValues("pixel_success").Inc()
+		default:
+			h.logger.Warn("conversion queue full (pixel) - dropping", zap.String("token", token))
+		}
+	}
+
+	h.serveTransparentGif(w)
+}
+
+func (h *PostbackHandler) serveTransparentGif(w http.ResponseWriter) {
+	// 1x1 transparent GIF
+	const pixel = "\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b"
+	w.Header().Set("Content-Type", "image/gif")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(pixel))
+}
+
+func (h *PostbackHandler) respondJSON(w http.ResponseWriter, status int, data interface{}) {
+	respondJSON(w, status, data)
+}
+
+func (h *PostbackHandler) respondError(w http.ResponseWriter, status int, message string) {
+	respondError(w, status, message)
+}
+
+func (h *PostbackHandler) respondText(w http.ResponseWriter, status int, body string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(body))
+}
+
+func (h *PostbackHandler) getPostbackSalt(ctx context.Context) (string, error) {
+	h.saltCache.mu.Lock()
+	if !h.saltCache.fetched.IsZero() && time.Since(h.saltCache.fetched) < h.saltCache.cacheTTL {
+		v := h.saltCache.value
+		h.saltCache.mu.Unlock()
+		return v, nil
+	}
+	h.saltCache.mu.Unlock()
+
+	lookupCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	v, err := h.settings.Get(lookupCtx, postbackSaltSetting)
+	if err != nil {
+		return "", err
+	}
+
+	h.saltCache.mu.Lock()
+	h.saltCache.value = v
+	h.saltCache.fetched = time.Now()
+	h.saltCache.mu.Unlock()
+
+	return v, nil
+}
+
+func (h *PostbackHandler) verifySignature(r *http.Request, sig, salt, token string) bool {
+	status := r.Form.Get("status")
+	payout := r.Form.Get("payout")
+
+	payload := fmt.Sprintf("%s|%s|%s", token, status, payout)
+	mac := hmac.New(sha256.New, []byte(salt))
+	mac.Write([]byte(payload))
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(sig), []byte(expectedMAC))
 }
 
 func (h *PostbackHandler) getPostbackKey(ctx context.Context) (string, error) {

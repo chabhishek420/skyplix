@@ -3,6 +3,7 @@ package macro
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/skyplix/zai-tds/internal/model"
@@ -35,7 +36,7 @@ func TestReplaceMacros(t *testing.T) {
 		Cost:           1.5,
 	}
 
-	targetURL := "https://example.com/?vc={visitor_code}&ct={connection_type}&brand={brand}&model={model}&bot={is_bot}&unique={is_unique}&kw={keyword}&kw8={keyword_utf8}&ext={external_id}&src={source}&e1={extra_param_1}&e10={extra_param_10}&cost={cost}"
+	targetURL := "https://example.com/?vc={visitor_code}&ct={connection_type}&brand={brand}&model={model}&bot={is_bot}&unique={is_unique}&kw={keyword}&kw8={keyword_utf8}&ext={external_id}&src={source}&e1={extra_param_1}&e10={extra_param_10}&cost={cost}&subid={subid}&tid={tid}&op={operator}&d={date}"
 
 	result := Replace(targetURL, click, campaign)
 
@@ -53,6 +54,10 @@ func TestReplaceMacros(t *testing.T) {
 		"e1=ep1",
 		"e10=ep10",
 		"cost=1.5000",
+		"subid=test_token",
+		"tid=test_token",
+		"op=Verizon",
+		"d=" + time.Now().Format("2006-01-02"),
 	}
 
 	for _, part := range expectedParts {

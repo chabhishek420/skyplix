@@ -7,6 +7,7 @@ package stage
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -79,7 +80,7 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 			return nil // No abort, we want to re-run the loop in Pipeline.Run
 		}
 		s.Logger.Error("action execution failed", zap.Error(err), zap.String("type", stream.ActionType))
-		return err
+		return fmt.Errorf("execute action %s: %w", stream.ActionType, err)
 	}
 
 	s.Logger.Debug("action executed", 

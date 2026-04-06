@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"strings"
 	"time"
 
@@ -53,32 +54,19 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	// Referrer
 	rc.Referrer = r.Header.Get("Referer")
 
-	// Sub IDs from query params
-	q := r.URL.Query()
-	rc.RawQuery = r.URL.RawQuery
-	rc.SubID1 = q.Get("sub_id_1")
-	if rc.SubID1 == "" {
-		rc.SubID1 = q.Get("sub1")
-	}
-	rc.SubID2 = q.Get("sub_id_2")
-	if rc.SubID2 == "" {
-		rc.SubID2 = q.Get("sub2")
-	}
-	rc.SubID3 = q.Get("sub_id_3")
-	if rc.SubID3 == "" {
-		rc.SubID3 = q.Get("sub3")
-	}
-	rc.SubID4 = q.Get("sub_id_4")
-	if rc.SubID4 == "" {
-		rc.SubID4 = q.Get("sub4")
-	}
-	rc.SubID5 = q.Get("sub_id_5")
-	if rc.SubID5 == "" {
-		rc.SubID5 = q.Get("sub5")
-	}
+	// Sub IDs from query params (avoiding r.URL.Query() allocations)
+	rawQuery := r.URL.RawQuery
+	rc.RawQuery = rawQuery
+
+	// Fast path for sub_ids using a manual query string scanner to avoid map[string][]string allocation
+	rc.SubID1 = getQueryParam(rawQuery, "sub_id_1", "sub1")
+	rc.SubID2 = getQueryParam(rawQuery, "sub_id_2", "sub2")
+	rc.SubID3 = getQueryParam(rawQuery, "sub_id_3", "sub3")
+	rc.SubID4 = getQueryParam(rawQuery, "sub_id_4", "sub4")
+	rc.SubID5 = getQueryParam(rawQuery, "sub_id_5", "sub5")
 
 	// Cost from query param
-	if costStr := q.Get("cost"); costStr != "" {
+	if costStr := getQueryParam(rawQuery, "cost"); costStr != "" {
 		var cost float64
 		if _, err := parseFloat(costStr, &cost); err == nil {
 			rc.Cost = cost
@@ -177,6 +165,46 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 	}
 
 	return false, ""
+}
+
+// getQueryParam manually parses the query string to find a value without allocating a map.
+// It also performs URL unescaping to ensure data integrity.
+func getQueryParam(query, key1 string, optionalKey2 ...string) string {
+	if query == "" {
+		return ""
+	}
+
+	val := findInQuery(query, key1)
+	if val == "" && len(optionalKey2) > 0 {
+		val = findInQuery(query, optionalKey2[0])
+	}
+
+	if val != "" {
+		if decoded, err := url.QueryUnescape(val); err == nil {
+			return decoded
+		}
+	}
+	return val
+}
+
+func findInQuery(query, key string) string {
+	pos := strings.Index(query, key+"=")
+	if pos == -1 {
+		return ""
+	}
+
+	// Ensure it's a full key match (start of string or preceded by &)
+	if pos > 0 && query[pos-1] != '&' {
+		// Substring match, continue search (simple version, could be more robust)
+		return findInQuery(query[pos+len(key):], key)
+	}
+
+	start := pos + len(key) + 1
+	end := strings.IndexByte(query[start:], '&')
+	if end == -1 {
+		return query[start:]
+	}
+	return query[start : start+end]
 }
 
 // parseFloat parses a string to float64 and stores result in dest.
