@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -64,6 +65,13 @@ func (a *LocalFileAction) Execute(w http.ResponseWriter, r *http.Request, ctx *A
 	}
 
 	fullPath := filepath.Join("data", "landers", cleanPath)
+
+	// If directory, append index.html
+	fi, err := os.Stat(fullPath)
+	if err == nil && fi.IsDir() {
+		fullPath = filepath.Join(fullPath, "index.html")
+	}
+
 	http.ServeFile(w, r, fullPath)
 	return nil
 }

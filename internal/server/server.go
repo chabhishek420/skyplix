@@ -223,6 +223,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
 		&stage.NormalizeIPStage{},
+		&stage.IdentifyVisitorStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
@@ -259,6 +260,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 
 	s.pipelineL2 = pipeline.New(
 		&stage.NormalizeIPStage{},
+		&stage.IdentifyVisitorStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
