@@ -205,6 +205,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.workers = worker.NewManager(logger,
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
 		worker.NewSessionJanitorWorker(logger),
+		worker.NewHitLimitResetWorker(s.valkey, logger),
 	)
 
 	// Warmup cache
@@ -275,6 +276,8 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.UpdatePayoutStage{},
 		&stage.SetCookieStage{},
 		&stage.ExecuteActionStage{ActionEngine: s.actionEngine, Logger: logger},
+		&stage.PrepareRawClickToStoreStage{},
+		&stage.CheckSendingToAnotherCampaignStage{},
 		&stage.StoreRawClicksStage{ClickChan: clickChan, Attribution: s.attributionSvc},
 	)
 
