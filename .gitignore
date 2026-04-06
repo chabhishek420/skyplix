@@ -1,5 +1,7 @@
 # === Go ===
 /zai-tds
+/migrate-ch
+/skyplix
 *.exe
 *.dll
 *.so

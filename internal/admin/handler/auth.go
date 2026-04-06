@@ -46,6 +46,11 @@ func (h *Handler) HandleLogin(jwtManager *auth.JWTManager) http.HandlerFunc {
 			return
 		}
 
+		// Security Check: Warn if using default password
+		if req.Password == "admin123" && req.Username == "admin" {
+			h.logger.Warn("SECURITY WARNING: Admin is still using default password 'admin123'. Change it immediately!")
+		}
+
 		// Generate JWT
 		token, err := jwtManager.Generate(userID, role)
 		if err != nil {

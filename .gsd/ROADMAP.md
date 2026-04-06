@@ -20,10 +20,13 @@
 **Gaps to Close:**
 - [x] Sync Shadow Development: Formally plan JA3/JA4 and Cluster Bus work.
 - [x] Documentation Hygiene: Populate `DECISIONS.md` with v1.0 and initial v2.0 rationale.
-- [x] Verification Audit: Add tests and `VERIFICATION.md` for `cluster.Bus` and### Milestone v2.0: Scaling & Automation [80%]
-- [x] Phase 5: Conversion Tracking Implementation [100%]
-- [x] Phase 6: Admin Dashboard Components [100%]
-- [x] Phase 7: Real-time Reports [100%]
+### Milestone v1.0: Production TDS [100%]
+- [x] Phase 1-4: Foundation & Cloaking
+- [x] Phase 5: Conversion Tracking & Analytics
+- [x] Phase 6: Admin Dashboard UI
+- [x] Phase 7: Production Hardening
+
+### Milestone v2.0: Scaling & Automation [0%]
 - [x] Phase 8: Campaign Optimization API [100%]
 - [x] Phase 9: Multi-user Support [100%]
 - [x] Phase 10: Cluster Orchestration [100%]

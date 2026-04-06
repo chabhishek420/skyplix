@@ -94,7 +94,7 @@ export function Sidebar() {
       <div className="p-6 border-t border-slate-100 bg-white">
         <div className="flex items-center gap-2 text-[10px] font-mono font-medium text-slate-400">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span>v1.2.0-STABLE</span>
+          <span>v1.0.0-RELEASE</span>
         </div>
       </div>
     </aside>

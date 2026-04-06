@@ -26,11 +26,18 @@
 - [x] Implement ClickHouse Materialized Views for real-time stats aggregation
 - [x] Define postback URL template macros (12 Keitaro-compatible macros)
 
-## Deferred to Later Phases
-- [ ] Research Grafana dashboard templates for TDS metrics (Phase 7)
-- [ ] Evaluate Kubernetes Helm chart for production deployment (Phase 7)
-- [ ] Design data migration script from existing Keitaro MySQL → ZAI PostgreSQL
-- [ ] Implement epsilon-greedy multi-armed bandit for optimization (from Keitaro reference)
+## v1.0 Production Readiness ✅ Complete
+- [x] Automated Database Migrations (Postgres & ClickHouse)
+- [x] Hardened Docker Image (Distroless)
+- [x] Secure Admin UI (JWT, In-memory auth, wired CRUD)
+- [x] Conversion Deduplication
+- [x] Native CLI Healthchecks
+- [x] Real-time Log Viewers
+
+## Deferred to v2.0
+- [ ] Research Grafana dashboard templates for TDS metrics
+- [ ] Evaluate Kubernetes Helm chart for production deployment
+- [ ] Implement epsilon-greedy multi-armed bandit for optimization
 
 ## Documentation Hygiene
 - [ ] Keep hierarchical `CLAUDE.md` files in sync after directory/file structure changes (regenerate outside `reference/` and preserve manual sections)
