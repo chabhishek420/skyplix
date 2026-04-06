@@ -124,6 +124,39 @@ func TestPostbackHandler_HandlePostback(t *testing.T) {
 		}
 	})
 
+	t.Run("HMACSignature_AliasPayout", func(t *testing.T) {
+		token := uuid.New().String()
+		campID := uuid.New()
+		status := "sale"
+		amount := "7"
+
+		// Seed attribution
+		attrData := fmt.Sprintf(`{"campaign_id":"%s"}`, campID)
+		vk.Set(context.Background(), "attr:"+token, attrData, 0)
+
+		// Calculate signature with canonical fields.
+		mac := hmac.New(sha256.New, []byte("test-salt"))
+		mac.Write([]byte(token + "|" + status + "|" + amount))
+		sig := hex.EncodeToString(mac.Sum(nil))
+
+		w := httptest.NewRecorder()
+		q := url.Values{}
+		q.Set("subid", token)
+		q.Set("status", status)
+		q.Set("amount", amount)
+		q.Set("sig", sig)
+
+		r := httptest.NewRequest("GET", "/postback/test-key?"+q.Encode(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("key", "test-key")
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+
+		h.HandlePostback(w, r)
+		if w.Code != http.StatusOK {
+			t.Errorf("valid alias sig: expected 200, got %d. body: %s", w.Code, w.Body.String())
+		}
+	})
+
 	t.Run("Deduplication", func(t *testing.T) {
 		token := uuid.New().String()
 		txID := "tx-999"

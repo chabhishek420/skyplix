@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
-	"path/filepath"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -61,8 +61,8 @@ type Server struct {
 	authSvc         *auth.Service
 	botDB           *botdb.ValkeyStore
 
-	uaStore         *botdb.UAStore
-	ratelimiter     *ratelimit.Service
+	uaStore     *botdb.UAStore
+	ratelimiter *ratelimit.Service
 
 	cache          *cache.Cache
 	filterEngine   *filter.Engine
@@ -175,6 +175,9 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.ratelimiter = ratelimit.New(s.valkey, logger)
 
 	// Auth Service (Phase 6)
+	if cfg.System.Salt == "" {
+		return nil, fmt.Errorf("system.salt is required for auth")
+	}
 	s.authSvc = auth.NewService(s.db, cfg.System.Salt)
 
 	// Admin Handler

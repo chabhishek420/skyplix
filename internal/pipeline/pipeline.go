@@ -128,7 +128,7 @@ func (p *Pipeline) Run(payload *Payload) error {
 			startStage := time.Now()
 			err := stage.Process(payload)
 			metrics.PipelineStagesDuration.WithLabelValues(stage.Name()).Observe(time.Since(startStage).Seconds())
-			
+
 			if err != nil {
 				return fmt.Errorf("stage %s: %w", stage.Name(), err)
 			}

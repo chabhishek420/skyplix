@@ -3,6 +3,7 @@ package stage
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/skyplix/zai-tds/internal/cookie"
 	"github.com/skyplix/zai-tds/internal/pipeline"
@@ -13,7 +14,7 @@ import (
 // Order: Cookie -> Query Parameter ({visitor_code}) -> New Generation.
 type IdentifyVisitorStage struct{}
 
-func (s *IdentifyVisitorStage) Name() string      { return "IdentifyVisitor" }
+func (s *IdentifyVisitorStage) Name() string    { return "IdentifyVisitor" }
 func (s *IdentifyVisitorStage) AlwaysRun() bool { return false }
 
 func (s *IdentifyVisitorStage) Process(p *pipeline.Payload) error {
@@ -28,7 +29,9 @@ func (s *IdentifyVisitorStage) Process(p *pipeline.Payload) error {
 	// 3. Generate new if missing
 	if code == "" {
 		b := make([]byte, 16)
-		rand.Read(b)
+		if _, err := rand.Read(b); err != nil {
+			return fmt.Errorf("generate visitor code: %w", err)
+		}
 		code = hex.EncodeToString(b)
 	}
 

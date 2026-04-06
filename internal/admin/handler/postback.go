@@ -112,18 +112,6 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		r.Form.Get("sub1"),
 	)
 
-	// HMAC Validation (Optional: only if salt is configured)
-	signature := r.Form.Get("sig")
-	if signature != "" {
-		salt, _ := h.getPostbackSalt(r.Context())
-		if salt != "" {
-			if !h.verifySignature(r, signature, salt, token) {
-				h.respondError(w, http.StatusUnauthorized, "error: invalid_signature")
-				metrics.PostbackProcessedTotal.WithLabelValues("invalid_signature").Inc()
-				return
-			}
-		}
-	}
 	if token == "" {
 		h.respondError(w, http.StatusBadRequest, "error: missing_token")
 		metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
@@ -137,7 +125,8 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		status = "lead"
 	}
 
-	payout := parseFloat(firstNonEmpty(r.Form.Get("payout"), r.Form.Get("amount"), r.Form.Get("sum")))
+	payoutRaw := firstNonEmpty(r.Form.Get("payout"), r.Form.Get("amount"), r.Form.Get("sum"))
+	payout := parseFloat(payoutRaw)
 	revenue := parseFloat(firstNonEmpty(r.Form.Get("revenue"), r.Form.Get("rev")))
 	externalID := firstNonEmpty(
 		r.Form.Get("external_id"),
@@ -145,6 +134,20 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		r.Form.Get("transaction_id"),
 		r.Form.Get("tid"),
 	)
+
+	// HMAC Validation (Optional: only if salt is configured)
+	// Uses the canonical parsed fields so aliases like amount/sum are covered.
+	signature := r.Form.Get("sig")
+	if signature != "" {
+		salt, _ := h.getPostbackSalt(r.Context())
+		if salt != "" {
+			if !h.verifySignature(signature, salt, token, status, payoutRaw) {
+				h.respondError(w, http.StatusUnauthorized, "error: invalid_signature")
+				metrics.PostbackProcessedTotal.WithLabelValues("invalid_signature").Inc()
+				return
+			}
+		}
+	}
 
 	// Valkey Deduplication
 	if externalID != "" && h.attribution != nil {
@@ -192,7 +195,7 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		Payout:             payout,
 		Revenue:            revenue,
 		ExternalID:         externalID,
-			ConversionType:     "postback",
+		ConversionType:     "postback",
 	}
 
 	select {
@@ -312,16 +315,18 @@ func (h *PostbackHandler) getPostbackSalt(ctx context.Context) (string, error) {
 	return v, nil
 }
 
-func (h *PostbackHandler) verifySignature(r *http.Request, sig, salt, token string) bool {
-	status := r.Form.Get("status")
-	payout := r.Form.Get("payout")
-
-	payload := fmt.Sprintf("%s|%s|%s", token, status, payout)
+func (h *PostbackHandler) verifySignature(sig, salt, token, status, payoutRaw string) bool {
+	payload := fmt.Sprintf("%s|%s|%s", token, status, payoutRaw)
 	mac := hmac.New(sha256.New, []byte(salt))
 	mac.Write([]byte(payload))
-	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+	expectedMAC := mac.Sum(nil)
 
-	return hmac.Equal([]byte(sig), []byte(expectedMAC))
+	sigBytes, err := hex.DecodeString(strings.ToLower(strings.TrimSpace(sig)))
+	if err != nil {
+		return false
+	}
+
+	return hmac.Equal(sigBytes, expectedMAC)
 }
 
 func (h *PostbackHandler) getPostbackKey(ctx context.Context) (string, error) {
