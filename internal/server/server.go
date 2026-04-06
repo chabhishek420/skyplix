@@ -236,7 +236,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.ChooseLandingStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.GenerateTokenStage{},
-		&stage.SaveLPTokenStage{LPToken: s.lpTokenSvc},
+		&stage.SaveLPTokenStage{LPToken: s.lpTokenSvc, Session: s.sessionSvc},
 		&stage.FindAffiliateNetworkStage{Cache: s.cache},
 		&stage.UpdateHitLimitStage{Service: s.hitlimitSvc},
 		&stage.UpdateCostsStage{},
