@@ -1,3 +1,17 @@
+---
+phase: 5
+plan: 1
+subsystem: analytics
+tags: [clickhouse, migrations]
+provides: [stats-mvs]
+tech-stack: [clickhouse]
+key-files:
+  - db/clickhouse/migrations/005_create_stats_materialized_views.sql
+one_liner: "Added ClickHouse stats tables + materialized views for real-time aggregation."
+metrics:
+  completed_date: "2026-04-03"
+---
+
 # Plan 5.1 Summary: ClickHouse Materialized Views & Stats Tables
 
 ## Accomplished

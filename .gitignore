@@ -88,7 +88,6 @@ tmp/
 .gemini/
 .bg-shell/
 .claude/
-.planning/
 
 # ── Legacy CLAUDE.md files (use .gsd/CLAUDE.md instead) ──
 CLAUDE.md
