@@ -246,7 +246,6 @@ func parseSort(s string) (field, dir string) {
 	return field, dir
 }
 
-
 func (h *ReportsHandler) respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	respondJSON(w, status, data)
 }

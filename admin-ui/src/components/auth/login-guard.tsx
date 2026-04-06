@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
 
 export function LoginGuard({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('api_key') || '');
+  const [token, setToken] = useState(localStorage.getItem('auth_token') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [inputToken, setInputToken] = useState('');
   const [error, setError] = useState('');
@@ -32,7 +32,7 @@ export function LoginGuard({ children }: { children: React.ReactNode }) {
         setError('');
       } catch (err) {
         setIsAuthenticated(false);
-        localStorage.removeItem('api_key');
+        localStorage.removeItem('auth_token');
       } finally {
         setLoading(false);
       }
@@ -48,12 +48,14 @@ export function LoginGuard({ children }: { children: React.ReactNode }) {
     setError('');
     
     try {
-      await api.get('/settings', {
-        headers: { 'X-Api-Key': inputToken.trim() }
-      });
-      
-      localStorage.setItem('api_key', inputToken.trim());
-      setToken(inputToken.trim());
+      const resp = await api.post('/auth/login', { api_key: inputToken.trim() });
+      const jwt = resp.data?.token;
+      if (!jwt || typeof jwt !== 'string') {
+        throw new Error('missing token');
+      }
+
+      localStorage.setItem('auth_token', jwt);
+      setToken(jwt);
       setIsAuthenticated(true);
     } catch (err) {
       setError('Invalid API Key provided.');

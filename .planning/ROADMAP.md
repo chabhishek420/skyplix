@@ -34,7 +34,7 @@
 **Objective**: Implement conversion ingestion (postback + pixel), attribution lookup/dedup, and reporting/query surfaces.
 
 ### Phase 06: Admin Dashboard
-**Status**: ⏳ Pending
+**Status**: ✅ Complete
 **Objective**: Ship a usable web dashboard UI for managing entities and viewing reports.
 
 ### Phase 07: Production Hardening
