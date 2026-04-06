@@ -88,9 +88,11 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 	// Tier 1 — FORCED
 	for _, idx := range forcedIdx {
 		if s.Filter.MatchAll(p.RawClick, streams[idx].Filters) {
+			p.AddTrace("Stream [%s] matched (FORCED)", streams[idx].Name)
 			s.selectAndBind(p, &streams[idx])
 			return nil
 		}
+		p.AddTrace("Stream [%s] filter mismatch (FORCED)", streams[idx].Name)
 	}
 
 	// Tier 2 — REGULAR
@@ -99,9 +101,11 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 			sort.Slice(regularIdx, func(i, j int) bool { return streams[regularIdx[i]].Position < streams[regularIdx[j]].Position })
 			for _, idx := range regularIdx {
 				if s.Filter.MatchAll(p.RawClick, streams[idx].Filters) {
+					p.AddTrace("Stream [%s] matched (REGULAR POSITION)", streams[idx].Name)
 					s.selectAndBind(p, &streams[idx])
 					return nil
 				}
+				p.AddTrace("Stream [%s] filter mismatch (REGULAR POSITION)", streams[idx].Name)
 			}
 		} else if p.Campaign.Type == model.CampaignTypeWeight {
 			var matching []interface{}
@@ -151,6 +155,7 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 
 	// Tier 3 — DEFAULT
 	if defIdx != -1 {
+		p.AddTrace("Using default stream [%s]", streams[defIdx].Name)
 		s.selectAndBind(p, &streams[defIdx])
 		return nil
 	}

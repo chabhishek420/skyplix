@@ -62,6 +62,19 @@ type Payload struct {
 	// Re-dispatch control (for recursion like ToCampaign)
 	ReDispatch bool
 	Hops       int
+
+	// Trace logs for debugging (Phase 11)
+	Trace []string
+
+	// Simulation mode (Phase 11)
+	IsSimulation bool
+}
+
+// AddTrace adds a diagnostic message to the payload.
+func (p *Payload) AddTrace(format string, a ...any) {
+	if p.Trace != nil {
+		p.Trace = append(p.Trace, fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, a...)))
+	}
 }
 
 // Pipeline runs an ordered slice of stages against a Payload.
@@ -84,6 +97,7 @@ func (p *Pipeline) Run(payload *Payload) error {
 			if payload.Abort && !stage.AlwaysRun() {
 				continue
 			}
+			payload.AddTrace("Entering stage: %s", stage.Name())
 			startStage := time.Now()
 			err := stage.Process(payload)
 			metrics.PipelineStagesDuration.WithLabelValues(stage.Name()).Observe(time.Since(startStage).Seconds())

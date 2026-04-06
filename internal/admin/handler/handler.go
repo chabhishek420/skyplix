@@ -9,12 +9,14 @@ import (
 	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/botdb"
 	"github.com/skyplix/zai-tds/internal/cache"
+	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
 // Handler holds dependencies for all admin API endpoints.
 type Handler struct {
 	db        *pgxpool.Pool
 	cache     *cache.Cache
+	pipelineL1 *pipeline.Pipeline
 	logger    *zap.Logger
 	campaigns *repository.CampaignRepository
 	streams   *repository.StreamRepository
@@ -44,10 +46,11 @@ type Handler struct {
 }
 
 // NewHandler creates a new admin handler.
-func NewHandler(db *pgxpool.Pool, cache *cache.Cache, botDB *botdb.ValkeyStore, uaStore *botdb.UAStore, logger *zap.Logger) *Handler {
+func NewHandler(db *pgxpool.Pool, cache *cache.Cache, pipelineL1 *pipeline.Pipeline, botDB *botdb.ValkeyStore, uaStore *botdb.UAStore, logger *zap.Logger) *Handler {
 	return &Handler{
 		db:        db,
 		cache:     cache,
+		pipelineL1: pipelineL1,
 		botDB:     botDB,
 		uaStore:   uaStore,
 		logger:    logger,

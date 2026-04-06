@@ -50,6 +50,7 @@ func (s *Server) routes() http.Handler {
 				r.Delete("/", s.adminHandler.HandleDeleteCampaign)
 				r.Post("/clone", s.adminHandler.HandleCloneCampaign)
 				r.Get("/streams", s.adminHandler.HandleListStreams)
+				r.Get("/simulate", s.adminHandler.HandleSimulateCampaign)
 			})
 		})
 

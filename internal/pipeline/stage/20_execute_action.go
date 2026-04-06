@@ -71,6 +71,12 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 		s.Logger.Warn("unknown action type, falling back to HttpRedirect", zap.String("type", stream.ActionType))
 	}
 
+	if payload.IsSimulation {
+		payload.AddTrace("Action [%s] would be executed with URL [%s]", stream.ActionType, finalURL)
+		payload.Abort = true
+		return nil
+	}
+
 	err := s.ActionEngine.Execute(stream.ActionType, payload.Writer, payload.Request, ctx)
 	if err != nil {
 		if errors.Is(err, action.ErrRedispatch) {

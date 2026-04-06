@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/model"
+	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
 // HandleListCampaigns returns a paginated list of campaigns.
@@ -174,4 +176,58 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 
 	h.cache.ScheduleWarmup()
 	h.respondJSON(w, http.StatusCreated, newCampaign)
+}
+
+// HandleSimulateCampaign runs a virtual click through the pipeline and returns the decision trace.
+// GET /api/v1/campaigns/{id}/simulate?ip=...&ua=...&ref=...
+func (h *Handler) HandleSimulateCampaign(w http.ResponseWriter, r *http.Request) {
+	id, err := h.parseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid campaign id")
+		return
+	}
+
+	campaign, err := h.campaigns.GetByID(r.Context(), id)
+	if err != nil {
+		h.respondError(w, http.StatusNotFound, "campaign not found")
+		return
+	}
+
+	// Build a mock payload
+	payload := &pipeline.Payload{
+		Ctx:     r.Context(),
+		Request: r,
+		Writer:  nil, // Simulations don't write to network
+		Trace:   make([]string, 0),
+		RawClick: &model.RawClick{
+			CampaignID:    campaign.ID,
+			CampaignAlias: campaign.Alias,
+			IP:            net.ParseIP(r.URL.Query().Get("ip")),
+			UserAgent:     r.URL.Query().Get("ua"),
+			Referrer:      r.URL.Query().Get("ref"),
+		},
+	}
+	if payload.RawClick.IP == nil {
+		payload.RawClick.IP = net.ParseIP("1.2.3.4")
+	}
+	if payload.RawClick.UserAgent == "" {
+		payload.RawClick.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+	}
+
+	// Run simulation (we use a custom pipeline that skips storage)
+	// For now, we'll just run the standard L1 pipeline but we'd normally want a 'safe' version
+	// We'll mark the payload to avoid side effects if stages respect it.
+
+	payload.IsSimulation = true
+
+	if err := h.pipelineL1.Run(payload); err != nil {
+		h.logger.Error("simulation failed", zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "simulation failed")
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]any{
+		"campaign": campaign.Name,
+		"trace":    payload.Trace,
+	})
 }

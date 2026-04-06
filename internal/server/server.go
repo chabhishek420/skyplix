@@ -174,7 +174,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.ratelimiter = ratelimit.New(s.valkey, logger)
 
 	// Admin Handler
-	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
+	s.adminHandler = handler.NewHandler(s.db, s.cache, s.pipelineL1, s.botDB, s.uaStore, logger)
 
 	var convChan chan<- queue.ConversionRecord
 	if s.chWriter != nil {
@@ -206,6 +206,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
 		worker.NewSessionJanitorWorker(logger),
 		worker.NewOptimizerWorker(s.db, s.valkey, analyticsSvc, logger),
+		worker.NewTriggerWorker(s.db, s.cache, logger),
 	)
 
 	// Warmup cache
@@ -303,6 +304,11 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 // Handler returns the HTTP handler (multiplexer) for this server.
 func (s *Server) Handler() http.Handler {
 	return s.http.Handler
+}
+
+// PipelineL1 returns the Level 1 click pipeline.
+func (s *Server) PipelineL1() *pipeline.Pipeline {
+	return s.pipelineL1
 }
 
 // Run starts the HTTP server. Blocks until ctx is cancelled.

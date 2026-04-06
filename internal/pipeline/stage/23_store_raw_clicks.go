@@ -22,6 +22,9 @@ func (s *StoreRawClicksStage) Name() string      { return "StoreRawClicks" }
 func (s *StoreRawClicksStage) AlwaysRun() bool   { return true }
 
 func (s *StoreRawClicksStage) Process(payload *pipeline.Payload) error {
+	if payload.IsSimulation {
+		return nil
+	}
 	rc := payload.RawClick
 	if rc == nil {
 		return nil
