@@ -37,7 +37,14 @@
     - [x] Sync GSD artifacts with codebase drift.
       - [x] [v11 Verification](.gsd/verification/v11-high-availability.md)
       - [x] [v12 Verification](.gsd/verification/v12-tls-fingerprinting.md)
-Multi-Armed Bandit (Epsilon-Greedy or Thompson Sampling) logic.
+
+### Milestone v1.0: Gold Master Ship [100%]
+- [x] Phase 14: Final Parity & Launch [100%]
+    - [x] Implement Pixel Tracking endpoint (/pixel.gif).
+    - [x] Fix L2 click token continuity for attribution.
+    - [x] Add dynamic parameter override stage (L1/L2).
+    - [x] Align Click ID and Macro Engine with production standards.
+    - [x] Finalized operations documentation.
 **Requirements**:
 - ClickHouse real-time metric reader (fetch CR/EPV per stream).
 - Weighted selection engine upgrade to support "Auto-Optimize" mode.
