@@ -34,3 +34,6 @@
 
 ## Documentation Hygiene
 - [ ] Keep hierarchical `CLAUDE.md` files in sync after directory/file structure changes (regenerate outside `reference/` and preserve manual sections)
+
+## Agent Execution Discipline
+- [ ] Keep working until the task is completely done (no pausing mid-stream)
