@@ -21,10 +21,10 @@ Accurately route every incoming click to the right destination under strict low-
 
 ### Active
 
-- [ ] Implement full conversion attribution and postback ingestion (Phase 5)
-- [ ] Deliver reporting/query layer and real-time stats surfaces (Phase 5)
-- [ ] Build production admin dashboard UI consuming admin/reporting APIs (Phase 6)
-- [ ] Complete production hardening, benchmark proofs, and deployment readiness (Phase 7)
+- [x] Implement full conversion attribution and postback ingestion (Phase 5)
+- [x] Deliver reporting/query layer and real-time stats surfaces (Phase 5)
+- [x] Build production admin dashboard UI consuming admin/reporting APIs (Phase 6)
+- [x] Complete production hardening, benchmark proofs, and deployment readiness (Phase 7)
 
 ### Out of Scope
 

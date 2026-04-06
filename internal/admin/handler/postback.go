@@ -135,17 +135,27 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 		r.Form.Get("tid"),
 	)
 
-	// HMAC Validation (Optional: only if salt is configured)
+	// HMAC Validation (Fail-closed when sig is provided)
 	// Uses the canonical parsed fields so aliases like amount/sum are covered.
 	signature := r.Form.Get("sig")
 	if signature != "" {
-		salt, _ := h.getPostbackSalt(r.Context())
-		if salt != "" {
-			if !h.verifySignature(signature, salt, token, status, payoutRaw) {
-				h.respondError(w, http.StatusUnauthorized, "error: invalid_signature")
-				metrics.PostbackProcessedTotal.WithLabelValues("invalid_signature").Inc()
-				return
-			}
+		salt, err := h.getPostbackSalt(r.Context())
+		if err != nil {
+			h.logger.Error("postback salt lookup failed", zap.Error(err))
+			h.respondError(w, http.StatusInternalServerError, "error: postback_salt_lookup_failed")
+			metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
+			return
+		}
+		if salt == "" {
+			h.logger.Error("postback salt missing")
+			h.respondError(w, http.StatusInternalServerError, "error: postback_salt_missing")
+			metrics.PostbackProcessedTotal.WithLabelValues("error").Inc()
+			return
+		}
+		if !h.verifySignature(signature, salt, token, status, payoutRaw) {
+			h.respondError(w, http.StatusUnauthorized, "error: invalid_signature")
+			metrics.PostbackProcessedTotal.WithLabelValues("invalid_signature").Inc()
+			return
 		}
 	}
 

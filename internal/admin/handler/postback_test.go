@@ -23,9 +23,15 @@ import (
 
 type mockSettings struct {
 	settings map[string]string
+	errKeys  map[string]error
 }
 
 func (m *mockSettings) Get(ctx context.Context, key string) (string, error) {
+	if m.errKeys != nil {
+		if err, ok := m.errKeys[key]; ok {
+			return "", err
+		}
+	}
 	return m.settings[key], nil
 }
 
@@ -154,6 +160,75 @@ func TestPostbackHandler_HandlePostback(t *testing.T) {
 		h.HandlePostback(w, r)
 		if w.Code != http.StatusOK {
 			t.Errorf("valid alias sig: expected 200, got %d. body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("HMACSignature_MissingSalt_FailsClosed", func(t *testing.T) {
+		token := uuid.New().String()
+		campID := uuid.New()
+		status := "sale"
+		payout := "1"
+
+		attrData := fmt.Sprintf(`{"campaign_id":"%s"}`, campID)
+		vk.Set(context.Background(), "attr:"+token, attrData, 0)
+
+		mac := hmac.New(sha256.New, []byte("test-salt"))
+		mac.Write([]byte(token + "|" + status + "|" + payout))
+		sig := hex.EncodeToString(mac.Sum(nil))
+
+		hNoSalt := NewPostbackHandler(logger, &mockSettings{settings: map[string]string{"tracker.postback_key": "test-key"}}, attrSvc, nil, convChan)
+
+		w := httptest.NewRecorder()
+		q := url.Values{}
+		q.Set("subid", token)
+		q.Set("status", status)
+		q.Set("payout", payout)
+		q.Set("sig", sig)
+
+		r := httptest.NewRequest("GET", "/postback/test-key?"+q.Encode(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("key", "test-key")
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+
+		hNoSalt.HandlePostback(w, r)
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("missing salt: expected 500, got %d. body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("HMACSignature_SaltLookupError_FailsClosed", func(t *testing.T) {
+		token := uuid.New().String()
+		campID := uuid.New()
+		status := "sale"
+		payout := "2"
+
+		attrData := fmt.Sprintf(`{"campaign_id":"%s"}`, campID)
+		vk.Set(context.Background(), "attr:"+token, attrData, 0)
+
+		mac := hmac.New(sha256.New, []byte("test-salt"))
+		mac.Write([]byte(token + "|" + status + "|" + payout))
+		sig := hex.EncodeToString(mac.Sum(nil))
+
+		hErrSalt := NewPostbackHandler(logger, &mockSettings{
+			settings: map[string]string{"tracker.postback_key": "test-key", "tracker.postback_salt": "test-salt"},
+			errKeys:  map[string]error{"tracker.postback_salt": fmt.Errorf("boom")},
+		}, attrSvc, nil, convChan)
+
+		w := httptest.NewRecorder()
+		q := url.Values{}
+		q.Set("subid", token)
+		q.Set("status", status)
+		q.Set("payout", payout)
+		q.Set("sig", sig)
+
+		r := httptest.NewRequest("GET", "/postback/test-key?"+q.Encode(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("key", "test-key")
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+
+		hErrSalt.HandlePostback(w, r)
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("salt lookup error: expected 500, got %d. body: %s", w.Code, w.Body.String())
 		}
 	})
 
