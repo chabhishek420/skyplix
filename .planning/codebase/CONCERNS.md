@@ -1,31 +1,56 @@
-# GSD State
+# Concerns and Technical Debt
 
-**Status**: Active (resumed 2026-04-04T09:43:19+05:30)
+**Analysis Date:** 2026-04-06
 
-## Current Position
-- **Phase**: 6 — Admin Dashboard UI (Redesign Complete)
-- **Task**: All tasks complete
-- **Status**: ✅ "Original Clean White" UI Verified
+## High-Priority Risks
 
-## Last Session Summary
-Phase 6 executed successfully. The "Original Clean White" redesign was fully implemented across 3 plans, bringing high-density data tables, pure white cards, and an Emerald/Blue metrics palette to the Keitaro-style dashboard UI.
+1. Partial migration command implementation
+- `cmd/zai-tds/main.go` prints that Keitaro migration is not fully implemented in CLI wrapper.
+- Operational risk: users may assume command is production-ready when it delegates to script.
 
-## Next Steps
-1. Proceed to Phase 7: Production Hardening
+2. Weak default secret in checked config
+- `config.yaml` contains `system.salt: "change-me-in-production-min-32-chars"`.
+- `internal/config/config.go` protects production mode, but debug environments can still run insecure defaults.
 
+3. Optional dependency degradation can hide analytics gaps
+- ClickHouse reader init failures only warn and continue (`internal/server/server.go`).
+- Readiness can report degraded/skipped dependencies (`internal/server/routes.go`).
+- Risk: partial service behavior without immediate hard failure.
 
-## Decisions Made
-- **Routing**: Chose a centralized `App.tsx` router with nested routes for clean path management.
-- **Log Retrieval**: Implemented direct ClickHouse raw queries for logs instead of reusable report aggregations to ensure maximum performance and detail.
-- **Visuals**: Adopted Tailwind v4 features (like `@theme` and `@apply`) for the design system update.
+## Security and Abuse Surface
 
-## Files of Interest
-- `admin-ui/src/App.tsx`: Main router configuration.
-- `internal/server/spa.go`: Go-side SPA route handling.
-- `internal/analytics/service.go`: Backend log retrieval logic.
-- `admin-ui/src/index.css`: Design system and polish.
+- Public postback endpoints (`GET|POST /postback/{key}`) are intentionally open and need strict key hygiene (`internal/server/routes.go`).
+- Traffic endpoints are public by design and depend heavily on anti-bot and rate-limit logic.
+- Some admin bot/UA operations are write-heavy and require auth middleware correctness (`internal/server/routes.go`, `internal/auth/service.go`).
 
-## Next Steps
-1. **Phase 7: Production Hardening** — Initialize plans for final benchmarking and release readiness.
-2. **Graceful Shutdown**: Implement coordinated shutdown for HTTP server and background workers.
-3. **Benchmarks**: Run load tests to verify <5ms p99 at scale.
+## Reliability and Maintainability Concerns
+
+- Server composition in `internal/server/server.go` is large and centralizes many responsibilities; this raises regression risk during feature changes.
+- Pipeline stage ordering is encoded manually in server wiring; accidental order changes can alter traffic behavior.
+- Dependency on external reference file for CIDR bot list (`reference/YellowCloaker/bases/bots.txt`) introduces runtime coupling to non-core directory content.
+
+## Style/Consistency Debt
+
+- Logging style is mixed:
+  - zap in runtime services.
+  - `log.Printf`/`log.Println` in migration script and `log.Fatalf` in CLI bootstrap.
+- This weakens uniform observability and structured log analysis.
+
+## Testing Gaps with Production Impact
+
+- `admin-ui` lacks visible automated tests in this repository.
+- Integration tests rely on real services and are unlikely to run on every local edit without automation.
+- No explicit CI pipeline files were observed, so regressions may rely on manual discipline.
+
+## Performance Considerations
+
+- High-throughput click paths depend on queue flush behavior and worker cadence (`internal/queue/writer.go`, `internal/worker/*`).
+- Misconfiguration of ClickHouse or Valkey can degrade throughput while service stays partially alive.
+- Large `reference/` tree increases repository weight and can affect tooling performance.
+
+## Suggested Follow-Up Work
+
+- Promote migration command to a fully integrated and validated CLI flow.
+- Harden startup checks for required production-safe secrets and dependency availability by mode.
+- Split `server.New(...)` wiring into smaller module assemblers to reduce blast radius.
+- Introduce CI test baseline and minimal frontend smoke tests.

@@ -1,78 +1,51 @@
-# Testing Patterns
+# Testing
 
-**Analysis Date:** 2026-04-03
+**Analysis Date:** 2026-04-06
 
-## Test Framework
+## Test Framework and Execution
 
-**Runner:**
-- Go `testing` package (stdlib)
-
-**Assertion Library:**
-- Built-in `testing.T`/`testing.B` with manual assertions (`t.Errorf`, `t.Fatal`, etc.)
-
-**Run Commands:**
-```bash
-# Unit tests
-go test ./test/unit/...
-
-# Single file
-go test -v ./test/unit/queue/writer_test.go
-
-# Single test function (example)
-go test -v -run TestParseUUIDVal_ValidUUID ./test/unit/queue/...
-
-# Integration tests (require services)
-go test -v -tags integration ./test/integration/... -timeout 30s
-
-# Benchmarks (tagged as integration)
-go test -v -tags integration -bench=BenchmarkClickLatency -benchmem ./test/benchmark/
-```
-
-## Test File Organization
-
-**Location:**
-- Tests are organized under a dedicated `test/` tree rather than colocated with source.
-
-**Naming:**
-- Standard Go `*_test.go` naming (examples: `test/unit/queue/writer_test.go`, `test/integration/click_test.go`).
-
-**Structure:**
-```
-test/
-  unit/
-    queue/
-      writer_test.go
-    worker/
-      worker_test.go
-  integration/
-    suite_test.go
-    click_test.go
-    routing_test.go
-  benchmark/
-    latency_test.go
-```
+- Backend tests use Go's standard `testing` package.
+- Commands documented for unit, integration, and coverage runs in project docs (`AGENTS.md` root instructions).
+- Integration suite requires external services (Postgres, ClickHouse, Valkey), usually via `docker-compose.yml`.
 
 ## Test Structure
 
-**Patterns observed:**
-- Direct unit tests for pure functions and small helpers (example: `test/unit/queue/writer_test.go`).
-- Integration tests use the `integration` build tag and typically require Postgres/Valkey/ClickHouse available (see `docker-compose.yml`).
+- Unit tests:
+  - `test/unit/queue/writer_test.go`
+  - `test/unit/worker/worker_test.go`
+  - `test/unit/macro/postback_test.go`
+- Integration tests (build tag `integration`):
+  - `test/integration/click_test.go`
+  - `test/integration/routing_test.go`
+  - `test/integration/cloaking_test.go`
+  - `test/integration/admin_test.go`
+- Package-local unit tests also exist (for example `internal/auth/service_test.go`, `internal/attribution/service_test.go`).
 
-## Mocking
+## Patterns in Current Tests
 
-- Minimal/none; tests mostly use real objects with `zap.NewNop()` logger (example: `test/unit/queue/writer_test.go`).
-- HTTP-level integration/bench tests use `httptest.NewServer` (example: `test/benchmark/latency_test.go`).
+- Table-driven style appears in several tests.
+- Mock and fake strategy is mixed:
+  - Redis fake via `github.com/alicebob/miniredis/v2`
+  - Postgres fake via `github.com/pashagolub/pgxmock/v3`
+  - Real integration dependencies in `test/integration/*`
+- Functional verification is emphasized for data transformation and service behavior.
 
-## Fixtures and Factories
+## What Is Covered Well
 
-- Tests commonly build structs inline (example: `model.RawClick` in `test/unit/queue/writer_test.go`).
+- Queue serialization/parsing helpers (`test/unit/queue/writer_test.go`).
+- Worker/service behaviors with mocked dependencies (`test/unit/worker/*`, `internal/*_test.go`).
+- End-to-end click and routing paths in integration tests.
 
-## Integration Test Setup
+## Testing Gaps and Risks
 
-- See `test/integration/suite_test.go` for suite-wide setup/teardown.
-- Local services are expected from `docker-compose.yml` unless otherwise configured via env vars.
+- No top-level CI workflow detected in repository root, so automated enforcement is unclear.
+- Admin UI (`admin-ui/src/**`) has no visible automated test suite in this repo.
+- Some critical runtime bootstrap and graceful shutdown paths are lightly covered by direct tests.
+- Benchmark/load scripts exist but are separate from assertions-based tests (`test/load/click_pipeline.js`, `test/bench/*`).
 
----
+## Recommended Near-Term Improvements
 
-*Testing analysis: 2026-04-03*
-*Update as test strategy changes*
+- Add deterministic tests for full L1 and L2 pipeline stage sequencing with controlled fixtures.
+- Add API contract tests for high-value admin routes (auth, campaigns, settings, reports).
+- Add frontend smoke tests for `admin-ui` route rendering and API client behavior.
+- Add a single automated test gate command to run in CI (at minimum `go test ./test/unit/...`).

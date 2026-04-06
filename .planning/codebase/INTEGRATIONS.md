@@ -1,72 +1,62 @@
 # External Integrations
 
-**Analysis Date:** 2026-04-03
+**Analysis Date:** 2026-04-06
 
-## APIs & External Services
+## Databases and State Stores
 
-**HTTP Fetch (Cloaking / Proxying):**
-- Arbitrary remote web servers — fetched server-side as part of cloaking/safe-page behavior
-  - Implementation: `internal/action/proxy.go` (`RemoteProxyAction`)
-  - Method: `GET` to `ActionContext.RedirectURL`
-  - Notes: Copies some browser headers; TTL caches responses in-memory
+### PostgreSQL
+- Driver and pool: `github.com/jackc/pgx/v5/pgxpool` (`internal/server/server.go`).
+- Used for admin entities and config repositories (`internal/admin/repository/*.go`).
+- Health/readiness includes ping checks (`internal/server/routes.go`).
 
-## Data Storage
+### Valkey (Redis protocol)
+- Client: `github.com/redis/go-redis/v9` (`internal/server/server.go`).
+- Used by cache/session/hit-limit/binding/lp-token/attribution/bot-db services:
+  - `internal/cache/cache.go`
+  - `internal/session/session.go`
+  - `internal/hitlimit/hitlimit.go`
+  - `internal/binding/binding.go`
+  - `internal/lptoken/lptoken.go`
+  - `internal/attribution/service.go`
+  - `internal/botdb/valkey.go`, `internal/botdb/uastore.go`
 
-**PostgreSQL:**
-- Purpose: admin entities and configuration (campaigns/streams/offers/landings/users/etc.)
-  - Connection: `postgres.dsn` in `config.yaml` / `DATABASE_URL` env var
-  - Client: `github.com/jackc/pgx/v5/pgxpool` (constructed in `internal/server/server.go`)
-  - Schema/migrations: `db/`
-  - Admin auth query: `internal/admin/middleware.go`
+### ClickHouse
+- Async writer for clicks/conversions: `internal/queue/writer.go`.
+- Optional reader connection for attribution fallback and reports (`internal/server/server.go`, `internal/analytics/service.go`).
+- Integration tests directly validate ClickHouse behavior (`test/integration/click_test.go`, `test/integration/routing_test.go`).
 
-**ClickHouse:**
-- Purpose: high-volume analytics/event ingestion for clicks/conversions
-  - Connection: `clickhouse.addr` + `clickhouse.database` in `config.yaml` / `CLICKHOUSE_URL` env var
-  - Client: `github.com/ClickHouse/clickhouse-go/v2` (`internal/queue/writer.go`)
-  - Write path: pipeline stage `internal/pipeline/stage/StoreRawClicksStage` → channel from `internal/queue/writer.go`
+## Observability
 
-**Valkey / Redis:**
-- Purpose: cache, sessions, bot IP/UA lists, hit limiting, misc runtime state
-  - Connection: `valkey.addr` in `config.yaml` / `VALKEY_URL` env var
-  - Client: `github.com/redis/go-redis/v9` (constructed in `internal/server/server.go`)
-  - Modules using Valkey: `internal/cache/`, `internal/session/`, `internal/botdb/`, `internal/hitlimit/`, `internal/ratelimit/`, `internal/lptoken/`
+### Prometheus Metrics
+- Metrics are registered in `internal/metrics/metrics.go`.
+- Exported at `GET /metrics` via `promhttp.Handler()` (`internal/server/routes.go`).
 
-**GeoIP Databases (local files):**
-- Purpose: geolocation and ASN lookups
-  - Inputs: MaxMind `.mmdb` files in `data/geoip/` configured via `geoip.*` in `config.yaml`
-  - Implementation: `internal/geo/*`
+### Health and Readiness
+- Health endpoint: `GET /api/v1/health`.
+- Readiness endpoint: `GET /api/v1/ready` checks Postgres, Valkey, and ClickHouse status (`internal/server/routes.go`).
 
-## Authentication & Identity
+## Authentication and Security Interfaces
 
-**Admin API Key:**
-- Mechanism: `X-Api-Key` HTTP header
-  - Middleware: `internal/admin/middleware.go` (`APIKeyAuth`)
-  - Validation: DB lookup in Postgres (`users` table)
+- Login endpoint: `POST /api/v1/auth/login` returns JWT (`internal/server/routes.go`, `internal/server/server.go`).
+- JWT signing/validation in `internal/auth/service.go`.
+- Protected admin routes mounted under `/api/v1` with auth middleware (`internal/server/routes.go`).
 
-## Monitoring & Observability
+## External File/Data Integrations
 
-**Logging:**
-- `go.uber.org/zap` (development vs production logger selected in `cmd/zai-tds/main.go`)
+- GeoIP databases from local files:
+  - `data/geoip/GeoLite2-Country.mmdb`
+  - `data/geoip/GeoLite2-City.mmdb`
+  - `data/geoip/GeoLite2-ASN.mmdb`
+  (configured in `config.yaml`, loaded by `internal/geo/geo.go`).
+- CIDR bot list loaded from `reference/YellowCloaker/bases/bots.txt` (`internal/server/server.go`).
 
-## CI/CD & Deployment
+## Migration and Legacy Input Integration
 
-**Local dev services:**
-- `docker-compose.yml` provides `postgres`, `valkey`, `clickhouse`
+- Keitaro migration script reads MySQL and writes PostgreSQL (`scripts/migrate_keitaro.go`).
+- CLI migration command currently delegates to script and is not fully wrapped (`cmd/zai-tds/main.go`).
 
-**Deployment:**
-- Not defined in-repo (no `.github/workflows/` found). Likely deploys as a Go binary/container.
+## HTTP Integration Surfaces
 
-## Environment Configuration
-
-**Config sources:**
-- YAML: `config.yaml` (overridable via `CONFIG_PATH`)
-- Env vars: see `internal/config/config.go` override list
-
-## Webhooks & Callbacks
-
-- None observed in the Go server code (no inbound webhook endpoints beyond admin + click paths in `internal/server/routes.go`).
-
----
-
-*Integrations analysis: 2026-04-03*
-*Update as new external dependencies are added*
+- Traffic endpoints: `/{alias}`, `/`, and `/lp/{token}/click` (`internal/server/routes.go`).
+- Postback endpoints: `GET|POST /postback/{key}` and tracking pixel `GET /pixel.gif` (`internal/server/routes.go`).
+- Admin API endpoints for campaigns, streams, offers, landings, domains, users, bots, settings, reports (`internal/server/routes.go`).

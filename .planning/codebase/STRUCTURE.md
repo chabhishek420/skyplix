@@ -1,121 +1,59 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-04-03
+**Analysis Date:** 2026-04-06
 
-## Directory Layout
+## Top-Level Layout
 
-```
-[zai-yt-keitaro]/
-├── admin-ui/              # (stub) admin UI area (no implementation files currently)
-├── cmd/                   # Go entrypoints/binaries
-│   └── zai-tds/            # Main server binary
-├── data/                  # Local data assets (GeoIP DB files expected under `data/geoip/`)
-├── db/                    # SQL schema/migrations
-├── docs/                  # Project documentation
-├── internal/              # Go application packages (business logic)
-├── reference/             # Reference/legacy material (e.g. prior Next.js/Keitaro parity work)
-├── test/                  # Unit/integration/benchmark tests
-├── .gsd-source/           # GSD tooling sources (node packages)
-├── .planning/             # GSD planning artifacts (created by Codex)
-├── docker-compose.yml     # Local Postgres/Valkey/ClickHouse
-├── config.yaml            # Runtime configuration (YAML)
-├── go.mod                 # Go module manifest
-├── go.sum                 # Go dependency lock
-└── events.jsonl           # Runtime/artifact data (project-specific)
-```
+- `cmd/` - executable entrypoints (`cmd/zai-tds/main.go`, `cmd/migrate-ch/main.go`).
+- `internal/` - backend business logic and HTTP handlers by domain.
+- `db/` - PostgreSQL and ClickHouse migration SQL.
+- `test/` - unit, integration, benchmark, and load tests.
+- `admin-ui/` - Vite + React admin frontend.
+- `deploy/` - deployment and observability provisioning (Grafana, Prometheus config).
+- `scripts/` - utility scripts including Keitaro migration.
+- `reference/` - legacy/reference data and source snapshots used by some support flows.
 
-## Directory Purposes
+## Backend Package Map (`internal/`)
 
-**cmd/:**
-- Purpose: executable entry points.
-- Key files: `cmd/zai-tds/main.go`
+- `internal/server` - server wiring, route registration, click handlers, SPA mounting.
+- `internal/pipeline` and `internal/pipeline/stage` - pipeline core + stage implementations.
+- `internal/admin/handler` - HTTP handlers for admin APIs.
+- `internal/admin/repository` - data access layer for admin entities.
+- `internal/queue` - ClickHouse async writer and record shaping.
+- `internal/analytics` - analytics query service for reports.
+- `internal/model` - core structs and shared domain models.
+- Support services: `cache`, `session`, `ratelimit`, `hitlimit`, `binding`, `lptoken`, `attribution`, `filter`, `rotator`, `auth`, `geo`, `device`, `botdb`, `worker`.
 
-**internal/:**
-- Purpose: application logic grouped by domain.
-- Key subdirectories (examples):
-  - `internal/server/` — HTTP server wiring + routes
-  - `internal/pipeline/` — pipeline engine
-  - `internal/pipeline/stage/` — pipeline stages (click processing)
-  - `internal/admin/` — admin middleware + handler layer
-  - `internal/action/` — post-click actions (redirect/proxy/cloaking)
-  - `internal/cache/`, `internal/session/` — runtime state
-  - `internal/queue/` — ClickHouse async writer
-  - `internal/worker/` — background workers
+## Entry Points
 
-**db/:**
-- Purpose: database schemas/migrations for Postgres/ClickHouse (project-defined).
+- Main binary: `cmd/zai-tds/main.go`.
+- HTTP wiring: `internal/server/server.go` and `internal/server/routes.go`.
+- Click flows: `internal/server/routes.go` handlers `handleClick` and `handleClickL2`.
+- Admin UI mount: `internal/server/routes.go` mounts SPA at `/admin`.
 
-**test/:**
-- Purpose: automated tests.
-- Structure:
-  - `test/unit/` — unit tests
-  - `test/integration/` — integration tests (require services)
-  - `test/benchmark/` — latency benchmarks (integration-tagged)
+## Test Layout
 
-**reference/:**
-- Purpose: legacy/reference code and prior work; not part of the Go runtime.
-- Notable: `reference/legacy-nextjs/` contains previous planning/docs.
+- Unit tests: `test/unit/**` and some package-local tests in `internal/**`.
+- Integration tests (build tag): `test/integration/**` with external service dependencies.
+- Benchmarks: `test/bench`, `test/benchmark`.
+- Load scripts: `test/load/click_pipeline.js`.
 
-**.planning/:**
-- Purpose: GSD planning state.
-- Current: `.planning/codebase/*.md` (this mapping output)
+## Database Artifacts
 
-## Key File Locations
+- Postgres migrations: `db/postgres/migrations/*.up.sql` and `*.down.sql`.
+- ClickHouse migrations: `db/clickhouse/migrations/*.sql`.
+- Additional optimization script: `db/clickhouse/002_optimize_indexes.sql`.
 
-**Entry Points:**
-- `cmd/zai-tds/main.go` — process bootstrap
+## Frontend Structure (`admin-ui/src`)
 
-**Routing / HTTP:**
-- `internal/server/routes.go` — routes + middleware
-- `internal/server/server.go` — dependency wiring + server lifecycle
+- `pages/` - route-level pages (campaigns, offers, domains, logs, dashboard).
+- `components/` - layout/auth/ui components.
+- `lib/api.ts` - API client glue.
+- `data/mockData.ts` - local mock data source for UI scaffolding.
 
-**Configuration:**
-- `config.yaml` — default runtime config
-- `internal/config/config.go` — config loading + env overrides
-- `docker-compose.yml` — local dependencies
+## Naming and Layout Conventions Observed
 
-**Core Logic:**
-- `internal/pipeline/` — pipeline runtime
-- `internal/pipeline/stage/` — stage implementations
-- `internal/action/` — action implementations
-
-**Data Access:**
-- `internal/admin/handler/` — admin CRUD handlers (Postgres)
-- `internal/cache/` — cache layer (Valkey + Postgres)
-- `internal/queue/writer.go` — ClickHouse writer
-
-**Testing:**
-- `test/unit/queue/writer_test.go` — example unit tests
-- `test/integration/suite_test.go` — integration suite setup
-
-## Naming Conventions
-
-**Go packages:**
-- Directory names are lowercase single words (e.g. `internal/ratelimit`, `internal/hitlimit`).
-
-**Go files:**
-- Lowercase with underscores when needed (e.g. `routes.go`, `server.go`, `middleware.go`).
-
-**Tests:**
-- `*_test.go` (e.g. `test/unit/queue/writer_test.go`).
-
-## Where to Add New Code
-
-**New click pipeline stage:**
-- Implementation: `internal/pipeline/stage/`
-- Wiring into pipeline: `internal/server/server.go`
-- Tests: `test/unit/` for pure logic; `test/integration/` when DB/Valkey needed
-
-**New admin endpoint:**
-- Route wiring: `internal/server/routes.go`
-- Handler: `internal/admin/handler/`
-- Tests: `test/integration/admin_test.go` style
-
-**New background task:**
-- Worker implementation: `internal/worker/`
-- Registration: `internal/server/server.go`
-
----
-
-*Structure analysis: 2026-04-03*
-*Update when directory structure changes*
+- Go package names are lowercase single-word domains (`internal/hitlimit`, `internal/lptoken`).
+- API routes are grouped by resource under `/api/v1/*` (`internal/server/routes.go`).
+- Stage files are numbered by execution order (`internal/pipeline/stage/1_domain_redirect.go`, etc.).
+- SQL migrations use numeric prefixes (`001_...`, `002_...`).
