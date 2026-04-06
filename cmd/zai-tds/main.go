@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -64,7 +65,14 @@ func main() {
 
 	migrateCmd.AddCommand(migrateCHCmd, migrateKeitaroCmd)
 
-	rootCmd.AddCommand(serveCmd, migrateCmd)
+	// Healthcheck command
+	healthCmd := &cobra.Command{
+		Use:   "healthcheck",
+		Short: "Run a container health check",
+		Run:   runHealthcheck,
+	}
+
+	rootCmd.AddCommand(serveCmd, migrateCmd, healthCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -164,6 +172,20 @@ func runMigrateKeitaro(cmd *cobra.Command, args []string) {
 	log.Printf("Successfully migrated %d campaigns", migrated)
 }
 
+func runHealthcheck(cmd *cobra.Command, args []string) {
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		os.Exit(1)
+	}
+
+	url := fmt.Sprintf("http://localhost:%d/api/v1/health", cfg.Server.Port)
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
 func runMigrateCH(cmd *cobra.Command, args []string) {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
@@ -249,16 +271,47 @@ func splitSQLStatements(sql string) []string {
 	var current strings.Builder
 	inString := false
 	var quoteChar rune
+	inLineComment := false
+	inBlockComment := false
 
-	for i, r := range sql {
+	chars := []rune(sql)
+	for i := 0; i < len(chars); i++ {
+		r := chars[i]
+
+		// Handle comments
+		if !inString {
+			if !inBlockComment && !inLineComment && i < len(chars)-1 && r == '-' && chars[i+1] == '-' {
+				inLineComment = true
+				i++
+				continue
+			}
+			if inLineComment && r == '\n' {
+				inLineComment = false
+				continue
+			}
+			if !inBlockComment && !inLineComment && i < len(chars)-1 && r == '/' && chars[i+1] == '*' {
+				inBlockComment = true
+				i++
+				continue
+			}
+			if inBlockComment && i < len(chars)-1 && r == '*' && chars[i+1] == '/' {
+				inBlockComment = false
+				i++
+				continue
+			}
+			if inLineComment || inBlockComment {
+				continue
+			}
+		}
+
 		switch r {
 		case '\'', '"', '`':
 			if !inString {
 				inString = true
 				quoteChar = r
 			} else if quoteChar == r {
-				// Check for escaped quote
-				if i > 0 && sql[i-1] != '\\' {
+				// Check for escaped quote (very basic check)
+				if i > 0 && chars[i-1] != '\\' {
 					inString = false
 				}
 			}

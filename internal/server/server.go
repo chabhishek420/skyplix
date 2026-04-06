@@ -18,6 +18,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/analytics"
 	"github.com/skyplix/zai-tds/internal/attribution"
+	"github.com/skyplix/zai-tds/internal/auth"
 
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/botdb"
@@ -55,6 +56,7 @@ type Server struct {
 	adminHandler    *handler.Handler
 	postbackHandler *handler.PostbackHandler
 	reportsHandler  *handler.ReportsHandler
+	jwtManager      *auth.JWTManager
 	botDB           *botdb.ValkeyStore
 
 	uaStore         *botdb.UAStore
@@ -132,6 +134,9 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 			s.chReader = chConn
 		}
 	}
+
+	// Auth (Phase 6/7)
+	s.jwtManager = auth.NewJWTManager(cfg.System.Salt, 24*time.Hour)
 
 	// Phase 2 services
 	s.cache = cache.New(s.valkey, s.db, logger)

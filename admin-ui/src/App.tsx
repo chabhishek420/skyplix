@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { MainLayout } from './components/layout/main-layout';
 import { Dashboard } from './pages/dashboard';
 import { Campaigns } from './pages/campaigns';
@@ -10,12 +11,39 @@ import { Sources } from './pages/sources';
 import { Domains } from './pages/domains';
 import { ClicksLog } from './pages/logs/clicks';
 import { ConversionsLog } from './pages/logs/conversions';
+import { Login } from './pages/login';
+import { Stats } from './pages/stats';
+import { getAuthToken } from './lib/api';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = getAuthToken();
+  const location = useLocation();
+
+  if (!token) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return children;
+}
 
 function App() {
+  const [, setIsAuth] = useState(!!getAuthToken());
+
+  useEffect(() => {
+    const handleAuth = () => setIsAuth(!!getAuthToken());
+    window.addEventListener('auth-unauthorized', handleAuth);
+    return () => window.removeEventListener('auth-unauthorized', handleAuth);
+  }, []);
+
   return (
     <Router basename="/admin">
       <Routes>
-        <Route path="/" element={<MainLayout />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<Dashboard />} />
           <Route path="campaigns">
             <Route index element={<Campaigns />} />
@@ -27,6 +55,7 @@ function App() {
           <Route path="networks" element={<Networks />} />
           <Route path="sources" element={<Sources />} />
           <Route path="domains" element={<Domains />} />
+          <Route path="stats" element={<Stats />} />
           <Route path="logs">
             <Route path="clicks" element={<ClicksLog />} />
             <Route path="conversions" element={<ConversionsLog />} />

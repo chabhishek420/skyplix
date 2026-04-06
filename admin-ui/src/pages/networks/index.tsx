@@ -40,18 +40,34 @@ const columns: ColumnDef<AffiliateNetwork, any>[] = [
 
 function NetworkActions({ network }: { network: AffiliateNetwork }) {
   const queryClient = useQueryClient();
+
+  const handleCopyPostback = async () => {
+    try {
+      const res = await api.get(`/affiliate_networks/${network.id}/postback_url`);
+      await navigator.clipboard.writeText(res.data.postback_url);
+      alert('Postback URL copied to clipboard!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to fetch postback URL');
+    }
+  };
+
   const deleteMutation = useMutation({
-    mutationFn: () => api.delete(`/networks/${network.id}`),
+    mutationFn: () => api.delete(`/affiliate_networks/${network.id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['networks'] }),
   });
 
   return (
     <div className="flex justify-end space-x-1">
-      <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Configure">
+      <button
+        onClick={handleCopyPostback}
+        className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md"
+        title="Copy Postback URL"
+      >
         <LinkIcon className="w-4 h-4" />
       </button>
       <button
-        onClick={() => deleteMutation.mutate()}
+        onClick={() => { if(confirm('Delete network?')) deleteMutation.mutate() }}
         disabled={deleteMutation.isPending}
         className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md disabled:opacity-50"
         title="Delete"
@@ -67,13 +83,13 @@ export function Networks() {
   const { data, isLoading } = useQuery({
     queryKey: ['networks'],
     queryFn: async () => {
-      const res = await api.get('/networks');
+      const res = await api.get('/affiliate_networks');
       return res.data;
     }
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => api.post('/networks', { name, state: 'active' }),
+    mutationFn: (name: string) => api.post('/affiliate_networks', { name, state: 'active' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['networks'] }),
   });
 

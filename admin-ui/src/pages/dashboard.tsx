@@ -4,8 +4,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, MousePointerClick, Target, DollarSign, Activity, Edit3 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ArrowUpRight, ArrowDownRight, MousePointerClick, Target, DollarSign, Activity } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface SummaryData {
   total_clicks: number;
@@ -14,21 +14,27 @@ interface SummaryData {
   roi: number;
 }
 
-interface CampaignRow {
-  entity_name: string;
-  status: string;
-  clicks: number;
-  conversions: number;
-  revenue: number;
-  roi: number;
-}
 
 export function Dashboard() {
   const { data: reportData, isLoading, isError } = useQuery({
     queryKey: ['dashboard-report'],
     queryFn: async () => {
-      const res = await api.get('/reports');
+      const res = await api.get('/stats/summary?preset=today');
       return res.data;
+    }
+  });
+
+  const { data: chartData } = useQuery({
+    queryKey: ['dashboard-chart'],
+    queryFn: async () => {
+      const res = await api.get('/reports?group_by=day&preset=last_7d');
+      return res.data?.rows?.map((row: any) => ({
+        name: format(new Date(row.dimensions.day), 'MMM dd'),
+        clicks: row.clicks,
+        conversions: row.conversions,
+        revenue: row.revenue,
+        cost: row.cost
+      })) || [];
     }
   });
 
@@ -48,18 +54,7 @@ export function Dashboard() {
     );
   }
 
-  const summary: SummaryData = reportData?.summary || { total_clicks: 0, total_conversions: 0, revenue: 0, roi: 0 };
-  const rows: CampaignRow[] = reportData?.rows || [];
-
-  const chartData = [
-    { name: '01 MAY', clicks: 4000, conversions: 2400, revenue: 2400, cost: 1200 },
-    { name: '03 MAY', clicks: 3000, conversions: 1398, revenue: 3200, cost: 1800 },
-    { name: '05 MAY', clicks: 2000, conversions: 9800, revenue: 2800, cost: 1500 },
-    { name: '07 MAY', clicks: 2780, conversions: 3908, revenue: 4500, cost: 2100 },
-    { name: '09 MAY', clicks: 1890, conversions: 4800, revenue: 3900, cost: 1700 },
-    { name: '11 MAY', clicks: 2390, conversions: 3800, revenue: 4200, cost: 1900 },
-    { name: '13 MAY', clicks: 3490, conversions: 4300, revenue: 5100, cost: 2300 },
-  ];
+  const summary: SummaryData = reportData || { total_clicks: 0, total_conversions: 0, revenue: 0, roi: 0 };
 
   const stats = [
     { label: 'Total Clicks', value: summary.total_clicks.toLocaleString(), trend: 'Live', isPositive: true, color: 'border-t-blue-600', icon: MousePointerClick },
@@ -169,50 +164,6 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded border border-slate-100 whisper-shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-tight leading-none">Recent Campaigns</h3>
-          <button className="text-[11px] font-bold text-blue-600 hover:underline">View All Records</button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-[#fcfdfe]">
-              <tr className="border-b border-slate-50">
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Campaign Name</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Clicks</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Conv.</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">Revenue</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">ROI%</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {rows.map((row: CampaignRow, i: number) => (
-                <tr key={i} className={`${i % 2 === 1 ? 'bg-[#fcfdfe]' : ''} hover:bg-slate-50 transition-colors`}>
-                  <td className="px-6 py-3 text-[13px] font-medium text-slate-900 border-r border-slate-50/50">{row.entity_name}</td>
-                  <td className="px-6 py-3">
-                    <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wide border-0 shadow-none px-2 py-0 h-5 leading-none ${
-                       row.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {row.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-3 text-[13px] text-slate-600 tabular-nums text-right font-medium">{row.clicks.toLocaleString()}</td>
-                  <td className="px-6 py-3 text-[13px] text-slate-600 tabular-nums text-right font-medium">{row.conversions.toLocaleString()}</td>
-                  <td className="px-6 py-3 text-[13px] font-semibold text-slate-900 tabular-nums text-right">${row.revenue.toLocaleString()}</td>
-                  <td className={`px-6 py-3 text-[13px] font-bold tabular-nums text-right ${row.roi > 200 ? 'text-emerald-600' : 'text-slate-500'}`}>{row.roi}%</td>
-                  <td className="px-6 py-3 text-center">
-                    <button className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-blue-600">
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

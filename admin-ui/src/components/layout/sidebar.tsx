@@ -9,7 +9,8 @@ import {
   MonitorOff, 
   FileBox, 
   Globe,
-  ShieldCheck
+  ShieldCheck,
+  BarChart2
 } from 'lucide-react';
 
 const MENU_GROUPS = [
@@ -38,6 +39,7 @@ const MENU_GROUPS = [
   {
     label: 'Analysis',
     items: [
+      { path: '/stats', label: 'Drilldowns', icon: BarChart2 },
       { path: '/logs/clicks', label: 'Clicks Log', icon: MousePointerClick },
       { path: '/logs/conversions', label: 'Conversions', icon: MonitorOff },
     ]

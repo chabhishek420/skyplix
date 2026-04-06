@@ -31,6 +31,7 @@ func (s *Server) routes() http.Handler {
 	// Public Administrative routes
 	r.Get("/api/v1/health", s.handleHealth)
 	r.Get("/api/v1/ready", s.handleReady)
+	r.Post("/api/v1/auth/login", s.adminHandler.HandleLogin(s.jwtManager))
 
 	// Public postback endpoint (Phase 5.2)
 	r.Get("/postback/{key}", s.postbackHandler.HandlePostback)
@@ -38,7 +39,7 @@ func (s *Server) routes() http.Handler {
 
 	// Protected Admin API routes
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(admin.APIKeyAuth(s.db))
+		r.Use(admin.APIKeyAuth(s.db, s.jwtManager))
 
 		r.Route("/campaigns", func(r chi.Router) {
 			r.Get("/", s.adminHandler.HandleListCampaigns)
@@ -150,6 +151,9 @@ func (s *Server) routes() http.Handler {
 		r.Post("/postback", s.postbackHandler.HandleAdminPostback)
 
 		r.Get("/cluster/nodes", s.adminHandler.ListClusterNodes)
+
+		// UI Mount
+		r.Mount("/admin", s.handleSPA())
 
 		if s.reportsHandler != nil {
 			r.Get("/reports", s.reportsHandler.HandleReport)
