@@ -37,7 +37,7 @@ func TestReplaceMacros(t *testing.T) {
 
 	targetURL := "https://example.com/?vc={visitor_code}&ct={connection_type}&brand={brand}&model={model}&bot={is_bot}&unique={is_unique}&kw={keyword}&kw8={keyword_utf8}&ext={external_id}&src={source}&e1={extra_param_1}&e10={extra_param_10}&cost={cost}"
 
-	result := Replace(targetURL, click, campaign)
+	result := Replace(targetURL, click, campaign, nil)
 
 	expectedParts := []string{
 		"vc=vc_123",
@@ -59,5 +59,21 @@ func TestReplaceMacros(t *testing.T) {
 		if !strings.Contains(result, part) {
 			t.Errorf("Expected result to contain %q, but got %q", part, result)
 		}
+	}
+}
+
+func TestReplaceMacros_Offer(t *testing.T) {
+	campaign := &model.Campaign{ID: uuid.New(), Name: "C1"}
+	click := &model.RawClick{StreamID: uuid.New()}
+	offer := &model.Offer{ID: uuid.New(), Name: "My Offer"}
+
+	target := "http://o.com/?oid={offer_id}&oname={offer_name}"
+	result := Replace(target, click, campaign, offer)
+
+	if !strings.Contains(result, "oid="+offer.ID.String()) {
+		t.Errorf("missing offer_id")
+	}
+	if !strings.Contains(result, "oname=My+Offer") {
+		t.Errorf("missing offer_name")
 	}
 }

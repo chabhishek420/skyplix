@@ -54,7 +54,7 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 	// 2. Perform macro replacement
 	finalURL := ""
 	if targetURL != "" {
-		finalURL = macro.Replace(targetURL, payload.RawClick, payload.Campaign)
+		finalURL = macro.Replace(targetURL, payload.RawClick, payload.Campaign, payload.Offer)
 	}
 
 	// 3. Execute the action

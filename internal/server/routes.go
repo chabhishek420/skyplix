@@ -23,6 +23,7 @@ func (s *Server) routes() http.Handler {
 	// Middlewares must be defined before any routes are registered
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(s.fingerprintMiddleware())
 	r.Use(s.requestLogger())
 
 	// Expose Prometheus metrics endpoint
@@ -151,6 +152,12 @@ func (s *Server) routes() http.Handler {
 
 		if s.reportsHandler != nil {
 			r.Get("/reports", s.reportsHandler.HandleReport)
+			r.Route("/stats", func(r chi.Router) {
+				r.Get("/campaigns", s.reportsHandler.HandleStatsCampaigns)
+				r.Get("/offers", s.reportsHandler.HandleStatsOffers)
+				r.Get("/geo", s.reportsHandler.HandleStatsGeo)
+				r.Get("/summary", s.reportsHandler.HandleStatsSummary)
+			})
 			r.Route("/logs", func(r chi.Router) {
 				r.Get("/clicks", s.reportsHandler.HandleClicksLog)
 				r.Get("/conversions", s.reportsHandler.HandleConversionsLog)
@@ -302,6 +309,24 @@ func (s *Server) handleClickL2(w http.ResponseWriter, r *http.Request) {
 			zap.String("token", payload.RawClick.ClickToken),
 			zap.Duration("latency", elapsed),
 		)
+	}
+}
+
+type fingerprintContextKey struct{}
+
+func (s *Server) fingerprintMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if s.listener != nil {
+				fp := s.listener.GetFingerprint(r.RemoteAddr)
+				if fp != nil {
+					ctx := context.WithValue(r.Context(), fingerprintContextKey{}, fp)
+					r = r.WithContext(ctx)
+					// Note: Cleanup is handled by the listener when the connection closes
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

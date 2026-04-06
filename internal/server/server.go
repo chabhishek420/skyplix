@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -46,6 +47,7 @@ type Server struct {
 	version         string
 	startTime       time.Time
 	http            *http.Server
+	listener        *fingerprintListener
 	db              *pgxpool.Pool
 	valkey          *redis.Client
 	geo             *geo.Resolver
@@ -221,6 +223,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
 		&stage.NormalizeIPStage{},
+		&stage.JA3EnrichmentStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
@@ -263,6 +266,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 
 	s.pipelineL2 = pipeline.New(
 		&stage.NormalizeIPStage{},
+		&stage.JA3EnrichmentStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
@@ -320,9 +324,15 @@ func (s *Server) Run(ctx context.Context) error {
 
 	errChan := make(chan error, 1)
 
+	ln, err := net.Listen("tcp", s.http.Addr)
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
+	}
+	s.listener = newFingerprintListener(ln)
+
 	go func() {
 		s.logger.Info("HTTP server listening", zap.String("addr", s.http.Addr))
-		if err := s.http.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.http.Serve(s.listener); err != nil && err != http.ErrServerClosed {
 			errChan <- fmt.Errorf("http server: %w", err)
 		}
 	}()

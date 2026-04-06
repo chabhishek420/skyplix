@@ -86,7 +86,7 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	}
 
 	// --- Inline Bot Detection (ADR-008) ---
-	isBot, reason := s.detectBot(rc.IP, rc.UserAgent)
+	isBot, reason := s.detectBot(rc.IP, rc.UserAgent, rc.JA3)
 	rc.IsBot = isBot
 	rc.BotReason = reason
 
@@ -95,7 +95,16 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 
 // detectBot runs the basic bot detection checks inline.
 // Returns (true, reason) if any check triggers.
-func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
+func (s *BuildRawClickStage) detectBot(ip net.IP, ua, ja3 string) (bool, string) {
+	// 0. TLS/JA3 bot signatures (Phase 9)
+	if ja3 != "" {
+		for _, botJA3 := range knownBotJA3 {
+			if ja3 == botJA3 {
+				return true, "bot_ja3"
+			}
+		}
+	}
+
 	// 1. Empty User-Agent
 	if strings.TrimSpace(ua) == "" {
 		return true, "empty_ua"
@@ -209,6 +218,14 @@ var botUAPatterns = []string{
 }
 
 // botIPPrefixes are known datacenter/bot IP ranges (starter list).
+// knownBotJA3 contains TLS fingerprints associated with bots/scrapers.
+var knownBotJA3 = []string{
+	"e936a282f6a9e87701389e1a141887e5", // Python Requests
+	"417c461324706596956620577717646a", // Python Requests (older)
+	"d6d37651c686cae750e3eb4c7f07010a", // Java/Go default
+	"1907e59c0490f84572236a948e4265f0", // Scrapy
+}
+
 // Phase 4 will load comprehensive databases (e.g., ipinfo.io ASN to bot mappings).
 var botIPPrefixes = func() []*net.IPNet {
 	prefixes := []string{

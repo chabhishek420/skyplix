@@ -10,10 +10,12 @@ import (
 )
 
 // Replace replaces all standard Keitaro macros in a URL with click/campaign data.
-func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) string {
+func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign, offer *model.Offer) string {
 	if targetURL == "" {
 		return ""
 	}
+
+	now := time.Now().UTC()
 
 	replacements := []string{
 		"{click_id}", click.ClickToken,
@@ -60,8 +62,18 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 		"{extra_param_10}", url.QueryEscape(click.ExtraParam10),
 		"{cost}", fmt.Sprintf("%.4f", click.Cost),
 		"{payout}", fmt.Sprintf("%.4f", click.Payout),
-		"{timestamp}", fmt.Sprintf("%d", time.Now().Unix()),
+		"{timestamp}", fmt.Sprintf("%d", now.Unix()),
+		"{datetime}", now.Format("2006-01-02 15:04:05"),
+		"{date}", now.Format("2006-01-02"),
+		"{time}", now.Format("15:04:05"),
 		"{random}", randomHex(8),
+	}
+
+	if offer != nil {
+		replacements = append(replacements,
+			"{offer_id}", offer.ID.String(),
+			"{offer_name}", url.QueryEscape(offer.Name),
+		)
 	}
 
 	result := targetURL
