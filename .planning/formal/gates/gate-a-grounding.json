@@ -1,0 +1,17 @@
+{
+  "schema_version": "2",
+  "generated": "2026-04-08T05:16:42.073Z",
+  "wiring_evidence_score": 0,
+  "target": 0.8,
+  "target_met": false,
+  "explained": 0,
+  "total": 0,
+  "unexplained_counts": {
+    "instrumentation_bug": 0,
+    "model_gap": 0,
+    "genuine_violation": 0
+  },
+  "scope": {
+    "mode": "per-model-aggregate"
+  }
+}

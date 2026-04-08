@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "generated_at": "2026-04-08T05:09:05.544Z",
+    "generator": "model-complexity-profile",
+    "version": "1.0"
+  },
+  "profiles": {
+    "ci:liveness-fairness-lint": {
+      "formalism": "tla",
+      "runtime_ms": 1,
+      "estimated_states": null,
+      "risk_level": null,
+      "variable_count": null,
+      "runtime_class": "FAST"
+    }
+  },
+  "recommendations": {
+    "split_candidates": [],
+    "merge_candidates": []
+  },
+  "summary": {
+    "total_profiled": 1,
+    "by_runtime_class": {
+      "FAST": 1,
+      "MODERATE": 0,
+      "SLOW": 0,
+      "HEAVY": 0
+    },
+    "split_candidates": 0,
+    "merge_candidates": 0
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "generated_at": "2026-04-08T05:16:42.249Z",
+    "generator_version": "1.1",
+    "data_sources": {
+      "annotations": {
+        "file_count": 0,
+        "property_count": 0
+      },
+      "model_registry": {
+        "file_count": 0,
+        "used_as_fallback": 0
+      },
+      "check_results": {
+        "entry_count": 1
+      },
+      "unit_test_coverage": {
+        "available": false,
+        "requirements_matched": 0
+      }
+    }
+  },
+  "requirements": {},
+  "properties": {},
+  "coverage_summary": {
+    "total_requirements": 24,
+    "covered_count": 0,
+    "coverage_percentage": 0,
+    "uncovered_requirements": [
+      "DATA-01",
+      "DATA-02",
+      "DATA-03",
+      "DATA-04",
+      "DATA-05",
+      "FEAT-01",
+      "FEAT-02",
+      "FEAT-03",
+      "FEAT-04",
+      "FEAT-05",
+      "FEAT-06",
+      "FEAT-07",
+      "MGMT-01",
+      "MGMT-02",
+      "MGMT-03",
+      "PERF-01",
+      "PERF-02",
+      "PERF-03",
+      "PERF-04",
+      "SEC-01",
+      "SEC-02",
+      "SEC-03",
+      "SEC-04",
+      "SEC-05"
+    ],
+    "orphan_properties": []
+  },
+  "bidirectional_validation": {
+    "asymmetric_links": [],
+    "stale_links": [],
+    "summary": {
+      "total_checked": 0,
+      "asymmetric_count": 0,
+      "stale_count": 0,
+      "clean": true
+    }
+  },
+  "state_space": {},
+  "coverage_preservation": {
+    "baseline_found": true,
+    "baseline_date": "2026-04-08T04:59:04.331Z",
+    "requirements_checked": 0,
+    "regressions": [],
+    "summary": {
+      "total_regressions": 0,
+      "affected_requirements": 0,
+      "clean": true
+    }
+  }
+}

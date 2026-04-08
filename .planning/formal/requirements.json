@@ -1,0 +1,233 @@
+{
+  "project": "zai-tds",
+  "description": "High-performance affiliate traffic distribution system",
+  "version": "1.0.0",
+  "lastSynced": "2026-04-07",
+  "requirements": [
+    {
+      "id": "FEAT-01",
+      "category": "Architecture",
+      "title": "Hierarchical Traffic Routing",
+      "description": "Support Campaign -> Stream -> [Lander] -> Offer structure",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 1
+    },
+    {
+      "id": "FEAT-02",
+      "category": "Architecture",
+      "title": "Stream Tiers",
+      "description": "Implement Forced, Regular, and Default stream types",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 2
+    },
+    {
+      "id": "FEAT-03",
+      "category": "Architecture",
+      "title": "Multi-tier Selection",
+      "description": "Select streams based on priority: Forced (Position) -> Regular (Weight/Position) -> Default",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 2
+    },
+    {
+      "id": "FEAT-04",
+      "category": "Architecture",
+      "title": "Advanced Filtering",
+      "description": "Filter traffic by Geo, Device, Connection, Schedule, and Custom Parameters",
+      "priority": "high",
+      "status": "implemented",
+      "phase": 2
+    },
+    {
+      "id": "FEAT-05",
+      "category": "Architecture",
+      "title": "Rotation Engines",
+      "description": "Weighted rotation for Regular streams, Landers, and Offers",
+      "priority": "high",
+      "status": "pending",
+      "phase": 3
+    },
+    {
+      "id": "FEAT-06",
+      "category": "Architecture",
+      "title": "Action Handlers",
+      "description": "19 action types: HttpRedirect, Meta, DoubleMeta, Js, JsIframe, Frame, Iframe, Curl, RemoteProxy, etc.",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 3
+    },
+    {
+      "id": "FEAT-07",
+      "category": "Architecture",
+      "title": "Macro Substitution",
+      "description": "40+ macros: {click_id}, {subid}, {country}, {device}, {cost}, {payout}, etc.",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 3
+    },
+    {
+      "id": "PERF-01",
+      "category": "Performance",
+      "title": "Throughput",
+      "description": "Sustain 10k+ RPS on single optimized instance",
+      "priority": "medium",
+      "status": "pending",
+      "phase": 7
+    },
+    {
+      "id": "PERF-02",
+      "category": "Performance",
+      "title": "Latency",
+      "description": "Maintain sub-10ms processing latency for hot-path",
+      "priority": "medium",
+      "status": "pending",
+      "phase": 7
+    },
+    {
+      "id": "PERF-03",
+      "category": "Performance",
+      "title": "Resource Efficiency",
+      "description": "Minimize heap allocations to prevent GC pauses",
+      "priority": "medium",
+      "status": "pending",
+      "phase": 7
+    },
+    {
+      "id": "PERF-04",
+      "category": "Performance",
+      "title": "High Availability",
+      "description": "Support stateless pipeline instances with shared Valkey state",
+      "priority": "low",
+      "status": "pending",
+      "phase": 7
+    },
+    {
+      "id": "SEC-01",
+      "category": "Security",
+      "title": "CSPRNG Click IDs",
+      "description": "Generate cryptographically secure click identifiers (24-char hex: 8 timestamp + 16 random)",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 1
+    },
+    {
+      "id": "SEC-02",
+      "category": "Security",
+      "title": "JA3/TLS Fingerprinting",
+      "description": "Extract JA3/JA4/TLS fingerprints for bot detection",
+      "priority": "low",
+      "status": "planned",
+      "phase": 4,
+      "note": "Fields exist in RawClick model, no extraction yet"
+    },
+    {
+      "id": "SEC-03",
+      "category": "Security",
+      "title": "Cloaking / Safe-Page",
+      "description": "Serve safe content to detected bots while redirecting real traffic",
+      "priority": "low",
+      "status": "pending",
+      "phase": 4
+    },
+    {
+      "id": "SEC-04",
+      "category": "Security",
+      "title": "Behavioral Detection",
+      "description": "HideClickDetect, ImkloDetect, JsFingerprint filters with bot score checks",
+      "priority": "high",
+      "status": "implemented",
+      "phase": 4
+    },
+    {
+      "id": "SEC-05",
+      "category": "Security",
+      "title": "IP/CIDR Blacklisting",
+      "description": "Block traffic from known bad IPs/CIDRs",
+      "priority": "high",
+      "status": "implemented",
+      "phase": 4,
+      "note": "Basic implementation exists"
+    },
+    {
+      "id": "DATA-01",
+      "category": "Analytics",
+      "title": "Real-time Analytics",
+      "description": "ClickHouse queue writer with batch inserts",
+      "priority": "high",
+      "status": "implemented",
+      "phase": 5
+    },
+    {
+      "id": "DATA-02",
+      "category": "Analytics",
+      "title": "Postback Processing",
+      "description": "Handler with HMAC validation for affiliate network conversions",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 5
+    },
+    {
+      "id": "DATA-03",
+      "category": "Analytics",
+      "title": "Conversion Attribution",
+      "description": "Token-based attribution via {click_id} macros",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 5
+    },
+    {
+      "id": "DATA-04",
+      "category": "Analytics",
+      "title": "Payout/Cost Tracking",
+      "description": "Cost/payout calculated in pipeline stages 16-17",
+      "priority": "high",
+      "status": "implemented",
+      "phase": 5
+    },
+    {
+      "id": "DATA-05",
+      "category": "Analytics",
+      "title": "Uniqueness Tracking",
+      "description": "Enforce uniqueness limits using Valkey",
+      "priority": "high",
+      "status": "implemented",
+      "phase": 2
+    },
+    {
+      "id": "MGMT-01",
+      "category": "Management",
+      "title": "Admin API",
+      "description": "26 files: handlers for campaigns, streams, offers, landings, networks, domains, sources, users, bots, settings, reports, postbacks",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 6
+    },
+    {
+      "id": "MGMT-02",
+      "category": "Management",
+      "title": "Metadata Storage",
+      "description": "PostgreSQL for persistent configuration storage",
+      "priority": "critical",
+      "status": "implemented",
+      "phase": 1
+    },
+    {
+      "id": "MGMT-03",
+      "category": "Management",
+      "title": "Dashboard",
+      "description": "Web interface for campaign management and analytics",
+      "priority": "high",
+      "status": "pending",
+      "phase": 6
+    }
+  ],
+  "summary": {
+    "total": 24,
+    "implemented": 16,
+    "in_progress": 1,
+    "pending": 6,
+    "planned": 1
+  }
+}

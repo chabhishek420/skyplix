@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "generated_at": "2026-04-08T05:16:42.347Z",
+    "generator": "analyze-state-space",
+    "version": "1.0",
+    "thresholds": {
+      "MINIMAL": 1000,
+      "LOW": 100000,
+      "MODERATE": 10000000
+    }
+  },
+  "models": {},
+  "summary": {
+    "total_models": 0,
+    "by_risk": {
+      "MINIMAL": 0,
+      "LOW": 0,
+      "MODERATE": 0,
+      "HIGH": 0
+    },
+    "unbounded_count": 0,
+    "models_without_cfg": 0
+  },
+  "cross_model": {
+    "budget": {
+      "max_tlc_seconds": 300,
+      "throughput_states_per_sec": 10000,
+      "max_merged_states": 3000000
+    },
+    "pairs": [],
+    "summary": {
+      "total_pairs_analyzed": 0,
+      "merge_recommended": 0,
+      "interface_contract_needed": 0
+    }
+  }
+}
