@@ -1,47 +1,114 @@
 {
   "version": "1.0",
-  "timestamp": "2026-04-06T16:04:43.779Z",
-  "phase": "07",
-  "phase_name": "production-hardening",
-  "phase_dir": ".planning/phases/07-production-hardening",
+  "timestamp": "2026-04-10T14:06:02.523Z",
+  "phase": "8",
+  "phase_name": "layer-parity",
+  "phase_dir": ".planning/phases/8-layer-parity",
   "plan": 1,
-  "task": 1,
-  "total_tasks": 1,
+  "task": 4,
+  "total_tasks": 5,
   "status": "paused",
   "completed_tasks": [
     {
       "id": 1,
-      "name": "Postback Signature Hardening",
+      "name": "Detect active context and select handoff target",
       "status": "done",
-      "commit": "9561034b"
+      "commit": ""
+    },
+    {
+      "id": 2,
+      "name": "Verify layer-parity implementation from live code (not docs)",
+      "status": "done",
+      "commit": ""
+    },
+    {
+      "id": 3,
+      "name": "Run build and automated test checks",
+      "status": "done",
+      "commit": ""
+    },
+    {
+      "id": 4,
+      "name": "Assess launch readiness blockers",
+      "status": "in_progress",
+      "progress": "Code-level features and tests pass, but launch blockers remain (production config, full E2E proof, dirty workspace)."
     }
   ],
-  "remaining_tasks": [],
-  "blockers": [],
-  "human_actions_pending": [],
+  "remaining_tasks": [
+    {
+      "id": 5,
+      "name": "Finalize go/no-go with end-to-end 5-layer validation evidence",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Production config is not launch-safe: system.debug=true and system.salt is placeholder in config.yaml.",
+      "type": "technical",
+      "workaround": "Prepare production config/secrets and set debug=false before release."
+    },
+    {
+      "description": "Full paid-ad to final-conversion E2E path was not executed against live services in this session.",
+      "type": "external",
+      "workaround": "Run staged/manual E2E with PostgreSQL/Valkey/ClickHouse and real redirect/pixel paths."
+    },
+    {
+      "description": "Repository has 685 uncommitted changes (many unrelated deletions/edits), increasing release risk.",
+      "type": "human_action",
+      "workaround": "Isolate verification branch/clean worktree before launch decision."
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Set production-safe config values and secrets",
+      "context": "Launch cannot be approved with debug=true and placeholder salt.",
+      "blocking": true
+    },
+    {
+      "action": "Run/record manual E2E validation across all 5 layers",
+      "context": "Automated tests pass, but launch readiness needs full click-to-conversion path proof.",
+      "blocking": true
+    },
+    {
+      "action": "Decide canonical planning path between 8-layer-parity and 08-layer-parity",
+      "context": "Dual phase directories create resumption ambiguity.",
+      "blocking": false
+    }
+  ],
   "decisions": [
     {
-      "decision": "Signed postbacks must fail closed if salt is missing or lookup fails",
-      "rationale": "Avoid silent security downgrade where attackers can supply sig but bypass validation",
-      "phase": "07"
+      "decision": "Treat docs/reports as untrusted and verify against live code and test execution.",
+      "rationale": "Existing planning docs contain contradictions and placeholders.",
+      "phase": "8"
     },
     {
-      "decision": "Admin UI authenticates via JWT login endpoint and stores auth_token",
-      "rationale": "Align UI with backend auth middleware and remove manual X-Api-Key header dependence",
-      "phase": "06"
+      "decision": "Use .planning/phases/8-layer-parity as handoff location.",
+      "rationale": "It is the most recently active phase path with an existing .continue-here.md.",
+      "phase": "8"
+    },
+    {
+      "decision": "Mark launch readiness as blocked until production config and E2E evidence are complete.",
+      "rationale": "Passing unit/build checks alone is insufficient for launch decision.",
+      "phase": "8"
     }
   ],
-  "uncommitted_files": [],
-  "next_action": "Start a new milestone (or append Phase 08+) and plan the next work.",
-  "context_notes": "Milestone v1.0 is complete and gsd-tools reports 100% plans. This pause-work handoff is for clean resumption across sessions.",
-  "constraints": [
-    {
-      "severity": "advisory",
-      "description": "When writing markdown via shell heredocs, avoid unquoted heredocs/backticks because the shell will expand $VARS and `...` and can corrupt files. Use a quoted heredoc (<<'EOF') or escape backticks."
-    },
-    {
-      "severity": "advisory",
-      "description": "admin-ui/.gitignore originally ignored the path 'logs' broadly; avoid generic ignore patterns that shadow source directories (use /logs for top-level log folders)."
-    }
-  ]
+  "uncommitted_files": [
+    "685 total changed paths in worktree",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md",
+    ".planning/config.json",
+    "config.yaml",
+    "internal/action/proxy.go",
+    "internal/pipeline/stage/3_build_raw_click.go",
+    "internal/pipeline/stage/11_choose_landing.go",
+    "internal/pipeline/stage/12_choose_offer.go",
+    "internal/pipeline/stage/13_generate_token.go",
+    "internal/pipeline/stage/cloak_decision.go",
+    "internal/server/server.go",
+    "internal/server/routes.go",
+    ".planning/phases/8-layer-parity/PLAN.md",
+    ".planning/phases/8-layer-parity/.continue-here.md"
+  ],
+  "next_action": "Resume by producing a strict layer-by-layer launch verdict with explicit PASS/BLOCK for each layer, then run/record missing E2E checks.",
+  "context_notes": "Verification was re-started from scratch due stale/outdated docs. Code-level parity signals are strong for layers 1-4, but launch decision is intentionally blocked pending production-safe config and end-to-end evidence."
 }
