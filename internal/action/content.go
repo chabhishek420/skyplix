@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 // FrameAction — Display the redirect URL inside a full-screen iframe.
@@ -45,12 +48,31 @@ func (a *ShowTextAction) Execute(w http.ResponseWriter, r *http.Request, ctx *Ac
 }
 
 // LocalFileAction — Serve a file from local disk.
+// Restricted to the 'data/landers' directory for safety.
 type LocalFileAction struct{}
 func (a *LocalFileAction) Type() string { return "LocalFile" }
 func (a *LocalFileAction) Execute(w http.ResponseWriter, r *http.Request, ctx *ActionContext) error {
-	if path, ok := ctx.Stream.ActionPayload["path"].(string); ok {
-		http.ServeFile(w, r, path)
+	path, ok := ctx.Stream.ActionPayload["path"].(string)
+	if !ok || path == "" {
+		return nil
 	}
+
+	// Safety: Ensure path is relative and within data/landers
+	cleanPath := filepath.Clean(path)
+	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil
+	}
+
+	fullPath := filepath.Join("data", "landers", cleanPath)
+
+	// If directory, append index.html
+	fi, err := os.Stat(fullPath)
+	if err == nil && fi.IsDir() {
+		fullPath = filepath.Join(fullPath, "index.html")
+	}
+
+	http.ServeFile(w, r, fullPath)
 	return nil
 }
 
@@ -74,7 +96,8 @@ func (a *DoNothingAction) Execute(w http.ResponseWriter, r *http.Request, ctx *A
 type CurlAction struct{}
 func (a *CurlAction) Type() string { return "Curl" }
 func (a *CurlAction) Execute(w http.ResponseWriter, r *http.Request, ctx *ActionContext) error {
-	// Synchronous external fetch. Reserved for safe page usage.
+	// Synchronous external fetch.
+	// Note: RemoteProxyAction is generally preferred for production.
 	resp, err := http.Get(ctx.RedirectURL)
 	if err != nil {
 		return err

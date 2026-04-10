@@ -2,6 +2,7 @@ package macro
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"net/url"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 
 	replacements := []string{
 		"{click_id}", click.ClickToken,
+		"{subid}", click.ClickToken, // Keitaro alias
+		"{tid}", click.ClickToken,   // Keitaro alias
 		"{campaign_id}", campaign.ID.String(),
 		"{campaign_name}", url.QueryEscape(campaign.Name),
 		"{stream_id}", click.StreamID.String(),
@@ -40,6 +43,7 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 		"{visitor_code}", url.QueryEscape(click.VisitorCode),
 		"{connection_type}", url.QueryEscape(click.ConnectionType),
 		"{carrier}", url.QueryEscape(click.Carrier),
+		"{operator}", url.QueryEscape(click.Carrier), // Keitaro alias
 		"{brand}", url.QueryEscape(click.Brand),
 		"{model}", url.QueryEscape(click.DeviceModel),
 		"{is_bot}", fmt.Sprintf("%t", click.IsBot),
@@ -61,6 +65,7 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 		"{cost}", fmt.Sprintf("%.4f", click.Cost),
 		"{payout}", fmt.Sprintf("%.4f", click.Payout),
 		"{timestamp}", fmt.Sprintf("%d", time.Now().Unix()),
+		"{date}", time.Now().Format("2006-01-02"), // Keitaro macro
 		"{random}", randomHex(8),
 	}
 
@@ -74,6 +79,10 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 }
 
 func randomHex(n int) string {
-	// Simple random hex generator
-	return fmt.Sprintf("%x", time.Now().UnixNano())[:n]
+	const charset = "0123456789abcdef"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = charset[rand.IntN(len(charset))]
+	}
+	return string(b)
 }

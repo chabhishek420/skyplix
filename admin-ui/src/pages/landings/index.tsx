@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
-import { FileBox, Link as LinkIcon, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { FileBox, Link as LinkIcon, Trash2, ExternalLink, Edit3 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 
@@ -13,6 +14,45 @@ type Landing = {
 };
 
 const columnHelper = createColumnHelper<Landing>();
+
+function ActionsCell({ id, url }: { id: string, url: string }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/landings/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['landings'] }),
+  });
+
+  return (
+    <div className="flex justify-end space-x-1">
+      <button
+        onClick={() => navigate(`/landings/${id}`)}
+        className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Edit"
+      >
+        <Edit3 className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(url);
+        }}
+        className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy URL"
+      >
+        <LinkIcon className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => {
+          if (confirm('Are you sure you want to delete this landing page?')) {
+            deleteMutation.mutate();
+          }
+        }}
+        className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
 const columns = [
   columnHelper.accessor('name', {
@@ -38,28 +78,17 @@ const columns = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: '',
-    cell: () => (
-      <div className="flex justify-end space-x-1">
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Copy URL">
-          <LinkIcon className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/5 rounded-md" title="Clone">
-          <Copy className="w-4 h-4" />
-        </button>
-        <button className="p-2 text-muted-foreground hover:text-destructive transition-colors hover:bg-destructive/5 rounded-md" title="Delete">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    ),
+    cell: info => <ActionsCell id={info.getValue()} url={info.row.original.url} />,
   }),
 ];
 
 export function Landings() {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['landings'],
     queryFn: async () => {
       const res = await api.get('/landings');
-      return res.data;
+      return res.data || [];
     }
   });
 
@@ -69,7 +98,7 @@ export function Landings() {
         title="Landings"
         description="Landing pages for Level 1 → Level 2 click conversion."
         icon={FileBox}
-        onAdd={() => console.log('Add Landing')}
+        onAdd={() => navigate('/landings/new')}
         addLabel="Create Landing"
       />
       

@@ -54,6 +54,13 @@ services:
       context: .
     ports:
       - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          memory: 1G
     environment:
       - DATABASE_URL=postgres://zai:zai_dev_pass@postgres:5432/zai_tds
       - VALKEY_URL=valkey:6379

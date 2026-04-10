@@ -40,7 +40,7 @@ func NewEngine() *Engine {
 		// Network (network.go)
 		&IpFilter{}, &Ipv6Filter{}, &IspFilter{}, &OperatorFilter{}, &ConnectionTypeFilter{}, &ProxyFilter{}, &IspBlacklistFilter{},
 		// Traffic (traffic.go)
-		&ReferrerFilter{}, &EmptyReferrerFilter{}, &ReferrerStopwordFilter{}, &UrlTokenFilter{}, &LanguageFilter{}, &UserAgentFilter{},
+		&ReferrerFilter{}, &EmptyReferrerFilter{}, &ReferrerStopwordFilter{}, &UrlTokenFilter{}, &UrlContainsFilter{}, &UrlNotContainsFilter{}, &LanguageFilter{}, &UserAgentFilter{},
 		// Tracking (tracking.go)
 		&UniquenessFilter{}, &LimitFilter{}, &IntervalFilter{},
 		// Parameters (params.go)

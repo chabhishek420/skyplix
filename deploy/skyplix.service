@@ -1,0 +1,16 @@
+[Unit]
+Description=SkyPlix TDS Service
+After=network.target postgresql.service valkey.service
+
+[Service]
+Type=simple
+User=skyplix
+Group=skyplix
+WorkingDirectory=/app
+ExecStart=/app/zai-tds
+Restart=always
+RestartSec=5
+Environment=CONFIG_PATH=/app/config.yaml
+
+[Install]
+WantedBy=multi-user.target

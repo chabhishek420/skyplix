@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { 
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { Megaphone, Plus, Link as LinkIcon, Trash2, Copy, Filter, ArrowUpDown } from 'lucide-react';
+import { Megaphone, Plus, Link as LinkIcon, Trash2, Filter, ArrowUpDown, Edit3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 type Campaign = {
@@ -16,9 +17,50 @@ type Campaign = {
   clicks?: number;
   conversions?: number;
   revenue?: number;
+  alias?: string;
 };
 
 const columnHelper = createColumnHelper<Campaign>();
+
+function ActionsCell({ id, alias }: { id: string, alias: string }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/campaigns/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns-with-stats'] }),
+  });
+
+  return (
+    <div className="flex justify-center space-x-1">
+      <button
+        onClick={() => navigate(`/campaigns/${id}`)}
+        className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Edit"
+      >
+        <Edit3 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => {
+          const url = `${window.location.origin}/${alias}`;
+          navigator.clipboard.writeText(url);
+        }}
+        className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL"
+      >
+        <LinkIcon className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => {
+          if (confirm('Are you sure you want to delete this campaign?')) {
+            deleteMutation.mutate();
+          }
+        }}
+        className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
 
 const columns = [
   columnHelper.accessor('name', {
@@ -35,41 +77,51 @@ const columns = [
       </Badge>
     ),
   }),
-  columnHelper.accessor('id', {
-    id: 'stats',
-    header: () => <div className="text-right">Performance</div>,
-    cell: () => (
-      <div className="flex justify-end items-center gap-4 tabular-nums text-[13px]">
-        <div className="text-slate-500"><span className="text-slate-900 font-semibold">12.4k</span> <span className="text-[10px] uppercase font-bold text-slate-400">Clicks</span></div>
-        <div className="text-slate-500"><span className="text-slate-900 font-semibold">412</span> <span className="text-[10px] uppercase font-bold text-slate-400">Conv</span></div>
-      </div>
-    ),
+  columnHelper.accessor('clicks', {
+    header: () => <div className="text-right whitespace-nowrap">Clicks</div>,
+    cell: info => <div className="text-right tabular-nums font-medium text-slate-600">{info.getValue()?.toLocaleString() || 0}</div>,
+  }),
+  columnHelper.accessor('conversions', {
+    header: () => <div className="text-right whitespace-nowrap">Conv.</div>,
+    cell: info => <div className="text-right tabular-nums font-medium text-slate-600">{info.getValue()?.toLocaleString() || 0}</div>,
+  }),
+  columnHelper.accessor('revenue', {
+    header: () => <div className="text-right whitespace-nowrap">Revenue</div>,
+    cell: info => <div className="text-right tabular-nums font-bold text-slate-900">${info.getValue()?.toLocaleString() || '0.00'}</div>,
   }),
   columnHelper.accessor('id', {
     id: 'actions',
     header: () => <div className="text-center">Actions</div>,
-    cell: () => (
-      <div className="flex justify-center space-x-1">
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL">
-          <LinkIcon className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
-          <Copy className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    ),
+    cell: info => <ActionsCell id={info.getValue()} alias={(info.row.original as any).alias} />,
   }),
 ];
 
 export function Campaigns() {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
-    queryKey: ['campaigns'],
+    queryKey: ['campaigns-with-stats'],
     queryFn: async () => {
-      const res = await api.get('/campaigns');
-      return (res.data || []) as Campaign[];
+      // Fetch both campaigns and stats to merge them
+      const [campaignsRes, statsRes] = await Promise.all([
+        api.get('/campaigns'),
+        api.get('/reports?group_by=campaign')
+      ]);
+
+      const campaigns = campaignsRes.data || [];
+      const statsRows = statsRes.data?.rows || [];
+
+      // Optimize join performance with a Map for O(1) lookups
+      const statsMap = new Map(statsRows.map((s: any) => [s.dimensions.campaign, s]));
+
+      return campaigns.map((c: any) => {
+        const s = statsMap.get(c.id) as any;
+        return {
+          ...c,
+          clicks: s?.clicks || 0,
+          conversions: s?.conversions || 0,
+          revenue: s?.revenue || 0,
+        };
+      });
     }
   });
 
@@ -93,7 +145,10 @@ export function Campaigns() {
             <Filter className="w-3.5 h-3.5" />
             <span>Filter</span>
           </button>
-          <button className="flex items-center space-x-2 bg-[#2563eb] text-white px-4 py-1.5 rounded text-[12px] font-bold shadow-sm shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95">
+          <button
+            onClick={() => navigate('/campaigns/new')}
+            className="flex items-center space-x-2 bg-[#2563eb] text-white px-4 py-1.5 rounded text-[12px] font-bold shadow-sm shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
+          >
             <Plus className="w-3.5 h-3.5" />
             <span>Create Campaign</span>
           </button>

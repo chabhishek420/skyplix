@@ -26,6 +26,24 @@ func (f *ReferrerFilter) Match(rc *model.RawClick, payload map[string]interface{
 	return true
 }
 
+type UrlContainsFilter struct{}
+func (f *UrlContainsFilter) Type() string { return "UrlContains" }
+func (f *UrlContainsFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	if val, ok := payload["match"].(string); ok && val != "" {
+		return strings.Contains(strings.ToLower(rc.RawQuery), strings.ToLower(val))
+	}
+	return true
+}
+
+type UrlNotContainsFilter struct{}
+func (f *UrlNotContainsFilter) Type() string { return "UrlNotContains" }
+func (f *UrlNotContainsFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	if val, ok := payload["match"].(string); ok && val != "" {
+		return !strings.Contains(strings.ToLower(rc.RawQuery), strings.ToLower(val))
+	}
+	return true
+}
+
 type ReferrerStopwordFilter struct{}
 func (f *ReferrerStopwordFilter) Type() string { return "ReferrerStopword" }
 func (f *ReferrerStopwordFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {

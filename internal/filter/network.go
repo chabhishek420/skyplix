@@ -43,7 +43,9 @@ type ProxyFilter struct{}
 func (f *ProxyFilter) Type() string { return "Proxy" }
 func (f *ProxyFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
 	if val, ok := payload["is_proxy"].(bool); ok {
-		return rc.IsProxy == val
+		// Matches either explicit proxy flag or Datacenter ASN which usually indicates proxy/VPN
+		isLikelyProxy := rc.IsProxy || rc.IsDatacenter
+		return isLikelyProxy == val
 	}
 	return true
 }

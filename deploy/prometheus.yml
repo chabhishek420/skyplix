@@ -1,8 +1,7 @@
 global:
   scrape_interval: 15s
-  evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'zai-tds'
+  - job_name: 'skyplix'
     static_configs:
       - targets: ['zai-tds:8080']

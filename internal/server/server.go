@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/admin/repository"
 	"github.com/skyplix/zai-tds/internal/analytics"
 	"github.com/skyplix/zai-tds/internal/attribution"
+	"github.com/skyplix/zai-tds/internal/auth"
 
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/botdb"
@@ -56,6 +58,7 @@ type Server struct {
 	adminHandler    *handler.Handler
 	postbackHandler *handler.PostbackHandler
 	reportsHandler  *handler.ReportsHandler
+	authSvc         *auth.Service
 	botDB           *botdb.ValkeyStore
 
 	uaStore         *botdb.UAStore
@@ -171,6 +174,9 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 
 	s.ratelimiter = ratelimit.New(s.valkey, logger)
 
+	// Auth Service (Phase 6)
+	s.authSvc = auth.NewService(s.db, cfg.System.Salt)
+
 	// Admin Handler
 	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
 
@@ -199,6 +205,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	s.workers = worker.NewManager(logger,
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
 		worker.NewSessionJanitorWorker(logger),
+		worker.NewHitLimitResetWorker(s.valkey, logger),
 	)
 
 	// Warmup cache
@@ -216,6 +223,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.DomainRedirectStage{},
 		&stage.CheckPrefetchStage{},
 		&stage.NormalizeIPStage{},
+		&stage.IdentifyVisitorStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
@@ -228,6 +236,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.FindCampaignStage{Cache: s.cache, Logger: logger},
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
+		&stage.UpdateParamsStage{},
 		&stage.CheckParamAliasesStage{Cache: s.cache, Logger: logger},
 		&stage.UpdateGlobalUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.UpdateCampaignUniquenessStage{Session: s.sessionSvc, Logger: logger},
@@ -251,6 +260,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 
 	s.pipelineL2 = pipeline.New(
 		&stage.NormalizeIPStage{},
+		&stage.IdentifyVisitorStage{},
 		&stage.BuildRawClickStage{
 			BotDB:        s.botDB,
 			CustomUA:     s.uaStore,
@@ -261,13 +271,15 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 			IPRateWindow: cfg.System.RateLimitWindow,
 		},
 		&stage.L2FindCampaignStage{LPToken: s.lpTokenSvc, Cache: s.cache, Logger: logger},
+		&stage.UpdateParamsStage{},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.FindAffiliateNetworkStage{Cache: s.cache},
 		&stage.UpdateCostsStage{},
 		&stage.UpdatePayoutStage{},
-		&stage.GenerateTokenStage{},
 		&stage.SetCookieStage{},
 		&stage.ExecuteActionStage{ActionEngine: s.actionEngine, Logger: logger},
+		&stage.PrepareRawClickToStoreStage{},
+		&stage.CheckSendingToAnotherCampaignStage{},
 		&stage.StoreRawClicksStage{ClickChan: clickChan, Attribution: s.attributionSvc},
 	)
 
@@ -287,6 +299,28 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 // Handler returns the HTTP handler (multiplexer) for this server.
 func (s *Server) Handler() http.Handler {
 	return s.http.Handler
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		ApiKey string `json:"api_key"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, `{"error": "invalid request"}`, http.StatusBadRequest)
+		return
+	}
+
+	token, err := s.authSvc.Login(r.Context(), payload.ApiKey)
+	if err != nil {
+		http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"token": token,
+	})
 }
 
 // Run starts the HTTP server. Blocks until ctx is cancelled.

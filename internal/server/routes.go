@@ -11,9 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	"github.com/skyplix/zai-tds/internal/admin"
 	"github.com/skyplix/zai-tds/internal/metrics"
-	"github.com/skyplix/zai-tds/internal/pipeline"
 )
 
 // routes wires all HTTP routes and returns the handler.
@@ -32,13 +30,17 @@ func (s *Server) routes() http.Handler {
 	r.Get("/api/v1/health", s.handleHealth)
 	r.Get("/api/v1/ready", s.handleReady)
 
-	// Public postback endpoint (Phase 5.2)
+	// Public postback and pixel endpoints (Phase 5.2)
 	r.Get("/postback/{key}", s.postbackHandler.HandlePostback)
 	r.Post("/postback/{key}", s.postbackHandler.HandlePostback)
+	r.Get("/pixel.gif", s.postbackHandler.HandlePixel)
+
+	// Login endpoint (Phase 6)
+	r.Post("/api/v1/auth/login", s.handleLogin)
 
 	// Protected Admin API routes
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(admin.APIKeyAuth(s.db))
+		r.Use(s.authSvc.Middleware)
 
 		r.Route("/campaigns", func(r chi.Router) {
 			r.Get("/", s.adminHandler.HandleListCampaigns)
@@ -230,12 +232,8 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 	l := s.logger
 
 	// Using pre-compiled singleton pipeline for Level 1 clicks
-
-	payload := &pipeline.Payload{
-		Ctx:     r.Context(),
-		Request: r,
-		Writer:  w,
-	}
+	payload := s.pipelineL1.GetPayload(r.Context(), r, w)
+	defer s.pipelineL1.PutPayload(payload)
 
 	if err := s.pipelineL1.Run(payload); err != nil {
 		s.logger.Error("pipeline error", zap.Error(err))
@@ -258,6 +256,15 @@ func (s *Server) handleClick(w http.ResponseWriter, r *http.Request) {
 	metrics.HTTPRequestDuration.WithLabelValues("GET", r.URL.Path).Observe(elapsed.Seconds())
 
 	if payload.RawClick != nil && payload.Campaign != nil {
+		alias := payload.Campaign.Alias
+		metrics.CampaignTrafficTotal.WithLabelValues(alias, "click").Inc()
+		if payload.RawClick.IsBot {
+			metrics.CampaignTrafficTotal.WithLabelValues(alias, "bot").Inc()
+		}
+		if payload.RawClick.IsUniqueGlobal {
+			metrics.CampaignTrafficTotal.WithLabelValues(alias, "unique").Inc()
+		}
+
 		l.Info("click processed",
 			zap.String("token", payload.RawClick.ClickToken),
 			zap.Bool("is_bot", payload.RawClick.IsBot),
@@ -273,11 +280,8 @@ func (s *Server) handleClickL2(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	s.logger.Debug("L2 click received", zap.String("url", r.URL.String()), zap.String("token_param", token))
 
-	payload := &pipeline.Payload{
-		Ctx:     r.Context(),
-		Request: r,
-		Writer:  w,
-	}
+	payload := s.pipelineL2.GetPayload(r.Context(), r, w)
+	defer s.pipelineL2.PutPayload(payload)
 
 	if err := s.pipelineL2.Run(payload); err != nil {
 		s.logger.Error("L2 pipeline error", zap.Error(err))

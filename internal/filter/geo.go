@@ -7,6 +7,7 @@ import (
 type CountryFilter struct{}
 func (f *CountryFilter) Type() string { return "Country" }
 func (f *CountryFilter) Match(rc *model.RawClick, payload map[string]interface{}) bool {
+	// Special case: country names are sometimes used instead of codes in UI
 	return matchIncludeExclude(rc.CountryCode, payload)
 }
 

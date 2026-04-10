@@ -3,40 +3,89 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/skyplix/zai-tds/internal/config"
 	"github.com/skyplix/zai-tds/internal/server"
 )
 
-const version = "0.1.0"
+var (
+	version    = "1.0.0"
+	configPath string
+)
 
 func main() {
-	// Load configuration
-	cfgPath := "config.yaml"
-	if v := os.Getenv("CONFIG_PATH"); v != "" {
-		cfgPath = v
+	rootCmd := &cobra.Command{
+		Use:   "zai-tds",
+		Short: "SkyPlix TDS — High-performance Traffic Distribution System",
 	}
 
-	cfg, err := config.Load(cfgPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FATAL: config error: %v\n", err)
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "config.yaml", "Path to configuration file")
+
+	serveCmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start the TDS server",
+		Run:   runServe,
+	}
+
+	migrateCmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Database migration tools",
+	}
+
+	migrateKeitaroCmd := &cobra.Command{
+		Use:   "keitaro",
+		Short: "Migrate metadata from Keitaro (MySQL)",
+		Run:   runMigrateKeitaro,
+	}
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print the version number of SkyPlix TDS",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("SkyPlix TDS v%s\n", version)
+		},
+	}
+
+	migrateCmd.AddCommand(migrateKeitaroCmd)
+	rootCmd.AddCommand(serveCmd, migrateCmd, versionCmd)
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func runMigrateKeitaro(cmd *cobra.Command, args []string) {
+	fmt.Println("Migrate Keitaro command not fully implemented in CLI wrapper yet.")
+	fmt.Println("Use 'go run scripts/migrate_keitaro.go' for now.")
+}
+
+func runServe(cmd *cobra.Command, args []string) {
+	// Load configuration
+	if v := os.Getenv("CONFIG_PATH"); v != "" {
+		configPath = v
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("FATAL: config error: %v", err)
 	}
 
 	// Initialize logger
 	logger, err := newLogger(cfg.System.Debug)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "FATAL: logger init: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("FATAL: logger init: %v", err)
 	}
-	defer logger.Sync() //nolint:errcheck
+	defer logger.Sync()
 
-	logger.Info("ZAI TDS starting",
+	logger.Info("SkyPlix TDS starting",
 		zap.String("version", version),
 		zap.String("addr", cfg.Addr()),
 		zap.Bool("debug", cfg.System.Debug),
@@ -62,7 +111,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("ZAI TDS shutdown complete")
+	logger.Info("SkyPlix TDS shutdown complete")
 }
 
 func newLogger(debug bool) (*zap.Logger, error) {

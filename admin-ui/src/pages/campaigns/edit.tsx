@@ -2,7 +2,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Save, ArrowLeft, Layers } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { StreamEditor } from '@/components/campaigns/stream-editor';
 
 const campaignSchema = z.object({
@@ -10,31 +13,75 @@ const campaignSchema = z.object({
   state: z.enum(['active', 'disabled']),
   cost_type: z.enum(['cpa', 'cpc', 'revshare']),
   cost_value: z.coerce.number().min(0).optional(),
+  bind_visitors: z.boolean().default(false),
+  is_optimization_enabled: z.boolean().default(false),
+  optimization_metric: z.enum(['CR', 'EPC']).default('CR'),
 });
 
 type CampaignFormValues = z.infer<typeof campaignSchema>;
 
 export function CampaignEdit() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'general' | 'streams'>('general');
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { data: campaign, isLoading } = useQuery({
+    queryKey: ['campaign', id],
+    queryFn: async () => {
+      if (!id || id === 'new') return null;
+      const res = await api.get(`/campaigns/${id}`);
+      return res.data;
+    },
+    enabled: !!id && id !== 'new',
+  });
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(campaignSchema),
     defaultValues: { state: 'active', cost_type: 'cpa' }
   });
 
+  useEffect(() => {
+    if (campaign) {
+      reset({
+        name: campaign.name,
+        state: campaign.state,
+        cost_type: campaign.cost_type,
+        cost_value: campaign.cost_value,
+        bind_visitors: campaign.bind_visitors,
+        is_optimization_enabled: campaign.is_optimization_enabled,
+        optimization_metric: campaign.optimization_metric || 'CR',
+      });
+    }
+  }, [campaign, reset]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: CampaignFormValues) => {
+      if (id && id !== 'new') {
+        return api.put(`/campaigns/${id}`, data);
+      }
+      return api.post('/campaigns', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns-with-stats'] });
+      navigate('/campaigns');
+    },
+  });
+
   const onSubmit = (data: CampaignFormValues) => {
-    console.log('Save Campaign', data);
-    // API Call here
+    saveMutation.mutate(data);
   };
+
+  if (isLoading) return <div className="p-12 text-center">Loading campaign...</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors">
+          <button onClick={() => navigate('/campaigns')} className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Edit Campaign</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{id === 'new' ? 'Create' : 'Edit'} Campaign</h1>
         </div>
         <button onClick={handleSubmit(onSubmit)} className="flex items-center space-x-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-md hover:opacity-90 transition-opacity">
           <Save className="w-4 h-4" />
@@ -98,6 +145,34 @@ export function CampaignEdit() {
                 {...register('cost_value')}
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
+            </div>
+
+            <div className="pt-4 space-y-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-semibold text-foreground">Visitor Binding</label>
+                  <p className="text-xs text-muted-foreground">Keep visitors locked to the same stream/offer for 24h.</p>
+                </div>
+                <input type="checkbox" {...register('bind_visitors')} className="w-5 h-5 rounded border-border text-primary focus:ring-primary" />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-semibold text-foreground">Auto-Optimization</label>
+                  <p className="text-xs text-muted-foreground">Automatically adjust stream weights based on performance.</p>
+                </div>
+                <input type="checkbox" {...register('is_optimization_enabled')} className="w-5 h-5 rounded border-border text-primary focus:ring-primary" />
+              </div>
+
+              {campaign?.is_optimization_enabled && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-sm font-medium text-foreground">Optimization Metric</label>
+                  <select {...register('optimization_metric')} className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                    <option value="CR">Conversion Rate (CR)</option>
+                    <option value="EPC">Earnings Per Click (EPC)</option>
+                  </select>
+                </div>
+              )}
             </div>
           </form>
         </div>

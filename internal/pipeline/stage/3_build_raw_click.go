@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"strings"
 	"time"
 
@@ -53,32 +54,19 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	// Referrer
 	rc.Referrer = r.Header.Get("Referer")
 
-	// Sub IDs from query params
-	q := r.URL.Query()
-	rc.RawQuery = r.URL.RawQuery
-	rc.SubID1 = q.Get("sub_id_1")
-	if rc.SubID1 == "" {
-		rc.SubID1 = q.Get("sub1")
-	}
-	rc.SubID2 = q.Get("sub_id_2")
-	if rc.SubID2 == "" {
-		rc.SubID2 = q.Get("sub2")
-	}
-	rc.SubID3 = q.Get("sub_id_3")
-	if rc.SubID3 == "" {
-		rc.SubID3 = q.Get("sub3")
-	}
-	rc.SubID4 = q.Get("sub_id_4")
-	if rc.SubID4 == "" {
-		rc.SubID4 = q.Get("sub4")
-	}
-	rc.SubID5 = q.Get("sub_id_5")
-	if rc.SubID5 == "" {
-		rc.SubID5 = q.Get("sub5")
-	}
+	// Sub IDs from query params (avoiding r.URL.Query() allocations)
+	rawQuery := r.URL.RawQuery
+	rc.RawQuery = rawQuery
+
+	// Fast path for sub_ids using a manual query string scanner to avoid map[string][]string allocation
+	rc.SubID1 = getQueryParam(rawQuery, "sub_id_1", "sub1")
+	rc.SubID2 = getQueryParam(rawQuery, "sub_id_2", "sub2")
+	rc.SubID3 = getQueryParam(rawQuery, "sub_id_3", "sub3")
+	rc.SubID4 = getQueryParam(rawQuery, "sub_id_4", "sub4")
+	rc.SubID5 = getQueryParam(rawQuery, "sub_id_5", "sub5")
 
 	// Cost from query param
-	if costStr := q.Get("cost"); costStr != "" {
+	if costStr := getQueryParam(rawQuery, "cost"); costStr != "" {
 		var cost float64
 		if _, err := parseFloat(costStr, &cost); err == nil {
 			rc.Cost = cost
@@ -94,43 +82,53 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 }
 
 // detectBot runs the basic bot detection checks inline.
-// Returns (true, reason) if any check triggers.
+// Returns (true, reason) if any check triggers or threshold is met.
 func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
-	// 1. Empty User-Agent
+	score := 0
+	reasons := []string{}
+
+	// 1. Empty User-Agent (P0 Critical)
 	if strings.TrimSpace(ua) == "" {
-		return true, "empty_ua"
+		score += 100
+		reasons = append(reasons, "empty_ua")
 	}
 
-	// 2. Known bot UA patterns (case-insensitive substring match)
+	// 2. Known bot UA patterns (P0 Critical)
 	uaLower := strings.ToLower(ua)
 	for _, pattern := range botUAPatterns {
 		if strings.Contains(uaLower, pattern) {
-			return true, fmt.Sprintf("ua_pattern:%s", pattern)
+			score += 90
+			reasons = append(reasons, fmt.Sprintf("ua_pattern:%s", pattern))
+			break
 		}
 	}
 
-	// 3. Known bot IP ranges (hardcoded starter list — fallback/fast-path)
+	// 3. Known bot IP ranges (P0 Critical)
 	if ip != nil {
 		for _, prefix := range botIPPrefixes {
 			if prefix.Contains(ip) {
-				return true, fmt.Sprintf("ip_prefix:%s", prefix.String())
+				score += 95
+				reasons = append(reasons, fmt.Sprintf("ip_prefix:%s", prefix.String()))
+				break
 			}
 		}
 	}
 
-	// 3.5 CIDR Blocklist
+	// 3.5 CIDR Blocklist (P0 Critical)
 	if s.CIDRFilter != nil && ip != nil {
 		if addr, ok := netip.AddrFromSlice(ip); ok {
 			if s.CIDRFilter.ContainsIP(addr.Unmap()) {
-				return true, "cidr_blocklist"
+				score += 95
+				reasons = append(reasons, "cidr_blocklist")
 			}
 		}
 	}
 
-	// 4. Advanced bot IP database (Phase 4 upgrade)
+	// 4. Advanced bot IP database
 	if s.BotDB != nil && ip != nil {
 		if s.BotDB.Contains(ip) {
-			return true, "bot_db_ip"
+			score += 95
+			reasons = append(reasons, "bot_db_ip")
 		}
 	}
 
@@ -139,19 +137,22 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 		customPatterns := s.CustomUA.Patterns()
 		for _, pattern := range customPatterns {
 			if strings.Contains(uaLower, pattern) {
-				return true, fmt.Sprintf("custom_ua:%s", pattern)
+				score += 90
+				reasons = append(reasons, fmt.Sprintf("custom_ua:%s", pattern))
+				break
 			}
 		}
 	}
 
-	// 6. Datacenter/VPN heuristic check (Phase 4 upgrade)
+	// 6. Datacenter/VPN heuristic check
 	if s.Geo != nil && ip != nil {
 		if s.Geo.IsDatacenter(ip) {
-			return true, "datacenter_asn"
+			score += 90
+			reasons = append(reasons, "datacenter_asn")
 		}
 	}
 
-	// 7. Per-IP Rate Limiting (Phase 4 upgrade)
+	// 7. Per-IP Rate Limiting
 	if s.RateLimiter != nil && ip != nil {
 		limit := s.IPRateLimit
 		if limit <= 0 {
@@ -167,16 +168,59 @@ func (s *BuildRawClickStage) detectBot(ip net.IP, ua string) (bool, string) {
 		defer cancel()
 
 		allowed, _, err := s.RateLimiter.CheckIPLimit(ctx, ip, limit, window)
-		if err != nil {
-			// Fail open on rate limiting error
-			return false, ""
-		}
-		if !allowed {
-			return true, "rate_limited"
+		if err == nil && !allowed {
+			score += 20 // Rate limit hit is a minor signal (could be a shared office IP)
+			reasons = append(reasons, "high_velocity")
 		}
 	}
 
+	// Threshold-based classification (Behavioral Scoring)
+	// Score >= 80 is classified as a bot.
+	if score >= 80 {
+		return true, strings.Join(reasons, ",")
+	}
+
 	return false, ""
+}
+
+// getQueryParam manually parses the query string to find a value without allocating a map.
+// It also performs URL unescaping to ensure data integrity.
+func getQueryParam(query, key1 string, optionalKey2 ...string) string {
+	if query == "" {
+		return ""
+	}
+
+	val := findInQuery(query, key1)
+	if val == "" && len(optionalKey2) > 0 {
+		val = findInQuery(query, optionalKey2[0])
+	}
+
+	if val != "" {
+		if decoded, err := url.QueryUnescape(val); err == nil {
+			return decoded
+		}
+	}
+	return val
+}
+
+func findInQuery(query, key string) string {
+	pos := strings.Index(query, key+"=")
+	if pos == -1 {
+		return ""
+	}
+
+	// Ensure it's a full key match (start of string or preceded by &)
+	if pos > 0 && query[pos-1] != '&' {
+		// Substring match, continue search (simple version, could be more robust)
+		return findInQuery(query[pos+len(key):], key)
+	}
+
+	start := pos + len(key) + 1
+	end := strings.IndexByte(query[start:], '&')
+	if end == -1 {
+		return query[start:]
+	}
+	return query[start : start+end]
 }
 
 // parseFloat parses a string to float64 and stores result in dest.
@@ -198,14 +242,15 @@ var botUAPatterns = []string{
 	"curl/", "python-requests", "python-urllib", "go-http-client", "libwww-perl",
 	"wget/", "java/", "scrapy", "headlesschrome", "phantomjs", "selenium", "webdriver",
 	"bot", "crawler", "spider", "scan", "scraper",
-	// Keitaro expansion (Plan 4.2)
+	// Keitaro expansion (Plan 4.2 & final alignment)
 	"advisorbot", "obot", "ezooms", "flipboardproxy", "chtml proxy", "tweetmemebot",
 	"sputnikbot", "webindex", "adsbot", "/bots", "ru_bot", "orangebot",
 	"synapse", "seostats", "owler", "ltx71", "winhttprequest", "pageanalyzer",
 	"openlinkprofiler", "bot for jce", "bubing", "nutch", "megaindex",
 	"coccoc", "sleuth", "cmcm.com", "yandexmobilebot", "google-youtube-links",
 	"mailruconnect", "surveybot", "appengine", "netcraftsurveyagent",
-	"exabot-thumbnails", "bingpreview",
+	"exabot-thumbnails", "bingpreview", "bitlybot", "org_bot", "bot.html", "bot.php", "facebook",
+	"google web preview",
 }
 
 // botIPPrefixes are known datacenter/bot IP ranges (starter list).

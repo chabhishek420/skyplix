@@ -29,10 +29,18 @@ func (s *L2FindCampaignStage) Name() string    { return "L2FindCampaign" }
 func (s *L2FindCampaignStage) AlwaysRun() bool { return false }
 
 func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
-	// Extract LP token from URL param (defined as {token} in routes)
+	// 1. Determine LP token from URL or Query
 	token := chi.URLParam(p.Request, "token")
 	if token == "" {
-		// Brute force fallback: parse from /lp/{token}/click
+		// Fallback 1: Query parameters (common for JS integration)
+		rawQuery := p.Request.URL.RawQuery
+		token = getQueryParam(rawQuery, "sub_id", "click_token")
+		if token == "" {
+			token = getQueryParam(rawQuery, "clickid", "click_id")
+		}
+	}
+	if token == "" {
+		// Fallback 2: Brute force parse from /lp/{token}/click
 		parts := strings.Split(p.Request.URL.Path, "/")
 		if len(parts) >= 3 && parts[1] == "lp" {
 			token = parts[2]
@@ -40,7 +48,7 @@ func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
 	}
 	
 	if token == "" {
-		s.Logger.Warn("L2 click missing token in URL", zap.String("path", p.Request.URL.Path))
+		s.Logger.Warn("L2 click missing token in URL or query", zap.String("path", p.Request.URL.Path))
 		p.Abort = true
 		p.AbortCode = 400
 		return nil
@@ -52,7 +60,7 @@ func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
 	lpCtx, err := s.LPToken.Resolve(p.Ctx, token)
 	if err != nil {
 		s.Logger.Error("failed to resolve LP token", zap.Error(err), zap.String("token", token))
-		return err
+		return fmt.Errorf("resolve lp token: %w", err)
 	}
 	if lpCtx == nil {
 		s.Logger.Warn("LP token not found or expired", zap.String("token", token))
@@ -64,11 +72,11 @@ func (s *L2FindCampaignStage) Process(p *pipeline.Payload) error {
 	// 2. Hydrate campaign and stream
 	camp, err := s.Cache.GetCampaignByID(p.Ctx, lpCtx.CampaignID)
 	if err != nil {
-		return err
+		return fmt.Errorf("get campaign: %w", err)
 	}
 	stream, err := s.Cache.GetStream(p.Ctx, lpCtx.StreamID)
 	if err != nil {
-		return err
+		return fmt.Errorf("get stream: %w", err)
 	}
 
 	if camp == nil || stream == nil {

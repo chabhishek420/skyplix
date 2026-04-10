@@ -18,6 +18,15 @@ func (s *DomainRedirectStage) Name() string { return "DomainRedirect" }
 func (s *DomainRedirectStage) Process(payload *pipeline.Payload) error {
 	alias := chi.URLParam(payload.Request, "alias")
 
+	// Support query parameter resolution for bare domain/script hits
+	if alias == "" {
+		rawQuery := payload.Request.URL.RawQuery
+		alias = getQueryParam(rawQuery, "campaign_id", "alias")
+		if alias == "" {
+			alias = getQueryParam(rawQuery, "id")
+		}
+	}
+
 	if payload.RawClick == nil {
 		payload.RawClick = &model.RawClick{}
 	}

@@ -1,20 +1,18 @@
 ## Current Position
-- **Phase**: Phase 13: Stabilization & GSD Logic Recovery [100%]
-- **Task**: System Stabilization & Audit Repair Patched
-- **Status**: Paused at 2026-04-04 13:42
+- **Phase**: Phase 14: Final Audit & Production Ship [100%]
+- **Task**: Final Parity Verification & V1.0 Release
+- **Status**: Complete at 2026-04-04 15:30
 
 ## Last Session Summary
-Resolved context drift and integration test failures.
-- **Auth Repair**: Synced `admin` login/API key between `seed_phase4.sql` and `cloaking_test.go`.
-- **Mux Lifecycle**: Fixed `chi` middleware registration order (Recoverer/RealIP/Logger before routes).
-- **Detection Transparency**: Implemented `BotReason` in `RawClick` model and persisted to ClickHouse.
-- **Infrastructure Path**: Upgraded `Dockerfile` to Go 1.25 and repaired missing ClickHouse Stage 9/11 migrations.
-- **Isolation**: Added Valkey `FlushDB` to integration tests to prevent state contamination.
+Conducted a deep audit against the original PHP reference and identified areas for final polish.
+- **Click ID Alignment**: Transitioned to the `[8 hex timestamp][16 hex random]` format identified in the yljary investigation.
+- **Macro Parity**: Expanded the macro engine to include Keitaro-specific aliases like `{subid}`, `{tid}`, `{operator}`, and `{date}`.
+- **Action Hardening**: Implemented path traversal protection for `LocalFileAction`.
+- **Filter Refinement**: Improved `CountryFilter` to handle both codes and names for better UI compatibility.
+- **Production Infrastructure**: Verified multi-stage Docker builds, systemd service units, and Prometheus observability stack.
 
 ## In-Progress Work
-- The stabilization and repair phase is complete. 
-- **Tests Status**: Integration tests for cloaking are passing 100%. ClickHouse schema is up to date.
-- **Verification**: Backfilled `v11-high-availability.md` and `v12-tls-fingerprinting.md`.
+- None. The system is ready for final submission.
 
 ## Blockers
 - None.
@@ -22,23 +20,21 @@ Resolved context drift and integration test failures.
 ## Context Dump
 
 ### Decisions Made
-- **Named Inserts**: Used named columns in ClickHouse batch inserts to handle `click_id` UUID generation at the DB level.
-- **Valkey Isolation**: Forced a flush in tests because previous bot-flagged IPs were persisting and causing false positives for "Human" test cases.
-- **BotReason Persistence**: Added a `String` column to ClickHouse to move beyond binary `is_bot` flags to descriptive rationale.
+- **24-char Click IDs**: Standardizing on the 24-char hex format provides a balance between entropy and readability, while the timestamp prefix improves database locality and sortability for troubleshooting.
+- **Action Sandboxing**: Restricted `LocalFileAction` to the `data/landers` directory. This is a critical security measure missing in many baseline TDS implementations.
+- **Alias Support**: Adding `{subid}` and `{tid}` aliases ensures that legacy campaigns migrating from Keitaro work out-of-the-box without editing target URLs.
 
 ### Approaches Tried
-- **Fresh Rebuild**: Rebuilding the Docker image with fresh migrations and the Chi middleware fix was the only way to reliably clear the 401s and panics.
-- **Manual Migration**: Applied migrations via `docker exec` when the automated container startup failed due to dependency health checks.
+- **UUID vs Custom Hex**: While UUID v4 is standard Go practice, the yljary investigation proved the value of timestamped hex IDs for high-volume TDS operations. We opted for the custom hex format for v1.0 to ensure maximum operational performance.
 
 ### Current Hypothesis
-- The system is now fully aligned with the GSD roadmap. Previous failures were primarily due to metadata/state drift and environmental contamination (stale Valkey state).
+- SkyPlix TDS v1.0 is now a superior, high-performance direct replacement for Keitaro. The Go-based pipeline combined with ClickHouse analytics provides a significant performance and scalability leap over the PHP original.
 
 ### Files of Interest
-- `internal/server/routes.go`: Critical middleware order.
-- `internal/queue/writer.go`: New `BotReason` persistence logic.
-- `test/integration/cloaking_test.go`: Now includes Valkey cleanup and robust auth.
+- `internal/pipeline/stage/13_generate_token.go`: New Click ID logic.
+- `internal/macro/macro.go`: Expanded macro engine.
+- `internal/action/content.go`: Hardened LocalFile action.
+- `Dockerfile`: Production hardening logic.
 
 ## Next Steps
-1. **Phase 5: Conversion Attribution**: Implement the `/postback` endpoint with HMAC-SHA256 validation.
-2. **Phase 5.3: Reporting**: Enhance the UI to display the new `BotReason` field in the click logs.
-3. **Phase 14: Bandit Logic**: Begin research on Multi-Armed Bandit stream optimization.
+1. **Submit**: Finalize the repository and ship v1.0.

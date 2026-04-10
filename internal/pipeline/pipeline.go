@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/skyplix/zai-tds/internal/metrics"
@@ -66,12 +67,52 @@ type Payload struct {
 
 // Pipeline runs an ordered slice of stages against a Payload.
 type Pipeline struct {
-	stages []Stage
+	stages      []Stage
+	payloadPool sync.Pool
+	clickPool   sync.Pool
 }
 
 // New creates a Pipeline from the given ordered stages.
 func New(stages ...Stage) *Pipeline {
-	return &Pipeline{stages: stages}
+	return &Pipeline{
+		stages: stages,
+		payloadPool: sync.Pool{
+			New: func() any {
+				return &Payload{}
+			},
+		},
+		clickPool: sync.Pool{
+			New: func() any {
+				return &model.RawClick{}
+			},
+		},
+	}
+}
+
+// GetPayload returns a pooled Payload with an initialized RawClick.
+func (p *Pipeline) GetPayload(ctx context.Context, r *http.Request, w http.ResponseWriter) *Payload {
+	payload := p.payloadPool.Get().(*Payload)
+	click := p.clickPool.Get().(*model.RawClick)
+
+	// Reset structs
+	*payload = Payload{}
+	*click = model.RawClick{}
+
+	payload.Ctx = ctx
+	payload.Request = r
+	payload.Writer = w
+	payload.RawClick = click
+	payload.RawClick.CreatedAt = time.Now().UTC()
+
+	return payload
+}
+
+// PutPayload returns a Payload and its RawClick to their respective pools.
+func (p *Pipeline) PutPayload(payload *Payload) {
+	if payload.RawClick != nil {
+		p.clickPool.Put(payload.RawClick)
+	}
+	p.payloadPool.Put(payload)
 }
 
 // Run executes each stage in order.

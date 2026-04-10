@@ -99,6 +99,24 @@ var (
 		[]string{"operation", "status"}, // operation: "get", "set" | status: "hit", "miss", "error"
 	)
 
+	// Campaign Metrics
+	CampaignTrafficTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "skyplix_campaign_traffic_total",
+			Help: "Total traffic per campaign.",
+		},
+		[]string{"campaign_alias", "type"}, // type: "click", "bot", "unique"
+	)
+
+	// Postback Metrics
+	PostbackProcessedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "skyplix_postback_processed_total",
+			Help: "Total number of postbacks processed.",
+		},
+		[]string{"status"}, // "success", "duplicate", "invalid_key", "invalid_signature", "error"
+	)
+
 	// Dependency Connection Metrics
 	ActiveConnections = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{

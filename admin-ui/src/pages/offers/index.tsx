@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import { Target, Link as LinkIcon, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { Target, Link as LinkIcon, Trash2, ExternalLink, Edit3 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +18,45 @@ type Offer = {
 
 const columnHelper = createColumnHelper<Offer>();
 
-// Explicitly typing the columns array with ColumnDef<T, any>[] to avoid 
-// inference locking the TValue type to only one property type (e.g. number).
+function ActionsCell({ id, url }: { id: string, url: string }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/offers/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['offers'] }),
+  });
+
+  return (
+    <div className="flex justify-center space-x-1">
+      <button
+        onClick={() => navigate(`/offers/${id}`)}
+        className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Edit"
+      >
+        <Edit3 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(url);
+        }}
+        className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL"
+      >
+        <LinkIcon className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => {
+          if (confirm('Are you sure you want to delete this offer?')) {
+            deleteMutation.mutate();
+          }
+        }}
+        className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 const columns: ColumnDef<Offer, any>[] = [
   columnHelper.accessor('name', {
     header: 'Offer Name',
@@ -34,7 +72,7 @@ const columns: ColumnDef<Offer, any>[] = [
   }),
   columnHelper.accessor('payout', {
     header: 'Payout',
-    cell: info => <div className="font-mono text-emerald-600 font-bold tabular-nums">${info.getValue().toFixed(2)}</div>,
+    cell: info => <div className="font-mono text-emerald-600 font-bold tabular-nums text-right px-4">${info.getValue().toFixed(2)}</div>,
   }),
   columnHelper.accessor('state', {
     header: 'Status',
@@ -49,28 +87,17 @@ const columns: ColumnDef<Offer, any>[] = [
   columnHelper.accessor('id', {
     id: 'actions',
     header: () => <div className="text-center">Actions</div>,
-    cell: () => (
-      <div className="flex justify-center space-x-1">
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Copy URL">
-          <LinkIcon className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors hover:bg-slate-50 rounded" title="Clone">
-          <Copy className="w-3.5 h-3.5" />
-        </button>
-        <button className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors hover:bg-rose-50 rounded" title="Delete">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    ),
+    cell: info => <ActionsCell id={info.getValue()} url={info.row.original.url} />,
   }),
 ];
 
 export function Offers() {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['offers'],
     queryFn: async () => {
       const res = await api.get('/offers');
-      return res.data;
+      return res.data || [];
     }
   });
 
@@ -80,7 +107,7 @@ export function Offers() {
         title="Offers"
         description="Target destinations for your traffic flows."
         icon={Target}
-        onAdd={() => console.log('Add Offer')}
+        onAdd={() => navigate('/offers/new')}
         addLabel="Create Offer"
       />
       
