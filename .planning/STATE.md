@@ -2,13 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Enterprise Features
-status: Completed
-last_updated: "2026-04-11T05:18:14Z"
+status: v1.1 milestone complete
+last_updated: "2026-04-11T05:25:21.900Z"
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 4
   completed_plans: 4
+  percent: 100
 ---
 
 # STATE: zai-tds
