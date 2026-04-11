@@ -17,7 +17,7 @@ import (
 // routes wires all HTTP routes and returns the handler.
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
-	
+
 	// Middlewares must be defined before any routes are registered
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
@@ -35,12 +35,20 @@ func (s *Server) routes() http.Handler {
 	r.Post("/postback/{key}", s.postbackHandler.HandlePostback)
 	r.Get("/pixel.gif", s.postbackHandler.HandlePixel)
 
+	// Cloak challenge endpoints (Phase 4)
+	// Serve the detector script explicitly; FileServer with /js prefix can misresolve to /public/js/js/...
+	r.Get("/js/cloak.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "public/js/cloak.js")
+	})
+	r.Post("/js/challenge", s.cloakHandler.HandleChallenge)
+
 	// Login endpoint (Phase 6)
 	r.Post("/api/v1/auth/login", s.handleLogin)
 
 	// Protected Admin API routes
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(s.authSvc.Middleware)
+		r.Use(TenantContextMiddleware)
 
 		r.Route("/campaigns", func(r chi.Router) {
 			r.Get("/", s.adminHandler.HandleListCampaigns)
@@ -98,7 +106,6 @@ func (s *Server) routes() http.Handler {
 				r.Get("/postback_url", s.adminHandler.HandleGeneratePostbackURL)
 			})
 		})
-
 
 		r.Route("/traffic_sources", func(r chi.Router) {
 			r.Get("/", s.adminHandler.HandleListSources)
@@ -164,6 +171,7 @@ func (s *Server) routes() http.Handler {
 	r.Mount("/admin", s.handleSPA())
 
 	// Click traffic routes (hot path)
+	r.Get("/click", s.handleClick)              // Standard click endpoint (Phase 8)
 	r.Get("/lp/{token}/click", s.handleClickL2) // Level 2 (Landing → Offer)
 	r.Get("/{alias}", s.handleClick)            // Level 1 (Campaign → Stream → Redirect)
 	r.Get("/", s.handleClick)                   // Gateway context (bare domain)

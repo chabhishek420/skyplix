@@ -7,6 +7,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// TenantContext carries tenant identity resolved for a single request.
+type TenantContext struct {
+	ID string
+}
+
 // RawClick represents all data collected from a single click request.
 // It is progressively populated as it flows through the pipeline stages.
 // Mirrors Keitaro's Traffic/RawClick.php (~60 fields).
@@ -57,6 +62,9 @@ type RawClick struct {
 	IsUniqueCampaign bool
 	IsUniqueStream   bool
 
+	// --- Primary click identifier (Keitaro sub_id equivalent) ---
+	SubID string
+
 	// --- Traffic source parameters ---
 	SubID1 string
 	SubID2 string
@@ -88,9 +96,9 @@ type RawClick struct {
 	Payout float64
 
 	// --- Phase 9: TLS Fingerprinting ---
-	JA3      string
-	JA4      string
-	TLSHost  string
+	JA3     string
+	JA4     string
+	TLSHost string
 
 	// --- Action result ---
 	ActionType string
@@ -102,17 +110,17 @@ type RawClick struct {
 // Campaign represents a traffic campaign entity.
 // Mirrors Keitaro's Campaign model including 3-tier stream selection fields.
 type Campaign struct {
-	ID                     uuid.UUID
-	Alias                  string
-	Name                   string
-	Type                   CampaignType // POSITION or WEIGHT
-	BindVisitors           bool
-	IsOptimizationEnabled  bool
-	OptimizationMetric     string // 'CR' or 'EPC'
+	ID                      uuid.UUID
+	Alias                   string
+	Name                    string
+	Type                    CampaignType // POSITION or WEIGHT
+	BindVisitors            bool
+	IsOptimizationEnabled   bool
+	OptimizationMetric      string // 'CR' or 'EPC'
 	OptimizationPeriodHours uint
-	State                  string
-	TrafficSourceID        *uuid.UUID
-	DefaultStreamID        *uuid.UUID
+	State                   string
+	TrafficSourceID         *uuid.UUID
+	DefaultStreamID         *uuid.UUID
 }
 
 // CampaignType controls stream selection mode (POSITION = sequential, WEIGHT = weighted random).
@@ -146,7 +154,7 @@ type StreamFilter struct {
 	Payload map[string]interface{} `json:"payload"`
 }
 
-func (s Stream) GetWeight() int    { return s.Weight }
+func (s Stream) GetWeight() int   { return s.Weight }
 func (s Stream) GetID() uuid.UUID { return s.ID }
 
 // StreamType controls the 3-tier selection hierarchy.
@@ -160,15 +168,15 @@ const (
 
 // Offer represents a target affiliate offer.
 type Offer struct {
-	ID                uuid.UUID
-	Name              string
-	URL               string
+	ID                 uuid.UUID
+	Name               string
+	URL                string
 	AffiliateNetworkID *uuid.UUID
-	Payout            float64
-	State             string
+	Payout             float64
+	State              string
 }
 
-func (o Offer) GetWeight() int    { return 100 }
+func (o Offer) GetWeight() int   { return 100 }
 func (o Offer) GetID() uuid.UUID { return o.ID }
 
 // Landing represents a landing page for Level 1 → Level 2 click linking.
@@ -180,7 +188,7 @@ type Landing struct {
 }
 
 func (l Landing) GetID() uuid.UUID { return l.ID }
-func (l Landing) GetWeight() int    { return 100 }
+func (l Landing) GetWeight() int   { return 100 }
 
 // WeightedOffer pairs an offer with its rotation weight.
 type WeightedOffer struct {
@@ -188,7 +196,7 @@ type WeightedOffer struct {
 	Weight int
 }
 
-func (wo WeightedOffer) GetWeight() int    { return wo.Weight }
+func (wo WeightedOffer) GetWeight() int   { return wo.Weight }
 func (wo WeightedOffer) GetID() uuid.UUID { return wo.Offer.ID }
 
 // WeightedLanding pairs a landing with its rotation weight.
@@ -197,7 +205,7 @@ type WeightedLanding struct {
 	Weight  int
 }
 
-func (wl WeightedLanding) GetWeight() int    { return wl.Weight }
+func (wl WeightedLanding) GetWeight() int   { return wl.Weight }
 func (wl WeightedLanding) GetID() uuid.UUID { return wl.Landing.ID }
 
 // AffiliateNetwork represents an affiliate network entity.
@@ -227,9 +235,9 @@ type Domain struct {
 
 // User represents an administrative user.
 type User struct {
-	ID       uuid.UUID
-	Login    string
-	Role     string
-	State    string
-	ApiKey   string // Added in migration 005
+	ID     uuid.UUID
+	Login  string
+	Role   string
+	State  string
+	ApiKey string // Added in migration 005
 }
