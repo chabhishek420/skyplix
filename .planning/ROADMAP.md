@@ -124,7 +124,7 @@
 ### Phases
 
 - [x] **Phase 9: Multi-Tenant Support** - Organization isolation, API keys, and per-tenant rate limits.
-- [ ] **Phase 10: Advanced Analytics** - Real-time dashboards, cohort analysis, and funnel visualization.
+- [x] **Phase 10: Advanced Analytics** - Real-time dashboards, cohort analysis, and funnel visualization.
 - [ ] **Phase 11: Webhook Notifications** - Real-time conversion alerts via webhooks.
 - [ ] **Phase 12: ML Optimization** - AI-based traffic allocation based on performance data.
 
@@ -148,7 +148,7 @@
   1. Dashboard endpoints return near-real-time campaign and stream metrics.
   2. Cohort and funnel views are queryable for configurable date windows.
   3. Core analytics endpoints stay within sub-second response budgets on baseline datasets.
-**Plans**: Not started
+**Plans**: Completed (`10-01-SUMMARY.md`).
 
 ### Phase 11: Webhook Notifications
 **Goal**: Emit reliable real-time conversion notifications to external systems.
@@ -175,6 +175,6 @@
 | Phase | Plans Complete | Status | Completed | Notes |
 |-------|----------------|--------|-----------|-------|
 | 9. Multi-Tenant Support | 1/1 | Completed | 2026-04-11 | Tenant context foundation shipped |
-| 10. Advanced Analytics | 0/1 | Not started | - | |
+| 10. Advanced Analytics | 1/1 | Completed | 2026-04-11 | Tenant-scoped analytics API foundation shipped |
 | 11. Webhook Notifications | 0/1 | Not started | - | |
 | 12. ML Optimization | 0/1 | Not started | - | |

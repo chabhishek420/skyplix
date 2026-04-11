@@ -159,7 +159,11 @@ func (s *Server) routes() http.Handler {
 		// r.Get("/cluster/nodes", s.adminHandler.ListClusterNodes)
 
 		if s.reportsHandler != nil {
-			r.Get("/reports", s.reportsHandler.HandleReport)
+			r.Route("/reports", func(r chi.Router) {
+				r.Get("/", s.reportsHandler.HandleReport)
+				r.Get("/campaigns", s.reportsHandler.HandleCampaignMetrics)
+				r.Get("/streams", s.reportsHandler.HandleStreamMetrics)
+			})
 			r.Route("/logs", func(r chi.Router) {
 				r.Get("/clicks", s.reportsHandler.HandleClicksLog)
 				r.Get("/conversions", s.reportsHandler.HandleConversionsLog)

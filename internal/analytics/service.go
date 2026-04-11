@@ -15,20 +15,39 @@ import (
 
 // Service provides analytics reporting functionality.
 type Service struct {
-	ch     driver.Conn
-	db     *pgxpool.Pool
-	logger *zap.Logger
-	qb     *QueryBuilder
+	ch               driver.Conn
+	db               *pgxpool.Pool
+	logger           *zap.Logger
+	qb               *QueryBuilder
+	reportRepository ReportRepository
 }
 
 // New creates a new analytics service.
 func New(ch driver.Conn, db *pgxpool.Pool, logger *zap.Logger) *Service {
-	return &Service{
+	svc := &Service{
 		ch:     ch,
 		db:     db,
 		logger: logger,
 		qb:     NewQueryBuilder(),
 	}
+	svc.reportRepository = reportRepositoryFunc(svc.GenerateReport)
+	return svc
+}
+
+// NewWithReportRepository creates a service with a custom report repository.
+func NewWithReportRepository(ch driver.Conn, db *pgxpool.Pool, logger *zap.Logger, repository ReportRepository) *Service {
+	svc := New(ch, db, logger)
+	if repository != nil {
+		svc.reportRepository = repository
+	}
+	return svc
+}
+
+func (s *Service) getReportRepository() ReportRepository {
+	if s.reportRepository != nil {
+		return s.reportRepository
+	}
+	return reportRepositoryFunc(s.GenerateReport)
 }
 
 // GenerateReport executes the reporting pipeline and returns aggregated results.
@@ -210,6 +229,46 @@ func (s *Service) GenerateReport(ctx context.Context, q *ReportQuery) (*ReportRe
 			Limit:     q.Limit,
 			Offset:    q.Offset,
 		},
+	}, nil
+}
+
+// GetCampaignMetrics returns tenant-scoped campaign aggregates.
+func (s *Service) GetCampaignMetrics(ctx context.Context, query CampaignMetricsQuery) (*TenantMetricsResponse, error) {
+	if err := query.Validate(); err != nil {
+		return nil, err
+	}
+
+	report, err := s.getReportRepository().GenerateReport(ctx, query.toReportQuery())
+	if err != nil {
+		return nil, fmt.Errorf("generate campaign metrics: %w", err)
+	}
+
+	return &TenantMetricsResponse{
+		TenantID: query.TenantID,
+		Scope:    "campaign",
+		Rows:     report.Rows,
+		Summary:  report.Summary,
+		Meta:     report.Meta,
+	}, nil
+}
+
+// GetStreamMetrics returns tenant-scoped stream aggregates.
+func (s *Service) GetStreamMetrics(ctx context.Context, query StreamMetricsQuery) (*TenantMetricsResponse, error) {
+	if err := query.Validate(); err != nil {
+		return nil, err
+	}
+
+	report, err := s.getReportRepository().GenerateReport(ctx, query.toReportQuery())
+	if err != nil {
+		return nil, fmt.Errorf("generate stream metrics: %w", err)
+	}
+
+	return &TenantMetricsResponse{
+		TenantID: query.TenantID,
+		Scope:    "stream",
+		Rows:     report.Rows,
+		Summary:  report.Summary,
+		Meta:     report.Meta,
 	}, nil
 }
 
