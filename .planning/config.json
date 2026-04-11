@@ -1,5 +1,25 @@
 {
+  "model_profile": "balanced",
+  "commit_docs": true,
+  "search_gitignored": false,
+  "branching_strategy": "none",
+  "phase_branch_template": "gsd/phase-{phase}-{slug}",
+  "milestone_branch_template": "gsd/{milestone}-{slug}",
+  "additional_protected_branches": [],
+  "quick_branch_template": "nf/quick-{number}-{slug}",
+  "research": true,
+  "plan_checker": true,
+  "verifier": true,
+  "parallelization": true,
+  "brave_search": false,
+  "auto_advance": true,
+  "nyquist_validation": true,
+  "model_tier_planner": "opus",
+  "model_tier_worker": "sonnet",
+  "milestone_version": "v1.0",
+  "milestone_name": "foundation-and-scale",
   "workflow": {
-    "discuss_mode": "discuss"
+    "_auto_chain_active": false,
+    "nyquist_validation": true
   }
 }

@@ -14,7 +14,7 @@ import (
 
 // HandleListStreams returns all streams for a specific campaign.
 func (h *Handler) HandleListStreams(w http.ResponseWriter, r *http.Request) {
-	campaignID, err := h.parseUUID(chi.URLParam(r, "campaign_id"))
+	campaignID, err := h.parseUUID(chi.URLParam(r, "id"))
 	if err != nil {
 		h.respondError(w, http.StatusBadRequest, "invalid campaign id")
 		return

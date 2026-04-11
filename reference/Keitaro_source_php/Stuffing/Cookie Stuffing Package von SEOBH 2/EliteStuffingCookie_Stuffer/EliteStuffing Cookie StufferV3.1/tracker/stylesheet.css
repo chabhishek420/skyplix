@@ -1,0 +1,57 @@
+<style type="text/css">
+body {background-color:Black; background-repeat:no-repeat; background-position:center center; background-attachment:fixed;}
+
+.blackbook0 {
+background-color:Black; color:White;
+border:2px solid; border-color:Black;
+width:800px; height:50px; overflow:hidden;
+position:absolute; z-index:2; left:50%; top:0%;
+margin-left:-400px; margin-top:690px; text-align:center;
+visibility:visible;}
+
+.blackbook1 {
+background-image:url("http://www.blackhatcookie.com/banner.jpg");
+background-color:Black; color:#C0C0C0;
+border:0px solid; border-color:Black;
+width:800px; height:78px; overflow:hidden;
+position:absolute; z-index:2; left:50%; top:0%;
+margin-left:-400px; margin-top:100px; text-align:center;
+visibility:visible;}
+
+.blackbook2 {
+background-color:Black; color:#C0C0C0;
+border:0px solid; border-color:Black;
+width:720px; height:75px; overflow:hidden;
+position:absolute; z-index:2; left:50%; top:0%;
+margin-left:-400px; margin-top:250px; text-align:left;
+visibility:visible;}
+
+.blackbook3 {
+background-color:Black; color:#C0C0C0;
+border:0px solid; border-color:Black;
+width:800px; height:200px; overflow:auto;
+position:absolute; z-index:2; left:50%; top:0%;
+margin-left:-400px; margin-top:325px; text-align:center;
+visibility:visible;}
+
+.blackbook4 {
+background-color:Black; color:#C0C0C0;
+border:0px solid; border-color:Black;
+width:720px; height:150px; overflow:auto;
+position:absolute; z-index:2; left:50%; top:0%;
+margin-left:-300px; margin-top:225px; text-align:center;
+visibility:visible;}
+
+.blackbook5 {
+background-color:Black; color:#C0C0C0;
+border:0px solid; border-color:Black;
+width:600px; height:78px; overflow:hidden;
+position:absolute; z-index:2; left:50%; top:0%;
+margin-left:-300px; margin-top:178px; text-align:center;
+visibility:visible;}
+
+table {border: 1px solid; border-color #C0C0C0; color: #C0C0C0;}
+td {border: 1px solid; border-color #C0C0C0; color: #C0C0C0;}
+a {color: #C0C0C0}
+
+</style>

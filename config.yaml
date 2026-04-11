@@ -25,3 +25,5 @@ system:
   salt: "change-me-in-production-min-32-chars"
   debug: true
   log_level: "info"
+  allow_change_referrer: true
+  bad_traffic_action: "Status404"

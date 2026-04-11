@@ -16,10 +16,15 @@ func Replace(targetURL string, click *model.RawClick, campaign *model.Campaign) 
 		return ""
 	}
 
+	subID := click.SubID
+	if subID == "" {
+		subID = click.ClickToken
+	}
+
 	replacements := []string{
 		"{click_id}", click.ClickToken,
-		"{subid}", click.ClickToken, // Keitaro alias
-		"{tid}", click.ClickToken,   // Keitaro alias
+		"{subid}", subID, // Keitaro alias
+		"{tid}", subID, // Keitaro alias
 		"{campaign_id}", campaign.ID.String(),
 		"{campaign_name}", url.QueryEscape(campaign.Name),
 		"{stream_id}", click.StreamID.String(),

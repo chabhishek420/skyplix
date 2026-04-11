@@ -52,6 +52,11 @@ type Payload struct {
 	// Visitor identification
 	VisitorCode string
 
+	// Action payload URL with injected tracking params (_token, _subid)
+	// Set by GenerateTokenStage after token generation for redirect actions.
+	// Stage 20 uses this instead of resolving from stream.ActionPayload.
+	ActionPayloadURL string
+
 	// Final response (set by ExecuteActionStage)
 	Response *Response
 

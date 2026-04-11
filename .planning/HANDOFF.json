@@ -3,7 +3,7 @@
   "timestamp": "2026-04-10T14:06:02.523Z",
   "phase": "8",
   "phase_name": "layer-parity",
-  "phase_dir": ".planning/phases/8-layer-parity",
+  "phase_dir": ".planning/phases/08-layer-parity",
   "plan": 1,
   "task": 4,
   "total_tasks": 5,
@@ -68,11 +68,6 @@
       "action": "Run/record manual E2E validation across all 5 layers",
       "context": "Automated tests pass, but launch readiness needs full click-to-conversion path proof.",
       "blocking": true
-    },
-    {
-      "action": "Decide canonical planning path between 8-layer-parity and 08-layer-parity",
-      "context": "Dual phase directories create resumption ambiguity.",
-      "blocking": false
     }
   ],
   "decisions": [
@@ -82,8 +77,8 @@
       "phase": "8"
     },
     {
-      "decision": "Use .planning/phases/8-layer-parity as handoff location.",
-      "rationale": "It is the most recently active phase path with an existing .continue-here.md.",
+      "decision": "Use .planning/phases/08-layer-parity as canonical handoff location.",
+      "rationale": "Canonical phase path after cleanup.",
       "phase": "8"
     },
     {
@@ -106,9 +101,9 @@
     "internal/pipeline/stage/cloak_decision.go",
     "internal/server/server.go",
     "internal/server/routes.go",
-    ".planning/phases/8-layer-parity/PLAN.md",
-    ".planning/phases/8-layer-parity/.continue-here.md"
+    ".planning/phases/08-layer-parity/PLAN.md",
+    ".planning/archive/legacy-phase-dirs/8-layer-parity-2026-04-10/.continue-here.md"
   ],
-  "next_action": "Resume by producing a strict layer-by-layer launch verdict with explicit PASS/BLOCK for each layer, then run/record missing E2E checks.",
+  "next_action": "Continue with launch-readiness E2E checks if needed.",
   "context_notes": "Verification was re-started from scratch due stale/outdated docs. Code-level parity signals are strong for layers 1-4, but launch decision is intentionally blocked pending production-safe config and end-to-end evidence."
 }

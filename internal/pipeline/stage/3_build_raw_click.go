@@ -1,6 +1,6 @@
 /*
  * MODIFIED: internal/pipeline/stage/3_build_raw_click.go
- * PURPOSE: Extracts request data into RawClick. Added nil-check for 
+ * PURPOSE: Extracts request data into RawClick. Added nil-check for
  *          RawClick initialization to prevent panics in L2 pipelines.
  */
 package stage
@@ -24,6 +24,7 @@ import (
 //   - Empty UA check
 //   - UA pattern match (known crawlers/bots)
 //   - IP blocklist check (upgraded in Phase 4 with botdb)
+//   - ?referrer= URL parameter override (if allow_change_referrer is enabled)
 type BuildRawClickStage struct {
 	BotDB       interface{ Contains(net.IP) bool }
 	CustomUA    interface{ Patterns() []string }
@@ -32,12 +33,13 @@ type BuildRawClickStage struct {
 	RateLimiter interface {
 		CheckIPLimit(context.Context, net.IP, int, time.Duration) (bool, int64, error)
 	}
-	IPRateLimit  int
-	IPRateWindow time.Duration
+	IPRateLimit         int
+	IPRateWindow        time.Duration
+	AllowChangeReferrer bool
 }
 
 func (s *BuildRawClickStage) AlwaysRun() bool { return false }
-func (s *BuildRawClickStage) Name() string { return "BuildRawClick" }
+func (s *BuildRawClickStage) Name() string    { return "BuildRawClick" }
 
 func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	r := payload.Request
@@ -51,12 +53,33 @@ func (s *BuildRawClickStage) Process(payload *pipeline.Payload) error {
 	// User Agent
 	rc.UserAgent = r.Header.Get("User-Agent")
 
-	// Referrer
+	// Referrer (initial - may be overridden below)
 	rc.Referrer = r.Header.Get("Referer")
 
 	// Sub IDs from query params (avoiding r.URL.Query() allocations)
 	rawQuery := r.URL.RawQuery
 	rc.RawQuery = rawQuery
+
+	// ?referrer= URL param override (spoof referrer for affiliate tracking)
+	if s.AllowChangeReferrer {
+		if urlReferrer := getQueryParam(rawQuery, "referrer"); urlReferrer != "" {
+			rc.Referrer = urlReferrer
+		}
+	}
+
+	// Source attribution parity with Keitaro:
+	// 1) source/src query param
+	// 2) site alias query param
+	// 3) fallback to referrer host
+	if rc.Source == "" {
+		if source := getQueryParam(rawQuery, "source", "src"); source != "" {
+			rc.Source = source
+		} else if site := getQueryParam(rawQuery, "site"); site != "" {
+			rc.Source = site
+		} else if refHost := extractReferrerHost(rc.Referrer); refHost != "" {
+			rc.Source = refHost
+		}
+	}
 
 	// Fast path for sub_ids using a manual query string scanner to avoid map[string][]string allocation
 	rc.SubID1 = getQueryParam(rawQuery, "sub_id_1", "sub1")
@@ -205,6 +228,24 @@ func findInQuery(query, key string) string {
 		return query[start:]
 	}
 	return query[start : start+end]
+}
+
+func extractReferrerHost(rawReferrer string) string {
+	if strings.TrimSpace(rawReferrer) == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(rawReferrer)
+	if err != nil {
+		return ""
+	}
+
+	host := strings.TrimSpace(parsed.Hostname())
+	if host == "" {
+		host = strings.TrimSpace(parsed.Host)
+	}
+
+	return host
 }
 
 // parseFloat parses a string to float64 and stores result in dest.

@@ -8,10 +8,12 @@ package stage
 import (
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	actionpkg "github.com/skyplix/zai-tds/internal/action"
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/cache"
 	"github.com/skyplix/zai-tds/internal/filter"
@@ -27,6 +29,9 @@ type ChooseStreamStage struct {
 	Rotator *rotator.Rotator
 	Binding *binding.Service
 	Logger  *zap.Logger
+	// BadTrafficAction is the global fallback action for bot-flagged traffic.
+	// Stream-level override is supported via action_payload.bad_traffic_action.
+	BadTrafficAction string
 }
 
 func (s *ChooseStreamStage) Name() string    { return "ChooseStream" }
@@ -128,11 +133,47 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 func (s *ChooseStreamStage) selectAndBind(p *pipeline.Payload, stream *model.Stream) {
 	// Create a heap-escaping copy to ensure the pointer survives pipeline transitions
 	selected := *stream
+	if p.RawClick != nil && p.RawClick.IsBot {
+		s.applyBadTrafficPolicy(&selected)
+	}
+
 	p.Stream = &selected
 	p.RawClick.StreamID = selected.ID
 	p.RawClick.CampaignID = selected.CampaignID
 
-	if p.Campaign.BindVisitors && p.VisitorCode != "" && s.Binding != nil {
+	if p.Campaign != nil && p.Campaign.BindVisitors && p.VisitorCode != "" && s.Binding != nil {
 		s.Binding.SetBinding(p.Ctx, p.VisitorCode, "stream", p.Campaign.ID, selected.ID)
+	}
+}
+
+func (s *ChooseStreamStage) applyBadTrafficPolicy(stream *model.Stream) {
+	if stream == nil {
+		return
+	}
+
+	if stream.ActionPayload != nil {
+		if override, ok := stream.ActionPayload["bad_traffic_action"].(string); ok && strings.TrimSpace(override) != "" {
+			stream.ActionType = strings.TrimSpace(override)
+			return
+		}
+	}
+
+	if isSafeTrafficAction(stream.ActionType) {
+		return
+	}
+
+	actionType := strings.TrimSpace(s.BadTrafficAction)
+	if actionType == "" {
+		actionType = "Status404"
+	}
+	stream.ActionType = actionType
+}
+
+func isSafeTrafficAction(actionType string) bool {
+	switch actionpkg.CanonicalKey(actionType) {
+	case "safepage", "status404":
+		return true
+	default:
+		return false
 	}
 }

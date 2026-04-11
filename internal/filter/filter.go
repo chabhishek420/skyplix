@@ -25,7 +25,6 @@ type Engine struct {
 	filters map[string]Filter
 }
 
-// NewEngine creates and registers all 27 filter types.
 func NewEngine() *Engine {
 	e := &Engine{
 		filters: make(map[string]Filter),
@@ -48,7 +47,7 @@ func NewEngine() *Engine {
 		// Schedule (schedule.go)
 		&ScheduleFilter{},
 		// Detection (detection.go)
-		&IsBotFilter{}, &HideClickDetectFilter{}, &ImkloDetectFilter{},
+		&IsBotFilter{}, &HideClickDetectFilter{}, &ImkloDetectFilter{}, &JsFingerprintFilter{},
 	)
 
 	return e

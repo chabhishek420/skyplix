@@ -75,7 +75,7 @@ func (s *ChooseOfferStage) Process(p *pipeline.Payload) error {
 
 	// 4. Bind
 	if p.Campaign != nil && p.Campaign.BindVisitors && p.VisitorCode != "" && s.Binding != nil {
-		s.Binding.SetBinding(p.Ctx, p.VisitorCode, "offer", p.Stream.ID, selected.ID)
+		s.Binding.SetBinding(p.Ctx, p.VisitorCode, "offer", p.Campaign.ID, selected.ID)
 	}
 
 	return nil

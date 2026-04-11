@@ -22,6 +22,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+require github.com/refraction-networking/utls v1.8.2 // indirect
+
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/ClickHouse/ch-go v0.71.0 // indirect

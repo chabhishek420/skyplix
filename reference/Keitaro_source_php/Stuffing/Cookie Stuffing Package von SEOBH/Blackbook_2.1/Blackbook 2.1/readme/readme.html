@@ -1,0 +1,56 @@
+
+
+
+
+
+<center><font size=6>Create Database</font><br>
+<img src="create_database.jpg"><hr>
+
+
+<font size=6>Import SQL</font><br>
+Click on the Import Tab of your new database<br>
+Click Browse and Select database.sql in the tracker folder<br>
+<img src="import_sql.jpg"><br>
+Database Installation is complete.<hr>
+
+
+<font size=6>Upload all files in the tracker folder to the root of your server.</font><br>be sure that you keep your directory structure intact.<br>The final resulting structure should look like http://www.yourdomain.com/tracker/*trackerfiles*<hr>
+
+
+<font size=6>Now open up code.txt.</font><br><br>
+
+Place <font color=red>include "./tracker/functions.php";</font> af the top of your index.php file right after <font color=red>&lt;?php</font><br>
+Place <font color=red>bhcookie();</font> anywhere after the &lt;body&gt; tag in your php file.  In most php files, its after a header() type function.<hr>
+
+<font size=6>Its now time to edit configure.php</font><br>
+Place the appropriate values for your sql server.  Once this is completed your ready to roll.<hr>
+
+<font size=6>USING BLACKBOOK</font><br>
+First we start by browsing to <font color=red>http://www.yourdomain.com/tracker/index.php</font><br>
+<img src=start.jpg><br><br>
+
+Then we have to enter our first affiliate by clicking add a new affiliate<br>
+Once that is done, you can add your first affiliate link.<br>
+Place your affiliate url in the first box, place your affiliate banner in the second box and set the CTR you wish to restrict it to<br>
+Thats it.  Anytime anyone goes to your front page, it will stuff cookies whenever they come from a url on your safe referer list.<br><br>
+
+Once you start getting traffic you can click on view referer list to add new referers to your safe referers list.<br>
+<strong>By default, nobody is on your safe referer list so it will appear to not be working.  Once you start to get traffic, simply add referers to your safe referers list.</strong>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</center>

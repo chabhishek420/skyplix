@@ -25,6 +25,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/binding"
 	"github.com/skyplix/zai-tds/internal/botdb"
 	"github.com/skyplix/zai-tds/internal/cache"
+	"github.com/skyplix/zai-tds/internal/cloak"
 	"github.com/skyplix/zai-tds/internal/config"
 	"github.com/skyplix/zai-tds/internal/device"
 	"github.com/skyplix/zai-tds/internal/filter"
@@ -74,6 +75,8 @@ type Server struct {
 	bindingSvc     *binding.Service
 	lpTokenSvc     *lptoken.Service
 	attributionSvc *attribution.Service
+	cloakHandler   *cloak.Handler
+	cloakDetector  *cloak.Detector
 
 	pipelineL1 *pipeline.Pipeline
 	pipelineL2 *pipeline.Pipeline
@@ -203,6 +206,10 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		s.reportsHandler = handler.NewReportsHandler(logger, analyticsSvc)
 	}
 
+	// Cloak Handler (Phase 4.4)
+	s.cloakDetector = cloak.NewDetector(cfg.System.VPNAPI)
+	s.cloakHandler = cloak.NewHandler(s.cloakDetector, logger, "public/js")
+
 	// Workers (AUDIT FIX #5)
 
 	s.workers = worker.NewManager(logger,
@@ -228,14 +235,16 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.NormalizeIPStage{},
 		&stage.IdentifyVisitorStage{},
 		&stage.BuildRawClickStage{
-			BotDB:        s.botDB,
-			CustomUA:     s.uaStore,
-			Geo:          s.geo,
-			CIDRFilter:   s.cidrFilter,
-			RateLimiter:  s.ratelimiter,
-			IPRateLimit:  cfg.System.RateLimitPerIP,
-			IPRateWindow: cfg.System.RateLimitWindow,
+			BotDB:               s.botDB,
+			CustomUA:            s.uaStore,
+			Geo:                 s.geo,
+			CIDRFilter:          s.cidrFilter,
+			RateLimiter:         s.ratelimiter,
+			IPRateLimit:         cfg.System.RateLimitPerIP,
+			IPRateWindow:        cfg.System.RateLimitWindow,
+			AllowChangeReferrer: cfg.System.AllowChangeReferrer,
 		},
+		stage.NewCloakDecision(s.cloakDetector, logger),
 		&stage.FindCampaignStage{Cache: s.cache, Logger: logger},
 		&stage.CheckDefaultCampaignStage{},
 		&stage.UpdateRawClickStage{Geo: s.geo, Device: s.device, Logger: logger},
@@ -243,7 +252,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.CheckParamAliasesStage{Cache: s.cache, Logger: logger},
 		&stage.UpdateGlobalUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.UpdateCampaignUniquenessStage{Session: s.sessionSvc, Logger: logger},
-		&stage.ChooseStreamStage{Cache: s.cache, Filter: s.filterEngine, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
+		&stage.ChooseStreamStage{Cache: s.cache, Filter: s.filterEngine, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger, BadTrafficAction: cfg.System.BadTrafficAction},
 		&stage.UpdateStreamUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.ChooseLandingStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
@@ -265,13 +274,14 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.NormalizeIPStage{},
 		&stage.IdentifyVisitorStage{},
 		&stage.BuildRawClickStage{
-			BotDB:        s.botDB,
-			CustomUA:     s.uaStore,
-			Geo:          s.geo,
-			CIDRFilter:   s.cidrFilter,
-			RateLimiter:  s.ratelimiter,
-			IPRateLimit:  cfg.System.RateLimitPerIP,
-			IPRateWindow: cfg.System.RateLimitWindow,
+			BotDB:               s.botDB,
+			CustomUA:            s.uaStore,
+			Geo:                 s.geo,
+			CIDRFilter:          s.cidrFilter,
+			RateLimiter:         s.ratelimiter,
+			IPRateLimit:         cfg.System.RateLimitPerIP,
+			IPRateWindow:        cfg.System.RateLimitWindow,
+			AllowChangeReferrer: cfg.System.AllowChangeReferrer,
 		},
 		&stage.L2FindCampaignStage{LPToken: s.lpTokenSvc, Cache: s.cache, Logger: logger},
 		&stage.UpdateParamsStage{},

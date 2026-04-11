@@ -1,0 +1,20 @@
+Add the following code to your existing index.php
+
+-----------------------------------------------
+
+after 
+<?php
+
+
+add
+include "./tracker/functions.php";
+
+-----------------------------------------------
+-----------------------------------------------
+
+anywhere in the <body>
+
+add
+bhcookie();
+
+-----------------------------------------------

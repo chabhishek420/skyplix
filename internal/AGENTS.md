@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-04-02 | Updated: 2026-04-02 -->
+<!-- Generated: 2026-04-02 | Updated: 2026-04-06 -->
 
 # internal
 

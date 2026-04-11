@@ -35,10 +35,20 @@ func (s *ChooseLandingStage) Process(p *pipeline.Payload) error {
 	}
 
 	// 1. Check for Visitor Binding
-	if p.Campaign.BindVisitors && p.VisitorCode != "" && s.Binding != nil {
+	if p.Campaign != nil && p.Campaign.BindVisitors && p.VisitorCode != "" && s.Binding != nil {
 		boundID, err := s.Binding.GetBinding(p.Ctx, p.VisitorCode, "landing", p.Campaign.ID)
 		if err == nil && boundID != uuid.Nil {
-			// Find and use (TBD: verification)
+			landings, err := s.Cache.GetLandingsByStream(p.Ctx, p.Stream.ID)
+			if err == nil {
+				for _, wl := range landings {
+					if wl.Landing.ID == boundID && wl.Landing.State == "active" {
+						selected := wl.Landing
+						p.Landing = &selected
+						p.RawClick.LandingID = selected.ID
+						return nil
+					}
+				}
+			}
 		}
 	}
 
@@ -62,9 +72,9 @@ func (s *ChooseLandingStage) Process(p *pipeline.Payload) error {
 	p.Landing = &selected
 	p.RawClick.LandingID = selected.ID
 
-	// Bind
+	// 4. Bind
 	if p.Campaign != nil && p.Campaign.BindVisitors && p.VisitorCode != "" && s.Binding != nil {
-		s.Binding.SetBinding(p.Ctx, p.VisitorCode, "landing", p.Stream.ID, selected.ID)
+		s.Binding.SetBinding(p.Ctx, p.VisitorCode, "landing", p.Campaign.ID, selected.ID)
 	}
 
 	return nil

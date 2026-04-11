@@ -1,4 +1,4 @@
-<!-- Generated: 2026-04-03 | Updated: 2026-04-03 -->
+<!-- Generated: 2026-04-03 | Updated: 2026-04-06 -->
 
 # zai-tds
 
@@ -158,6 +158,22 @@ zai-tds/
 | `zap` | Structured logging |
 | `google/uuid` | UUID generation |
 
+## Anti-Patterns (THIS PROJECT)
+
+### Never Do
+- Never use `log.Println()` — use zap structured logging
+- Never suppress errors with `_` — always return or handle
+- Never store `context.Context` in structs — pass as first parameter
+- Never crash the worker process — handle panics gracefully (`internal/worker/worker.go:34`)
+- Never block click response when channel full — log warning only (`internal/pipeline/stage/23_store_raw_clicks.go:66`)
+- Never send empty `Location` header — Safari retries loop
+
+### Always Do
+- Always use 16-byte IPv6 form for IPv4-mapped addresses (`internal/queue/writer.go:304,454`)
+- Always use `zap.NewNop()` in unit tests for deterministic output
+- Always use build tags (`//go:build integration`) for integration tests
+- Always wrap errors with context: `fmt.Errorf("operation: %w", err)`
+
 ## Conventions
 
 - Configuration via YAML (`config.yaml`)
@@ -165,3 +181,18 @@ zai-tds/
 - Async processing via queue/workers
 - Repository pattern for data access
 - Middleware chaining for cross-cutting concerns
+
+## Entry Points
+
+| File | Purpose |
+|------|---------|
+| `cmd/zai-tds/main.go` | Main TDS service |
+| `cmd/migrate-ch/main.go` | ClickHouse migration tool |
+
+## Build/CI
+
+- **Docker**: `docker-compose up -d` starts all services (PostgreSQL, ClickHouse, Valkey, Prometheus, Grafana)
+- **Static binary**: `CGO_ENABLED=0 go build -o zai-tds cmd/zai-tds/main.go`
+- **systemd**: Production deployment via `deploy/skyplix.service`
+- **No Makefile** — uses docker-compose directly
+- **No GitHub Actions** — CI not configured in main project

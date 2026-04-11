@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -48,11 +49,14 @@ type GeoIPConfig struct {
 }
 
 type SystemConfig struct {
-	Salt     string `yaml:"salt"`
-	Debug           bool          `yaml:"debug"`
-	LogLevel        string        `yaml:"log_level"`
-	RateLimitPerIP  int           `yaml:"rate_limit_per_ip"`
-	RateLimitWindow time.Duration `yaml:"rate_limit_window"`
+	Salt                string        `yaml:"salt"`
+	Debug               bool          `yaml:"debug"`
+	LogLevel            string        `yaml:"log_level"`
+	RateLimitPerIP      int           `yaml:"rate_limit_per_ip"`
+	RateLimitWindow     time.Duration `yaml:"rate_limit_window"`
+	VPNAPI              string        `yaml:"vpn_api"`
+	AllowChangeReferrer bool          `yaml:"allow_change_referrer"`
+	BadTrafficAction    string        `yaml:"bad_traffic_action"`
 }
 
 // Load reads config from yamlPath and applies environment variable overrides.
@@ -91,11 +95,21 @@ func Load(yamlPath string) (*Config, error) {
 	if v := os.Getenv("SYSTEM_SALT"); v != "" {
 		cfg.System.Salt = v
 	}
+	if v := os.Getenv("ALLOW_CHANGE_REFERRER"); v == "true" || v == "1" {
+		cfg.System.AllowChangeReferrer = true
+	}
+	if v := os.Getenv("BAD_TRAFFIC_ACTION"); v != "" {
+		cfg.System.BadTrafficAction = v
+	}
 	if v := os.Getenv("DEBUG"); v == "true" || v == "1" {
 		cfg.System.Debug = true
 	}
 	if v := os.Getenv("LOG_LEVEL"); v != "" {
 		cfg.System.LogLevel = v
+	}
+
+	if strings.TrimSpace(cfg.System.BadTrafficAction) == "" {
+		cfg.System.BadTrafficAction = "Status404"
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -116,10 +130,11 @@ func defaults() *Config {
 			Port: 8080,
 		},
 		System: SystemConfig{
-			LogLevel:        "info",
-			Debug:           false,
-			RateLimitPerIP:  60,
-			RateLimitWindow: time.Minute,
+			LogLevel:         "info",
+			Debug:            false,
+			RateLimitPerIP:   60,
+			RateLimitWindow:  time.Minute,
+			BadTrafficAction: "Status404",
 		},
 		Valkey: ValkeyConfig{
 			DB: 0,

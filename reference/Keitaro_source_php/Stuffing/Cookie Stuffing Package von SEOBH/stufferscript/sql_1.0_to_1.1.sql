@@ -1,0 +1,2 @@
+ALTER TABLE `loginfo` ADD `hit` VARCHAR( 255 ) NOT NULL DEFAULT '0' AFTER `useragent` ,
+ADD `stuff` VARCHAR( 255 ) NOT NULL DEFAULT '0' AFTER `hit` ;

@@ -1,0 +1,4 @@
+RewriteEngine On
+
+RewriteRule ^t/([^/]*)/([^/]*)\.([^/]*) img.php?r=true&campaign=$1&img=$2&ext=$3 [L]
+RewriteRule ^([^/]*)/([^/]*)\.([^/]*) img.php?campaign=$1&img=$2&ext=$3 [L]

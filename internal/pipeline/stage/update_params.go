@@ -11,7 +11,7 @@ import (
 // from the request query string.
 type UpdateParamsStage struct{}
 
-func (s *UpdateParamsStage) Name() string      { return "UpdateParams" }
+func (s *UpdateParamsStage) Name() string    { return "UpdateParams" }
 func (s *UpdateParamsStage) AlwaysRun() bool { return false }
 
 func (s *UpdateParamsStage) Process(p *pipeline.Payload) error {
@@ -51,6 +51,8 @@ func (s *UpdateParamsStage) Process(p *pipeline.Payload) error {
 	}
 	if val := getQueryParam(rawQuery, "source", "src"); val != "" {
 		rc.Source = val
+	} else if val := getQueryParam(rawQuery, "site"); val != "" {
+		rc.Source = val
 	}
 
 	// Extra params mapping (1-10)
@@ -58,16 +60,26 @@ func (s *UpdateParamsStage) Process(p *pipeline.Payload) error {
 		key := fmt.Sprintf("extra_param_%d", i)
 		if val := getQueryParam(rawQuery, key); val != "" {
 			switch i {
-			case 1: rc.ExtraParam1 = val
-			case 2: rc.ExtraParam2 = val
-			case 3: rc.ExtraParam3 = val
-			case 4: rc.ExtraParam4 = val
-			case 5: rc.ExtraParam5 = val
-			case 6: rc.ExtraParam6 = val
-			case 7: rc.ExtraParam7 = val
-			case 8: rc.ExtraParam8 = val
-			case 9: rc.ExtraParam9 = val
-			case 10: rc.ExtraParam10 = val
+			case 1:
+				rc.ExtraParam1 = val
+			case 2:
+				rc.ExtraParam2 = val
+			case 3:
+				rc.ExtraParam3 = val
+			case 4:
+				rc.ExtraParam4 = val
+			case 5:
+				rc.ExtraParam5 = val
+			case 6:
+				rc.ExtraParam6 = val
+			case 7:
+				rc.ExtraParam7 = val
+			case 8:
+				rc.ExtraParam8 = val
+			case 9:
+				rc.ExtraParam9 = val
+			case 10:
+				rc.ExtraParam10 = val
 			}
 		}
 	}

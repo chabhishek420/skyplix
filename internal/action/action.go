@@ -1,6 +1,6 @@
 /*
  * MODIFIED: internal/action/action.go
- * PURPOSE: Implemented case-insensitive (Title Case) normalization for action 
+ * PURPOSE: Implemented case-insensitive (Title Case) normalization for action
  *          registration and lookups to prevent configuration-level casing errors.
  */
 package action
@@ -10,9 +10,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 
 	"github.com/skyplix/zai-tds/internal/model"
 )
@@ -40,6 +37,60 @@ type Engine struct {
 	actions map[string]Action
 }
 
+var actionKeyReplacer = strings.NewReplacer(
+	"_", "",
+	"-", "",
+	" ", "",
+	"\t", "",
+	"\n", "",
+	"\r", "",
+)
+
+// actionAliases maps Keitaro-style names and legacy aliases to canonical engine keys.
+var actionAliases = map[string]string{
+	"http":     "httpredirect",
+	"location": "httpredirect",
+	"campaign": "tocampaign",
+	"group":    "tocampaign",
+}
+
+// redirectActionKeys follows Keitaro redirect-type semantics used by token URL injection.
+var redirectActionKeys = map[string]struct{}{
+	"httpredirect":  {},
+	"meta":          {},
+	"doublemeta":    {},
+	"blankreferrer": {},
+	"js":            {},
+	"jsforiframe":   {},
+	"jsforscript":   {},
+	"formsubmit":    {},
+	"frame":         {},
+	"iframe":        {},
+	"curl":          {},
+	"remote":        {},
+	"spoofreferrer": {},
+}
+
+// CanonicalKey normalizes action names so configuration aliases resolve
+// consistently (for example: blank_referrer, blank-referrer, BlankReferrer).
+func CanonicalKey(actionType string) string {
+	return actionKeyReplacer.Replace(strings.ToLower(strings.TrimSpace(actionType)))
+}
+
+func resolveCanonicalKey(actionType string) string {
+	key := CanonicalKey(actionType)
+	if alias, ok := actionAliases[key]; ok {
+		return alias
+	}
+	return key
+}
+
+// IsRedirectActionType reports whether the provided action name is a redirect-type action.
+func IsRedirectActionType(actionType string) bool {
+	_, ok := redirectActionKeys[resolveCanonicalKey(actionType)]
+	return ok
+}
+
 // NewEngine registers all 19 standard TDS action types.
 func NewEngine() *Engine {
 	e := &Engine{
@@ -52,12 +103,13 @@ func NewEngine() *Engine {
 		&HttpRedirect{}, &MetaAction{}, &DoubleMetaAction{}, &BlankReferrerAction{},
 		&JsAction{}, &JsIframeAction{}, &JsScriptAction{}, &FormSubmitAction{},
 		// content.go
-		&FrameAction{}, &IframeAction{}, &ShowHtmlAction{}, &ShowTextAction{}, 
+		&FrameAction{}, &IframeAction{}, &ShowHtmlAction{}, &ShowTextAction{},
 		&LocalFileAction{}, &Status404Action{}, &DoNothingAction{}, &CurlAction{},
 		// proxy.go
 		NewRemoteProxyAction(0),
+		NewSpoofReferrerAction(),
 		// special.go
-		&SubIdAction{}, &ToCampaignAction{},
+		&SubIdAction{}, &ToCampaignAction{}, &SafePageAction{},
 	)
 
 	return e
@@ -65,13 +117,13 @@ func NewEngine() *Engine {
 
 func (e *Engine) register(actions ...Action) {
 	for _, a := range actions {
-		e.actions[cases.Title(language.Und).String(strings.ToLower(a.Type()))] = a
+		e.actions[resolveCanonicalKey(a.Type())] = a
 	}
 }
 
 // Get looks up an action by type.
 func (e *Engine) Get(actionType string) (Action, bool) {
-	a, ok := e.actions[cases.Title(language.Und).String(strings.ToLower(actionType))]
+	a, ok := e.actions[resolveCanonicalKey(actionType)]
 	return a, ok
 }
 

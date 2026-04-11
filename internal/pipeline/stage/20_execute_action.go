@@ -41,11 +41,14 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 	}
 
 	// 1. Determine target URL hierarchy (Landing > Offer > action_payload)
+	// Use ActionPayloadURL if set (contains _token/_subid injection from stage 13)
 	targetURL := ""
 	if payload.Landing != nil {
 		targetURL = payload.Landing.URL
 	} else if payload.Offer != nil {
 		targetURL = payload.Offer.URL
+	} else if payload.ActionPayloadURL != "" {
+		targetURL = payload.ActionPayloadURL
 	} else if stream.ActionPayload != nil {
 		if url, ok := stream.ActionPayload["url"].(string); ok {
 			targetURL = url
@@ -83,7 +86,7 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 		return fmt.Errorf("execute action %s: %w", stream.ActionType, err)
 	}
 
-	s.Logger.Debug("action executed", 
+	s.Logger.Debug("action executed",
 		zap.String("type", stream.ActionType),
 		zap.String("target_url", targetURL),
 		zap.String("final_url", finalURL),
@@ -92,7 +95,7 @@ func (s *ExecuteActionStage) Process(payload *pipeline.Payload) error {
 	// 4. Mark payload as finished
 	payload.Abort = true
 	payload.RawClick.ActionType = stream.ActionType
-	
+
 	// We set a response placeholder so the pipeline knows we've handled the client
 	payload.Response = &pipeline.Response{
 		StatusCode: http.StatusOK, // Status set by Action.Execute

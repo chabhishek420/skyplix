@@ -135,6 +135,53 @@ func (a *RemoteProxyAction) serveCached(w http.ResponseWriter, entry *cacheEntry
 	_, _ = io.Copy(w, bytes.NewReader(entry.body))
 }
 
+// SpoofReferrerAction — Server-side redirect that spoofs the Referer header.
+// The offer URL is fetched server-side with a fake referrer, then the user is redirected.
+// Use case: Traffic source wants to appear as coming from a specific site.
+type SpoofReferrerAction struct {
+	client *http.Client
+}
+
+func NewSpoofReferrerAction() *SpoofReferrerAction {
+	return &SpoofReferrerAction{
+		client: &http.Client{Timeout: 10 * time.Second},
+	}
+}
+func (a *SpoofReferrerAction) Type() string { return "SpoofReferrer" }
+func (a *SpoofReferrerAction) Execute(w http.ResponseWriter, r *http.Request, ctx *ActionContext) error {
+	// Get spoofed referrer from stream config, default to the offer URL domain
+	var spoofedReferrer string
+	if ctx.Stream != nil {
+		if ref, ok := ctx.Stream.ActionPayload["spoof_referrer"].(string); ok {
+			spoofedReferrer = ref
+		}
+	}
+
+	// Default: use the campaign domain as referrer
+	if spoofedReferrer == "" {
+		spoofedReferrer = ctx.RedirectURL
+	}
+
+	// Fetch the offer server-side with spoofed referrer
+	req, err := http.NewRequestWithContext(r.Context(), "GET", ctx.RedirectURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", r.UserAgent())
+	req.Header.Set("Referer", spoofedReferrer)
+	req.Header.Set("Accept-Language", r.Header.Get("Accept-Language"))
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		http.Redirect(w, r, ctx.RedirectURL, http.StatusFound)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	http.Redirect(w, r, ctx.RedirectURL, http.StatusFound)
+	return nil
+}
+
 func rewriteRelativeURLs(html, baseURL string) string {
 	// Find the base domain including protocol
 	idx := strings.Index(baseURL[8:], "/")

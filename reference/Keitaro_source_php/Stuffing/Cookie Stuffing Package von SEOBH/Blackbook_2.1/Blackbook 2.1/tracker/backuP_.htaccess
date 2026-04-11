@@ -1,0 +1,22 @@
+AuthUserFile /home/brank20/public_html/ebaymysteryauctions/tracker/.htpasswd
+AuthName "Restricted Area" 
+AuthType Basic 
+AuthGroupFile /dev/null 
+<Files index.php>
+require valid-user
+</Files>
+<Files referers.php>
+require valid-user
+</Files>
+<Files add_affiliate.php>
+require valid-user
+</Files>
+<Files add_affiliate_link.php>
+require valid-user
+</Files>
+<Files edit_affiliate_link.php>
+require valid-user
+</Files>
+<Files getlink.php>
+require valid-user
+</Files>
