@@ -34,6 +34,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/ratelimit"
 
 	"github.com/skyplix/zai-tds/internal/lptoken"
+	"github.com/skyplix/zai-tds/internal/optimizer"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 	"github.com/skyplix/zai-tds/internal/pipeline/stage"
 	"github.com/skyplix/zai-tds/internal/queue"
@@ -56,6 +57,7 @@ type Server struct {
 	chWriter        *queue.Writer
 	chReader        driver.Conn
 	workers         *worker.Manager
+	webhookQueue    *worker.WebhookQueue
 	adminHandler    *handler.Handler
 	postbackHandler *handler.PostbackHandler
 	reportsHandler  *handler.ReportsHandler
@@ -70,6 +72,7 @@ type Server struct {
 	cidrFilter     *filter.CIDRFilter
 	sessionSvc     *session.Service
 	rotator        *rotator.Rotator
+	optimizerSvc   *optimizer.Service
 	actionEngine   *action.Engine
 	hitlimitSvc    *hitlimit.Service
 	bindingSvc     *binding.Service
@@ -156,6 +159,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		s.cidrFilter = cidrF
 	}
 	s.rotator = rotator.New()
+	s.optimizerSvc = optimizer.NewDefault(logger)
 	s.actionEngine = action.NewEngine()
 	s.hitlimitSvc = hitlimit.New(s.valkey, logger)
 	s.bindingSvc = binding.New(s.valkey, logger)
@@ -186,6 +190,11 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 	// Admin Handler
 	s.adminHandler = handler.NewHandler(s.db, s.cache, s.botDB, s.uaStore, logger)
 
+	// Webhook delivery pipeline (Phase 11)
+	s.webhookQueue = worker.NewWebhookQueue(5000, logger)
+	webhookRepo := repository.NewWebhookRepository(s.db)
+	webhookDispatcher := worker.NewWebhookDispatcher(s.webhookQueue.Channel(), webhookRepo, nil, logger)
+
 	var convChan chan<- queue.ConversionRecord
 	if s.chWriter != nil {
 		convChan = s.chWriter.ConvChan()
@@ -198,6 +207,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		s.attributionSvc,
 		s.chReader,
 		convChan,
+		s.webhookQueue,
 	)
 
 	// Analytics & Reports (Phase 5.3)
@@ -216,6 +226,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		worker.NewCacheWarmupWorker(s.valkey, s.cache, logger), // AUDIT FIX #2: pass s.cache (upgraded in 3.5)
 		worker.NewSessionJanitorWorker(logger),
 		worker.NewHitLimitResetWorker(s.valkey, logger),
+		webhookDispatcher,
 	)
 
 	// Warmup cache
@@ -252,7 +263,7 @@ func New(cfg *config.Config, logger *zap.Logger, version string) (*Server, error
 		&stage.CheckParamAliasesStage{Cache: s.cache, Logger: logger},
 		&stage.UpdateGlobalUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.UpdateCampaignUniquenessStage{Session: s.sessionSvc, Logger: logger},
-		&stage.ChooseStreamStage{Cache: s.cache, Filter: s.filterEngine, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger, BadTrafficAction: cfg.System.BadTrafficAction},
+		&stage.ChooseStreamStage{Cache: s.cache, Filter: s.filterEngine, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger, Optimizer: s.optimizerSvc, BadTrafficAction: cfg.System.BadTrafficAction},
 		&stage.UpdateStreamUniquenessStage{Session: s.sessionSvc, Logger: logger},
 		&stage.ChooseLandingStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},
 		&stage.ChooseOfferStage{Cache: s.cache, Rotator: s.rotator, Binding: s.bindingSvc, Logger: logger},

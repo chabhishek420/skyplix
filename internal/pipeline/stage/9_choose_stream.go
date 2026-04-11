@@ -1,11 +1,12 @@
 /*
  * MODIFIED: internal/pipeline/stage/9_choose_stream.go
- * PURPOSE: Implemented 3-tier stream selection. Fixed memory safety bug
- *          by using heap-escaping copies for the selected stream.
+ * PURPOSE: Implemented 3-tier stream selection with optional optimizer-assisted
+ *          selection when campaign optimization mode is enabled.
  */
 package stage
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/skyplix/zai-tds/internal/cache"
 	"github.com/skyplix/zai-tds/internal/filter"
 	"github.com/skyplix/zai-tds/internal/model"
+	"github.com/skyplix/zai-tds/internal/optimizer"
 	"github.com/skyplix/zai-tds/internal/pipeline"
 	"github.com/skyplix/zai-tds/internal/rotator"
 )
@@ -29,9 +31,21 @@ type ChooseStreamStage struct {
 	Rotator *rotator.Rotator
 	Binding *binding.Service
 	Logger  *zap.Logger
+	// Optimizer can override weighted stream choice when campaign optimization is enabled.
+	Optimizer streamOptimizer
 	// BadTrafficAction is the global fallback action for bot-flagged traffic.
 	// Stream-level override is supported via action_payload.bad_traffic_action.
 	BadTrafficAction string
+}
+
+type streamOptimizer interface {
+	ChooseStream(
+		ctx context.Context,
+		campaign *model.Campaign,
+		rawClick *model.RawClick,
+		visitorCode string,
+		streams []model.Stream,
+	) (*optimizer.Decision, error)
 }
 
 func (s *ChooseStreamStage) Name() string    { return "ChooseStream" }
@@ -71,7 +85,7 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 
 	// Separate into tiers
 	var forcedIdx, regularIdx []int
-	var defIdx = -1
+	defIdx := -1
 
 	for i, st := range streams {
 		switch st.Type {
@@ -86,7 +100,7 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 
 	sort.Slice(forcedIdx, func(i, j int) bool { return streams[forcedIdx[i]].Position < streams[forcedIdx[j]].Position })
 
-	// Tier 1 — FORCED
+	// Tier 1 - FORCED
 	for _, idx := range forcedIdx {
 		if s.Filter.MatchAll(p.RawClick, streams[idx].Filters) {
 			s.selectAndBind(p, &streams[idx])
@@ -94,7 +108,7 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 		}
 	}
 
-	// Tier 2 — REGULAR
+	// Tier 2 - REGULAR
 	if len(regularIdx) > 0 {
 		if p.Campaign.Type == model.CampaignTypePosition {
 			sort.Slice(regularIdx, func(i, j int) bool { return streams[regularIdx[i]].Position < streams[regularIdx[j]].Position })
@@ -105,21 +119,46 @@ func (s *ChooseStreamStage) Process(p *pipeline.Payload) error {
 				}
 			}
 		} else if p.Campaign.Type == model.CampaignTypeWeight {
-			var matching []interface{}
+			var matchingInterfaces []interface{}
+			matchingStreams := make([]model.Stream, 0, len(regularIdx))
 			for _, idx := range regularIdx {
 				if s.Filter.MatchAll(p.RawClick, streams[idx].Filters) {
-					matching = append(matching, &streams[idx])
+					matchingInterfaces = append(matchingInterfaces, &streams[idx])
+					matchingStreams = append(matchingStreams, streams[idx])
 				}
 			}
-			if len(matching) > 0 {
-				selected := s.Rotator.Pick(matching).(*model.Stream)
+
+			if len(matchingStreams) > 0 {
+				if p.Campaign.IsOptimizationEnabled && s.Optimizer != nil {
+					decision, err := s.Optimizer.ChooseStream(p.Ctx, p.Campaign, p.RawClick, p.VisitorCode, matchingStreams)
+					if err == nil && decision != nil {
+						for i := range matchingStreams {
+							if matchingStreams[i].ID == decision.SelectedStreamID {
+								if s.Logger != nil {
+									s.Logger.Debug(
+										"optimizer selected stream",
+										zap.String("campaign_id", p.Campaign.ID.String()),
+										zap.String("stream_id", decision.SelectedStreamID.String()),
+										zap.String("strategy", decision.Strategy),
+									)
+								}
+								s.selectAndBind(p, &matchingStreams[i])
+								return nil
+							}
+						}
+					} else if err != nil && s.Logger != nil {
+						s.Logger.Warn("optimizer fallback to weighted rotator", zap.Error(err), zap.String("campaign_id", p.Campaign.ID.String()))
+					}
+				}
+
+				selected := s.Rotator.Pick(matchingInterfaces).(*model.Stream)
 				s.selectAndBind(p, selected)
 				return nil
 			}
 		}
 	}
 
-	// Tier 3 — DEFAULT
+	// Tier 3 - DEFAULT
 	if defIdx != -1 {
 		s.selectAndBind(p, &streams[defIdx])
 		return nil

@@ -50,7 +50,7 @@ func TestPostbackHandler_HandlePostback(t *testing.T) {
 		},
 	}
 
-	h := NewPostbackHandler(logger, settings, attrSvc, nil, convChan)
+	h := NewPostbackHandler(logger, settings, attrSvc, nil, convChan, nil)
 
 	t.Run("ValidPostback", func(t *testing.T) {
 		token := uuid.New().String()
@@ -176,7 +176,7 @@ func TestPostbackHandler_HandlePostback(t *testing.T) {
 		mac.Write([]byte(token + "|" + status + "|" + payout))
 		sig := hex.EncodeToString(mac.Sum(nil))
 
-		hNoSalt := NewPostbackHandler(logger, &mockSettings{settings: map[string]string{"tracker.postback_key": "test-key"}}, attrSvc, nil, convChan)
+		hNoSalt := NewPostbackHandler(logger, &mockSettings{settings: map[string]string{"tracker.postback_key": "test-key"}}, attrSvc, nil, convChan, nil)
 
 		w := httptest.NewRecorder()
 		q := url.Values{}
@@ -212,7 +212,7 @@ func TestPostbackHandler_HandlePostback(t *testing.T) {
 		hErrSalt := NewPostbackHandler(logger, &mockSettings{
 			settings: map[string]string{"tracker.postback_key": "test-key", "tracker.postback_salt": "test-salt"},
 			errKeys:  map[string]error{"tracker.postback_salt": fmt.Errorf("boom")},
-		}, attrSvc, nil, convChan)
+		}, attrSvc, nil, convChan, nil)
 
 		w := httptest.NewRecorder()
 		q := url.Values{}

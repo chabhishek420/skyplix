@@ -25,6 +25,7 @@ type Handler struct {
 	domains   *repository.DomainRepository
 	users     *repository.UserRepository
 	settings  *repository.SettingsRepository
+	webhooks  *repository.WebhookRepository
 	botDB     interface {
 		Add(string) error
 		Exclude(string) error
@@ -60,5 +61,6 @@ func NewHandler(db *pgxpool.Pool, cache *cache.Cache, botDB *botdb.ValkeyStore, 
 		domains:   repository.NewDomainRepository(db),
 		users:     repository.NewUserRepository(db),
 		settings:  repository.NewSettingsRepository(db),
+		webhooks:  repository.NewWebhookRepository(db),
 	}
 }

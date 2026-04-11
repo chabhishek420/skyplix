@@ -153,6 +153,15 @@ func (s *Server) routes() http.Handler {
 			})
 		})
 
+		r.Route("/webhooks", func(r chi.Router) {
+			r.Get("/", s.adminHandler.HandleListWebhooks)
+			r.Post("/", s.adminHandler.HandleCreateWebhook)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Put("/", s.adminHandler.HandleUpdateWebhook)
+				r.Delete("/", s.adminHandler.HandleDeleteWebhook)
+			})
+		})
+
 		r.Get("/settings", s.adminHandler.HandleGetSettings)
 		r.Put("/settings", s.adminHandler.HandleUpdateSettings)
 

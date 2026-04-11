@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -56,6 +58,10 @@ func (h *Handler) HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "alias and name are required")
 		return
 	}
+	if err := normalizeCampaignOptimization(&c); err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if err := h.campaigns.Create(r.Context(), &c); err != nil {
 		h.logger.Error("create campaign failed", zap.Error(err))
@@ -81,6 +87,10 @@ func (h *Handler) HandleUpdateCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.ID = id
+	if err := normalizeCampaignOptimization(&c); err != nil {
+		h.respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if err := h.campaigns.Update(r.Context(), &c); err != nil {
 		h.logger.Error("update campaign failed", zap.String("id", id.String()), zap.Error(err))
@@ -174,4 +184,28 @@ func (h *Handler) HandleCloneCampaign(w http.ResponseWriter, r *http.Request) {
 
 	h.cache.ScheduleWarmup()
 	h.respondJSON(w, http.StatusCreated, newCampaign)
+}
+
+func normalizeCampaignOptimization(c *model.Campaign) error {
+	if c == nil {
+		return nil
+	}
+
+	metric := strings.ToUpper(strings.TrimSpace(c.OptimizationMetric))
+	if metric == "" {
+		metric = "CR"
+	}
+	if metric != "CR" && metric != "EPC" {
+		return fmt.Errorf("optimization_metric must be CR or EPC")
+	}
+	c.OptimizationMetric = metric
+
+	if c.OptimizationPeriodHours == 0 {
+		c.OptimizationPeriodHours = 24
+	}
+	if c.OptimizationPeriodHours > 24*30 {
+		return fmt.Errorf("optimization_period_hours must be <= 720")
+	}
+
+	return nil
 }

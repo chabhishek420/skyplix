@@ -41,16 +41,22 @@ type SettingsReader interface {
 	Get(ctx context.Context, key string) (string, error)
 }
 
+// WebhookEventQueue defines minimal enqueue behavior for outbound conversion notifications.
+type WebhookEventQueue interface {
+	Enqueue(event model.WebhookConversionEvent) error
+}
+
 // PostbackHandler receives conversion postbacks and enqueues ConversionRecord writes.
 // It is a public handler secured by a global key (`/postback/{key}`) stored in settings.
 type PostbackHandler struct {
-	logger      *zap.Logger
-	settings    SettingsReader
-	attribution *attribution.Service
-	clickhouse  driver.Conn
-	convChan    chan<- queue.ConversionRecord
-	keyCache    postbackKeyCache
-	saltCache   postbackKeyCache
+	logger       *zap.Logger
+	settings     SettingsReader
+	attribution  *attribution.Service
+	clickhouse   driver.Conn
+	convChan     chan<- queue.ConversionRecord
+	webhookQueue WebhookEventQueue
+	keyCache     postbackKeyCache
+	saltCache    postbackKeyCache
 }
 
 func NewPostbackHandler(
@@ -59,13 +65,15 @@ func NewPostbackHandler(
 	attribution *attribution.Service,
 	clickhouse driver.Conn,
 	convChan chan<- queue.ConversionRecord,
+	webhookQueue WebhookEventQueue,
 ) *PostbackHandler {
 	return &PostbackHandler{
-		logger:      logger,
-		settings:    settings,
-		attribution: attribution,
-		clickhouse:  clickhouse,
-		convChan:    convChan,
+		logger:       logger,
+		settings:     settings,
+		attribution:  attribution,
+		clickhouse:   clickhouse,
+		convChan:     convChan,
+		webhookQueue: webhookQueue,
 		keyCache: postbackKeyCache{
 			cacheTTL: 30 * time.Second,
 		},
@@ -210,6 +218,7 @@ func (h *PostbackHandler) HandlePostback(w http.ResponseWriter, r *http.Request)
 
 	select {
 	case h.convChan <- record:
+		h.enqueueWebhookEvent(r, record)
 		h.respondText(w, http.StatusOK, "ok")
 		metrics.PostbackProcessedTotal.WithLabelValues("success").Inc()
 	default:
@@ -268,6 +277,7 @@ func (h *PostbackHandler) HandlePixel(w http.ResponseWriter, r *http.Request) {
 
 		select {
 		case h.convChan <- record:
+			h.enqueueWebhookEvent(r, record)
 			metrics.PostbackProcessedTotal.WithLabelValues("pixel_success").Inc()
 		default:
 			h.logger.Warn("conversion queue full (pixel) - dropping", zap.String("token", token))
@@ -298,6 +308,62 @@ func (h *PostbackHandler) respondText(w http.ResponseWriter, status int, body st
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(body))
+}
+
+func (h *PostbackHandler) enqueueWebhookEvent(r *http.Request, record queue.ConversionRecord) {
+	if h.webhookQueue == nil || r == nil {
+		return
+	}
+
+	tenantID := resolvePostbackTenantID(r)
+	if tenantID == "" {
+		return
+	}
+
+	event := model.WebhookConversionEvent{
+		EventID:        uuid.NewString(),
+		TenantID:       tenantID,
+		OccurredAt:     record.CreatedAt,
+		ConversionID:   record.ID,
+		ClickToken:     record.ClickToken,
+		CampaignID:     record.CampaignID,
+		StreamID:       record.StreamID,
+		OfferID:        record.OfferID,
+		LandingID:      record.LandingID,
+		CountryCode:    record.CountryCode,
+		Status:         record.Status,
+		Payout:         record.Payout,
+		Revenue:        record.Revenue,
+		ExternalID:     record.ExternalID,
+		ConversionType: record.ConversionType,
+	}
+	if event.OccurredAt.IsZero() {
+		event.OccurredAt = time.Now().UTC()
+	}
+
+	if err := h.webhookQueue.Enqueue(event); err != nil {
+		h.logger.Warn("failed to enqueue webhook event", zap.String("event_id", event.EventID), zap.String("tenant_id", tenantID), zap.Error(err))
+	}
+}
+
+func resolvePostbackTenantID(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+
+	if id := strings.TrimSpace(r.Header.Get(tenantIDHeader)); id != "" {
+		return id
+	}
+
+	if id := strings.TrimSpace(r.Form.Get("tenant_id")); id != "" {
+		return id
+	}
+
+	if id := strings.TrimSpace(r.URL.Query().Get("tenant_id")); id != "" {
+		return id
+	}
+
+	return ""
 }
 
 func (h *PostbackHandler) getPostbackSalt(ctx context.Context) (string, error) {

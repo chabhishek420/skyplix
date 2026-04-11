@@ -1,0 +1,3 @@
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS is_optimization_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS optimization_metric VARCHAR(16) NOT NULL DEFAULT 'CR';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS optimization_period_hours INTEGER NOT NULL DEFAULT 24;

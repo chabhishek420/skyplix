@@ -241,3 +241,36 @@ type User struct {
 	State  string
 	ApiKey string // Added in migration 005
 }
+
+// WebhookEndpoint stores tenant-scoped outbound webhook configuration.
+type WebhookEndpoint struct {
+	ID             uuid.UUID
+	TenantID       string
+	Name           string
+	URL            string
+	Secret         string
+	IsActive       bool
+	MaxRetries     int
+	TimeoutSeconds int
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// WebhookConversionEvent is the payload queued for outbound conversion notifications.
+type WebhookConversionEvent struct {
+	EventID        string
+	TenantID       string
+	OccurredAt     time.Time
+	ConversionID   string
+	ClickToken     string
+	CampaignID     string
+	StreamID       string
+	OfferID        string
+	LandingID      string
+	CountryCode    string
+	Status         string
+	Payout         float64
+	Revenue        float64
+	ExternalID     string
+	ConversionType string
+}

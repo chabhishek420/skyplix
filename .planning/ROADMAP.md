@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 Core TDS** — Phases 1-8 (shipped)
-- 🚧 **v1.1 Enterprise Features** — Phases 9-12 (in progress)
+- ✅ **v1.1 Enterprise Features** — Phases 9-12 (shipped)
 
 <details>
 <summary>Shipped Milestone: v1.0 Core TDS</summary>
@@ -125,8 +125,8 @@
 
 - [x] **Phase 9: Multi-Tenant Support** - Organization isolation, API keys, and per-tenant rate limits.
 - [x] **Phase 10: Advanced Analytics** - Real-time dashboards, cohort analysis, and funnel visualization.
-- [ ] **Phase 11: Webhook Notifications** - Real-time conversion alerts via webhooks.
-- [ ] **Phase 12: ML Optimization** - AI-based traffic allocation based on performance data.
+- [x] **Phase 11: Webhook Notifications** - Real-time conversion alerts via webhooks.
+- [x] **Phase 12: ML Optimization** - AI-based traffic allocation based on performance data.
 
 ### Phase Details
 
@@ -158,7 +158,7 @@
   1. Webhook endpoints can be configured per tenant with secret signing.
   2. Delivery retries and dead-letter behavior are observable and testable.
   3. Conversion events are delivered at-least-once with idempotency guidance.
-**Plans**: Not started
+**Plans**: Completed (`11-01-SUMMARY.md`).
 
 ### Phase 12: ML Optimization
 **Goal**: Add model-assisted traffic allocation with safe rollout controls.
@@ -168,7 +168,7 @@
   1. Optimization mode can be toggled per campaign with clear fallback to deterministic routing.
   2. Allocation decisions are explainable via logged feature inputs and selected outcomes.
   3. Offline/online validation demonstrates measurable lift over baseline rules on sample cohorts.
-**Plans**: Not started
+**Plans**: Completed (`12-01-SUMMARY.md`).
 
 ### Progress Table
 
@@ -176,5 +176,5 @@
 |-------|----------------|--------|-----------|-------|
 | 9. Multi-Tenant Support | 1/1 | Completed | 2026-04-11 | Tenant context foundation shipped |
 | 10. Advanced Analytics | 1/1 | Completed | 2026-04-11 | Tenant-scoped analytics API foundation shipped |
-| 11. Webhook Notifications | 0/1 | Not started | - | |
-| 12. ML Optimization | 0/1 | Not started | - | |
+| 11. Webhook Notifications | 1/1 | Completed | 2026-04-11 | Tenant-scoped webhook delivery with retries shipped |
+| 12. ML Optimization | 1/1 | Completed | 2026-04-11 | Deterministic optimizer bootstrap with safe fallback shipped |

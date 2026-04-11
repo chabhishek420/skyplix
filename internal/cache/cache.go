@@ -43,7 +43,7 @@ func (c *Cache) Warmup(ctx context.Context) error {
 
 	// 1. Load all active campaigns
 	rows, err := c.db.Query(ctx, `
-		SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+		SELECT id, alias, name, type, bind_visitors, is_optimization_enabled, optimization_metric, optimization_period_hours, state, traffic_source_id, default_stream_id
 		FROM campaigns
 		WHERE state = 'active'
 	`)
@@ -57,7 +57,8 @@ func (c *Cache) Warmup(ctx context.Context) error {
 		var camp model.Campaign
 		if err := rows.Scan(
 			&camp.ID, &camp.Alias, &camp.Name, &camp.Type,
-			&camp.BindVisitors, &camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID,
+			&camp.BindVisitors, &camp.IsOptimizationEnabled, &camp.OptimizationMetric, &camp.OptimizationPeriodHours,
+			&camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID,
 		); err != nil {
 			return fmt.Errorf("scan campaign: %w", err)
 		}
@@ -207,9 +208,9 @@ func (c *Cache) GetCampaignByID(ctx context.Context, id uuid.UUID) (*model.Campa
 		// Fallback to DB
 		var camp model.Campaign
 		err := c.db.QueryRow(ctx, `
-			SELECT id, alias, name, type, bind_visitors, state, traffic_source_id, default_stream_id
+			SELECT id, alias, name, type, bind_visitors, is_optimization_enabled, optimization_metric, optimization_period_hours, state, traffic_source_id, default_stream_id
 			FROM campaigns WHERE id = $1
-		`, id).Scan(&camp.ID, &camp.Alias, &camp.Name, &camp.Type, &camp.BindVisitors, &camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID)
+		`, id).Scan(&camp.ID, &camp.Alias, &camp.Name, &camp.Type, &camp.BindVisitors, &camp.IsOptimizationEnabled, &camp.OptimizationMetric, &camp.OptimizationPeriodHours, &camp.State, &camp.TrafficSourceID, &camp.DefaultStreamID)
 		if err != nil {
 			return nil, err
 		}
